@@ -6,7 +6,18 @@
  */
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { type AccessMap, can, homePathFor, type Permission, resolveAccess, ROLE_PRESETS, sanitizeAccess } from "@/domain/access";
+import {
+  type AccessMap,
+  can,
+  homePathFor,
+  isAccessFixed,
+  isCustomAccess,
+  type Permission,
+  resolveAccess,
+  ROLE_PRESETS,
+  sanitizeAccess,
+  storedAccess,
+} from "@/domain/access";
 import { stockSettingsSchema } from "@/domain/schemas";
 import type { StaffRole } from "@/domain/types";
 import { db } from "@/server/db";
@@ -91,6 +102,36 @@ describe("perfis-modelo = regras de antes", () => {
     expect(tampered.fullCpf).toBe(false);
     expect(resolveAccess("SECURITY", "{quebrado")).toEqual(ROLE_PRESETS.SECURITY);
     expect(resolveAccess("ATTENDANT", null)).toEqual(ROLE_PRESETS.ATTENDANT);
+  });
+
+  it("Administrador não tem ajuste por área: nada é gravado e um ajuste antigo não reduz o acesso", () => {
+    const reduced: AccessMap = {
+      modules: { ...ROLE_PRESETS.ADMIN.modules, usuarios: "none", configuracoes: "none", participantes: "view" },
+      fullCpf: false,
+    };
+    expect(isAccessFixed("ADMIN")).toBe(true);
+    expect(storedAccess("ADMIN", reduced)).toBeNull();
+    const legacy = resolveAccess("ADMIN", JSON.stringify(reduced));
+    expect(legacy).toEqual(ROLE_PRESETS.ADMIN);
+    for (const permission of LEGACY) expect(can(legacy, permission), permission).toBe(true);
+    expect(isCustomAccess("ADMIN", JSON.stringify(reduced))).toBe(false);
+  });
+
+  it("Atendimento e Segurança: o modelo vem marcado e dá para ajustar (a mais ou a menos)", () => {
+    for (const role of ["ATTENDANT", "SECURITY"] as const) {
+      expect(isAccessFixed(role)).toBe(false);
+      // Igual ao modelo: nada gravado, acompanha o perfil.
+      expect(storedAccess(role, ROLE_PRESETS[role])).toBeNull();
+      expect(isCustomAccess(role, null)).toBe(false);
+    }
+    const plus: AccessMap = { ...ROLE_PRESETS.ATTENDANT, modules: { ...ROLE_PRESETS.ATTENDANT.modules, colaboradores: "view" } };
+    const saved = storedAccess("ATTENDANT", plus);
+    expect(saved).not.toBeNull();
+    expect(isCustomAccess("ATTENDANT", saved)).toBe(true);
+    expect(can(resolveAccess("ATTENDANT", saved), "viewEmployees")).toBe(true);
+    expect(can(resolveAccess("ATTENDANT", saved), "manageEmployees")).toBe(false);
+    const minus: AccessMap = { ...ROLE_PRESETS.SECURITY, fullCpf: false, modules: { ...ROLE_PRESETS.SECURITY.modules, portaria: "view" } };
+    expect(can(resolveAccess("SECURITY", storedAccess("SECURITY", minus)), "checkIn")).toBe(false);
   });
 });
 
@@ -227,6 +268,46 @@ describe("usuários: permissões, trava do último administrador e senha provis�
       "INVALID_STATE",
     );
     expect(error.message).toMatch(/pelo menos uma pessoa ativa/);
+  });
+
+  it("Administrador é sempre acesso total: criar ou promover ignora ajustes; ajuste antigo gravado não vale", async () => {
+    const reduced: AccessMap = {
+      modules: { ...ROLE_PRESETS.ADMIN.modules, usuarios: "none", configuracoes: "none", participantes: "view" },
+      fullCpf: false,
+    };
+    const novo = await createStaffUser(admin, {
+      name: "Rodrigo Carneiro Admin",
+      email: "rodrigo@teste.local",
+      role: "ADMIN",
+      password: "senha-provisoria-9",
+      access: reduced,
+    });
+    const saved = await row(novo!.userId);
+    expect(saved.permissions).toBeNull();
+    expect(resolveAccess(saved.role, saved.permissions)).toEqual(ROLE_PRESETS.ADMIN);
+
+    // Atendimento com ajuste promovido a administrador: o ajuste some.
+    const tuned: AccessMap = { ...ROLE_PRESETS.ATTENDANT, modules: { ...ROLE_PRESETS.ATTENDANT.modules, colaboradores: "view" } };
+    const joana = await createStaffUser(admin, {
+      name: "Joana Atendimento",
+      email: "joana@teste.local",
+      role: "ATTENDANT",
+      password: "senha-provisoria-8",
+      access: tuned,
+    });
+    expect((await row(joana!.userId)).permissions).not.toBeNull();
+    await updateStaffUser(admin, { userId: joana!.userId, name: "Joana Atendimento", role: "ADMIN", active: true, access: reduced });
+    expect((await row(joana!.userId)).permissions).toBeNull();
+    // De volta a Atendimento sem ajuste: vale o modelo do perfil.
+    await updateStaffUser(admin, { userId: joana!.userId, name: "Joana Atendimento", role: "ATTENDANT", active: true });
+    expect(resolveAccess("ATTENDANT", (await row(joana!.userId)).permissions)).toEqual(ROLE_PRESETS.ATTENDANT);
+
+    // Ajuste antigo gravado num administrador (versão anterior): não reduz nada e não trava a edição do próprio nome.
+    await db.update(user).set({ permissions: JSON.stringify(reduced) }).where(eq(user.id, admin.userId));
+    const legacy = await row(admin.userId);
+    expect(can(resolveAccess(legacy.role, legacy.permissions), "manageUsers")).toBe(true);
+    await updateStaffUser(admin, { userId: admin.userId, name: "Ana Administradora Lima", role: "ADMIN", active: true, access: ROLE_PRESETS.ADMIN });
+    expect(await row(admin.userId)).toMatchObject({ name: "Ana Administradora Lima", permissions: null });
   });
 
   it("administrador pode pedir nova senha; redefinir senha também pede; criar a própria senha libera", async () => {

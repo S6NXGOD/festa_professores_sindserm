@@ -4,7 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
 import type { Executor, Tx } from "@/server/db";
 import { account, session, user } from "@/server/db/schema";
-import { type AccessMap, can, resolveAccess, storedAccess } from "@/domain/access";
+import { type AccessMap, can, isAccessFixed, resolveAccess, sameAccess, storedAccess } from "@/domain/access";
 import type { BootstrapAdminInput, CreateUserInput, UpdateUserInput } from "@/domain/schemas";
 import { bootstrapAdminSchema, createUserSchema, resetPasswordSchema, updateUserSchema } from "@/domain/schemas";
 import { ROLE_LABEL } from "@/domain/labels";
@@ -156,10 +156,19 @@ export async function updateStaffUser(actor: Actor, rawInput: UpdateUserInput) {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('staff_users'))`);
     const [current] = await tx.select().from(user).where(eq(user.id, input.userId)).for("update");
     if (!current) throw new DomainError("NOT_FOUND", "Usuário não encontrado.");
-    // Sem "access" no pedido: mantém as permissões atuais (ajustadas ou do perfil).
-    const permissions = input.access === undefined ? (input.role === current.role ? current.permissions : null) : storedAccess(input.role, input.access);
+    // Administrador: nada gravado (acesso total). Sem "access" no pedido: mantém as permissões atuais
+    // (ajustadas ou do perfil); trocou de perfil sem mandar ajuste: vale o modelo do perfil novo.
+    const permissions = isAccessFixed(input.role)
+      ? null
+      : input.access === undefined
+        ? input.role === current.role
+          ? current.permissions
+          : null
+        : storedAccess(input.role, input.access);
     const isSelf = current.id === actor.userId;
-    if (isSelf && (!input.active || input.role !== current.role || permissions !== current.permissions)) {
+    // Compara o acesso efetivo (um ajuste antigo que não vale mais não conta como mudança).
+    const sameEffectiveAccess = sameAccess(resolveAccess(input.role, permissions), resolveAccess(current.role, current.permissions));
+    if (isSelf && (!input.active || input.role !== current.role || !sameEffectiveAccess)) {
       throw new DomainError("INVALID_STATE", "Você não pode desativar nem alterar as próprias permissões.");
     }
     const managedUsers = current.active && can(resolveAccess(current.role, current.permissions), "manageUsers");

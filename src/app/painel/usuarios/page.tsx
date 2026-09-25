@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/staff/panel-ui";
 import { CreateUserDialog, EditUserDialog, ResetPasswordDialog } from "@/components/staff/user-dialogs";
 import { ToneBadge } from "@/components/status/status-badge";
-import { resolveAccess } from "@/domain/access";
+import { isCustomAccess, resolveAccess } from "@/domain/access";
 import { ROLE_LABEL } from "@/domain/labels";
 import { initials } from "@/lib/text";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,7 @@ export default async function UsersPage() {
                   {u.name}
                   {u.id === actor.userId ? <ToneBadge tone="info">Você</ToneBadge> : null}
                   {!u.active ? <ToneBadge tone="danger">Desativado</ToneBadge> : null}
-                  {u.permissions ? <ToneBadge tone="info">Permissões ajustadas</ToneBadge> : null}
+                  {isCustomAccess(u.role, u.permissions) ? <ToneBadge tone="info">Permissões ajustadas</ToneBadge> : null}
                   {u.mustChangePassword && u.active ? <ToneBadge tone="warning">Senha provisória</ToneBadge> : null}
                 </p>
                 <p className="truncate text-sm text-fg-muted">

@@ -16,6 +16,7 @@ import { writeQrVideo } from "./helpers/qr-video";
 const ADMIN = { name: "Ana Administradora Lima", email: "admin@e2e.test", password: "senha-admin-123" };
 const ATTENDANT = { name: "Paulo Atendente Rocha", email: "atendimento@e2e.test", password: "senha-atend-123" };
 const SECURITY = { name: "Sergio Seguranca Alves", email: "seguranca@e2e.test", password: "senha-segur-123" };
+const EXTRA_ADMIN = { name: "Rodrigo Carneiro Admin", email: "rodrigo@e2e.test", password: "senha-rodri-123" };
 
 const MEMBER = {
   name: "Maria Aparecida Souza",
@@ -765,6 +766,75 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(nav).toContainText("Administração");
       await expect(nav).toContainText("Colaboradores SINDSERM");
       await expect(nav).toContainText("Acesso ao sistema");
+      await context.close();
+    });
+
+    await test.step("novo usuário: Administrador é acesso total (nada a marcar); os outros perfis já vêm marcados e ajustáveis", async () => {
+      const adminContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      const admin = await adminContext.newPage();
+      await login(admin, ADMIN);
+      await admin.goto("/painel/usuarios");
+      await admin.getByRole("button", { name: "Novo usuário" }).click();
+      const editor = admin.getByTestId("access-editor");
+      // Começa em Segurança/Recepção, com o modelo marcado.
+      await expect(editor.getByTestId("role-SECURITY")).toHaveAttribute("aria-checked", "true");
+      await expect(editor.getByTestId("access-portaria-edit")).toHaveAttribute("aria-checked", "true");
+      await expect(editor.getByTestId("access-placar-none")).toHaveAttribute("aria-checked", "true");
+      await expect(editor.getByTestId("access-preset")).toBeVisible();
+      // Atendimento: o modelo dele vem marcado; dá para ajustar e voltar ao perfil.
+      await editor.getByTestId("role-ATTENDANT").click();
+      await expect(editor.getByTestId("access-inscricoes-edit")).toHaveAttribute("aria-checked", "true");
+      await expect(editor.getByTestId("access-fichas-edit")).toHaveAttribute("aria-checked", "true");
+      await expect(editor.getByTestId("access-colaboradores-none")).toHaveAttribute("aria-checked", "true");
+      await expect(editor.getByTestId("access-usuarios-none")).toHaveAttribute("aria-checked", "true");
+      await editor.getByTestId("access-colaboradores-view").click();
+      await expect(editor).toContainText("Personalizado");
+      await editor.getByTestId("access-reset").click();
+      await expect(editor.getByTestId("access-preset")).toBeVisible();
+      await expect(editor.getByTestId("access-colaboradores-none")).toHaveAttribute("aria-checked", "true");
+      // Administrador: nenhuma área para marcar, só o aviso de acesso total.
+      await editor.getByTestId("role-ADMIN").click();
+      await expect(editor.getByTestId("admin-full-access")).toBeVisible();
+      await expect(editor.getByTestId("access-areas")).toHaveCount(0);
+      await expect(editor.getByTestId("access-fullCpf")).toHaveCount(0);
+      await admin.fill("#user-name", EXTRA_ADMIN.name);
+      await admin.fill("#user-email", EXTRA_ADMIN.email);
+      await admin.fill("#user-password", EXTRA_ADMIN.password);
+      await admin.getByTestId("create-user-submit").click();
+      const created = admin.getByTestId("user-row").filter({ hasText: EXTRA_ADMIN.email });
+      await expect(created).toContainText("Administrador");
+      await expect(created).not.toContainText("Permissões ajustadas");
+      // Editar um administrador também não mostra áreas.
+      await admin.getByTestId(`edit-user-${EXTRA_ADMIN.email}`).click();
+      await expect(admin.getByTestId("admin-full-access")).toBeVisible();
+      await expect(admin.getByTestId("access-areas")).toHaveCount(0);
+      await admin.keyboard.press("Escape");
+      await adminContext.close();
+
+      // O novo administrador cria a própria senha e chega a tudo, sem ninguém ter marcado nada.
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await login(page, EXTRA_ADMIN);
+      await expect(page).toHaveURL(/\/painel$/);
+      const nav = page.getByTestId("panel-nav").first();
+      for (const label of [
+        "Placar",
+        "Portaria",
+        "Kits e estoque",
+        "Inscrições",
+        "Fichas de filiação",
+        "Participantes",
+        "Colaboradores SINDSERM",
+        "Acesso ao sistema",
+        "Auditoria",
+        "Configurações",
+      ]) {
+        await expect(nav, label).toContainText(label);
+      }
+      for (const path of ["/painel/usuarios", "/painel/configuracoes", "/painel/auditoria", "/painel/colaboradores", "/painel/kits"]) {
+        await page.goto(path);
+        await expect(page, `Administrador entra em ${path}`).toHaveURL(new RegExp(`${path}$`));
+      }
       await context.close();
     });
 

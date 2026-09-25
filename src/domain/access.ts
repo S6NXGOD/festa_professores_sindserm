@@ -1,9 +1,9 @@
 import type { StaffRole } from "./types";
 
 /*
- * Permissões por área do sistema. Os três perfis (Administrador, Atendimento,
- * Segurança/Recepção) são modelos prontos; o administrador pode ajustar área
- * por área para cada pessoa. O servidor confere tudo a partir deste mapa.
+ * Permissões por área do sistema. Administrador tem acesso total, sem ajuste;
+ * Atendimento e Segurança/Recepção são modelos que podem ser ajustados área por
+ * área para cada pessoa. O servidor confere tudo a partir deste mapa.
  */
 
 export const ACCESS_LEVELS = ["none", "view", "edit"] as const;
@@ -77,7 +77,8 @@ export const MODULE_INFO: Record<AccessModule, { label: string; levels: readonly
 export const ACCESS_LEVEL_LABEL: Record<AccessLevel, string> = {
   none: "Sem acesso",
   view: "Só ver",
-  edit: "Ver e editar",
+  // Editar já inclui ver; o texto curto cabe no botão até nos celulares estreitos.
+  edit: "Editar",
 };
 
 function allModules(level: (module: AccessModule) => AccessLevel): Record<AccessModule, AccessLevel> {
@@ -176,8 +177,19 @@ export function sameAccess(a: AccessMap, b: AccessMap): boolean {
   return a.fullCpf === b.fullCpf && ACCESS_MODULES.every((module) => a.modules[module] === b.modules[module]);
 }
 
+/**
+ * Administrador pode tudo: o perfil já é a permissão, sem ajuste por área
+ * (decisão da organização). Atendimento e Segurança/Recepção partem do modelo
+ * e podem ser ajustados pessoa a pessoa.
+ */
+export function isAccessFixed(role: StaffRole): boolean {
+  return role === "ADMIN";
+}
+
 /** Permissões efetivas: as personalizadas, se houver; senão, as do perfil. */
 export function resolveAccess(role: StaffRole, stored: string | null | undefined): AccessMap {
+  // Ajuste antigo gravado num administrador não reduz nada: vale o acesso total.
+  if (isAccessFixed(role)) return ROLE_PRESETS[role];
   if (stored) {
     try {
       return sanitizeAccess(JSON.parse(stored) as { modules?: Record<string, unknown>; fullCpf?: unknown });
@@ -188,11 +200,16 @@ export function resolveAccess(role: StaffRole, stored: string | null | undefined
   return ROLE_PRESETS[role];
 }
 
-/** Para gravar: nulo quando é igual ao perfil (a pessoa acompanha o modelo). */
+/** Para gravar: nulo quando é igual ao perfil (a pessoa acompanha o modelo) e sempre para administrador. */
 export function storedAccess(role: StaffRole, access: AccessMap | null | undefined): string | null {
-  if (!access) return null;
+  if (!access || isAccessFixed(role)) return null;
   const clean = sanitizeAccess(access);
   return sameAccess(clean, ROLE_PRESETS[role]) ? null : JSON.stringify(clean);
+}
+
+/** A pessoa tem permissões diferentes do modelo do perfil? (administrador, nunca) */
+export function isCustomAccess(role: StaffRole, stored: string | null | undefined): boolean {
+  return !sameAccess(resolveAccess(role, stored), ROLE_PRESETS[role]);
 }
 
 /** Onde a pessoa cai ao entrar: a primeira área que ela pode ver. */

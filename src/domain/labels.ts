@@ -44,9 +44,9 @@ export const ROLE_LABEL: Record<StaffRole, string> = {
 };
 
 export const ROLE_DESCRIPTION: Record<StaffRole, string> = {
-  ADMIN: "Acesso total: configurações, colaboradores do SINDSERM, usuários e auditoria.",
-  ATTENDANT: "Portaria, conferência de filiação, fichas, convidados e kits.",
-  SECURITY: "Somente leitura de QR, pesquisa e registro de entrada.",
+  ADMIN: "Acesso total a todas as áreas. Não precisa marcar nada.",
+  ATTENDANT: "Portaria, conferência de filiação, fichas, convidados e kits. Ajustável.",
+  SECURITY: "Leitura de QR, busca e registro de entrada. Ajustável.",
 };
 
 export const KIT_TYPE_LABEL: Record<KitType, string> = {
