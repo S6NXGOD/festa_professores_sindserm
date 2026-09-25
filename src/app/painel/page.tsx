@@ -28,7 +28,7 @@ import { formatDateTime, formatShortDateTime, formatTime } from "@/lib/datetime"
 import { plural } from "@/lib/plural";
 import { db } from "@/server/db";
 import { getEventInfo, getRegistrationWindow } from "@/server/queries/config";
-import { listVerificationQueue, recentCheckIns } from "@/server/queries/panel";
+import { listAffiliationForms, listVerificationQueue, recentCheckIns } from "@/server/queries/panel";
 import { getCheckInTimeline, getDashboardStats } from "@/server/services/stats";
 import { can } from "@/domain/rules";
 import { requirePageActor } from "@/server/session";
@@ -38,21 +38,40 @@ export const metadata: Metadata = { title: "Placar" };
 export default async function DashboardPage() {
   const actor = await requirePageActor("viewPanel");
   const isAdmin = can(actor.role, "manageEmployees");
-  const [event, window, stats, pending, signatures, checkIns, timeline] = await Promise.all([
+  const [event, window, stats, pending, drafts, checkIns, timeline] = await Promise.all([
     getEventInfo(),
     getRegistrationWindow(),
     getDashboardStats(db),
     listVerificationQueue({ kind: "PENDING", page: 1 }),
-    listVerificationQueue({ kind: "AWAITING_SIGNATURE", page: 1 }),
+    listAffiliationForms({ status: "DRAFT", page: 1 }),
     recentCheckIns(8),
     getCheckInTimeline(db, 6),
   ]);
   const stock = stats.stock;
   const employeePool = stock?.pools.find((pool) => pool.pool === "EMPLOYEE") ?? null;
   const presence = stats.expected > 0 ? Math.round((stats.present / stats.expected) * 100) : 0;
+  // As duas filas do Atendimento, na ordem em que a recepção costuma resolver.
   const queue = [
-    ...signatures.rows.map((row) => ({ ...row, kind: "AWAITING_SIGNATURE" as const })),
-    ...pending.rows.map((row) => ({ ...row, kind: "PENDING" as const })),
+    ...drafts.rows.map((row) => ({
+      key: `ficha-${row.id}`,
+      href: `/painel/filiacoes/${row.id}`,
+      queueHref: "/painel/filiacoes?filtro=assinar",
+      fullName: row.fullName,
+      isTeacher: row.isTeacher,
+      registrationNumber: row.registrationNumber,
+      createdAt: row.createdAt,
+      kind: "SIGNATURE" as const,
+    })),
+    ...pending.rows.map((row) => ({
+      key: `inscricao-${row.registrationId}`,
+      href: `/painel/participantes/${row.personId}`,
+      queueHref: "/painel/inscricoes?filtro=conferir",
+      fullName: row.fullName,
+      isTeacher: row.isTeacher,
+      registrationNumber: row.registrationNumber,
+      createdAt: row.createdAt,
+      kind: "PENDING" as const,
+    })),
   ].slice(0, 6);
 
   return (
@@ -172,8 +191,8 @@ export default async function DashboardPage() {
           testId="stat-guests"
         />
         <StatTile label="Filiados confirmados" value={stats.confirmed} icon={Check} tone="success" testId="stat-confirmed" />
-        <StatTile label="Aguardando conferência" value={stats.pending} icon={Clock} tone="warning" href="/painel/conferencia" testId="stat-pending" />
-        <StatTile label="Fichas para assinar" value={stats.awaitingSignature} icon={ClipboardNote} tone="warning" href="/painel/conferencia?fila=assinatura" testId="stat-signature" />
+        <StatTile label="Aguardando conferência" value={stats.pending} icon={Clock} tone="warning" href="/painel/inscricoes?filtro=conferir" testId="stat-pending" />
+        <StatTile label="Fichas para assinar" value={stats.draftForms} icon={ClipboardNote} tone="warning" href="/painel/filiacoes?filtro=assinar" testId="stat-signature" />
         <StatTile label="Filiaram-se na festa" value={stats.joinedAtEvent} icon={Sparkles} href="/painel/filiacoes" testId="stat-joined" />
         <StatTile
           label="Kits a entregar"
@@ -215,12 +234,21 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <Panel
-          title="Fila da conferência"
+          title="Para resolver"
           icon={Check}
           action={
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/painel/conferencia">Ver fila</Link>
-            </Button>
+            <div className="flex gap-1">
+              {stats.pending > 0 ? (
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/painel/inscricoes?filtro=conferir">Conferir</Link>
+                </Button>
+              ) : null}
+              {stats.draftForms > 0 ? (
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/painel/filiacoes?filtro=assinar">Assinar</Link>
+                </Button>
+              ) : null}
+            </div>
           }
         >
           {queue.length === 0 ? (
@@ -230,17 +258,19 @@ export default async function DashboardPage() {
           ) : (
             <ul className="divide-y divide-line">
               {queue.map((row) => (
-                <li key={row.registrationId} className="flex items-center justify-between gap-3 py-3">
+                <li key={row.key} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
-                    <Link href={`/painel/participantes/${row.personId}`} className="block truncate font-semibold text-fg hover:text-red">
+                    <Link href={row.href} className="block truncate font-semibold text-fg hover:text-red">
                       {row.fullName}
                     </Link>
                     <p className="truncate text-xs text-fg-muted">
-                      {row.isTeacher ? "Professor(a)" : "Não professor(a)"} · Matrícula {row.registrationNumber ?? "—"} ·{" "}
+                      {row.isTeacher ? "Professor(a)" : "Não professor(a)"} · Matrícula {row.registrationNumber || "—"} ·{" "}
                       {formatShortDateTime(row.createdAt)}
                     </p>
                   </div>
-                  {row.kind === "AWAITING_SIGNATURE" ? <PixelTag tone="warning">Assinar</PixelTag> : <PixelTag tone="neutral">Conferir</PixelTag>}
+                  <Link href={row.queueHref} className="shrink-0">
+                    {row.kind === "SIGNATURE" ? <PixelTag tone="warning">Assinar</PixelTag> : <PixelTag tone="neutral">Conferir</PixelTag>}
+                  </Link>
                 </li>
               ))}
             </ul>

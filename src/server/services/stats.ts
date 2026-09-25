@@ -7,6 +7,8 @@ export interface DashboardStats {
   registrations: number;
   pending: number;
   awaitingSignature: number;
+  /** Fichas de filiação esperando assinatura (do site e do Atendimento): a fila de Fichas de filiação. */
+  draftForms: number;
   confirmed: number;
   rejected: number;
   joinedAtEvent: number;
@@ -64,6 +66,7 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
       (SELECT count(*) FROM registration)::int AS registrations,
       (SELECT count(*) FROM registration WHERE status = 'PENDING')::int AS pending,
       (SELECT count(*) FROM registration WHERE status = 'AWAITING_SIGNATURE')::int AS awaiting_signature,
+      (SELECT count(*) FROM affiliation_form WHERE status = 'DRAFT')::int AS draft_forms,
       (SELECT count(*) FROM registration WHERE status = 'CONFIRMED')::int AS confirmed,
       (SELECT count(*) FROM registration WHERE status = 'REJECTED')::int AS rejected,
       (SELECT count(*) FROM registration WHERE status = 'JOINED_AT_EVENT')::int AS joined,
@@ -104,6 +107,7 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
     registrations: n("registrations"),
     pending: n("pending"),
     awaitingSignature: n("awaiting_signature"),
+    draftForms: n("draft_forms"),
     confirmed: n("confirmed"),
     rejected: n("rejected"),
     joinedAtEvent: n("joined"),

@@ -85,7 +85,7 @@ O `railway.json` já configura tudo: build `npm run build`, antes de cada deploy
 ## 5. Rotas
 
 - Público: `/` · `/inscricao` (`?ficha=1` abre a ficha de filiação) · `/vouchers/[link]` · `/v/[token]` (voucher individual e `/imagem`) · `/local/foto`
-- Equipe: `/entrar` · `/conta` · `/portaria` (leitor em `/portaria/scanner`) · `/painel` (placar, conferência, participantes, inscrições, fichas de filiação, kits, funcionários do SINDSERM, acesso ao sistema, auditoria, configurações) · `/painel/inscricoes/[id]/vouchers` (imprime os vouchers do(a) professor(a) e do convidado numa folha) · `/painel/funcionarios/vouchers` (vouchers dos funcionários e dos convidados deles, para imprimir)
+- Equipe: `/entrar` · `/conta` · `/portaria` (leitor em `/portaria/scanner`) · `/painel` (placar, inscrições — abre na fila de conferência quando há o que conferir —, fichas de filiação — abre na fila de assinatura —, participantes, kits, funcionários do SINDSERM, acesso ao sistema, auditoria, configurações) · `/painel/inscricoes/[id]/vouchers` (imprime os vouchers do(a) professor(a) e do convidado numa folha) · `/painel/funcionarios/vouchers` (vouchers dos funcionários e dos convidados deles, para imprimir)
 - Arquivos: `POST /api/documentos` (envio de RG/contracheque) · `GET /api/documentos/[id]` (só equipe; `?miniatura=1`) · `GET /api/health` (verificação do Railway)
 
 ## 6. Testes

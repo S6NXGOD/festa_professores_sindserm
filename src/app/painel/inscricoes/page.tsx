@@ -1,33 +1,54 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, Gift, List, Login, UserPlus, Users } from "@/components/icons/pixel";
+import { redirect } from "next/navigation";
+import { Check, ChevronRight, Gift, List, Login, UserPlus, Users } from "@/components/icons/pixel";
+import { AnimatedList } from "@/components/staff/animated-list";
 import { ChipFilters, EmptyState, FilterBar, PageHeader, Pagination } from "@/components/staff/panel-ui";
+import { VerificationCard } from "@/components/staff/queue-cards";
 import { AffiliationBadge, TeacherBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
 import { AFFILIATION_STATUS_SHORT } from "@/domain/labels";
+import { can } from "@/domain/rules";
 import { AFFILIATION_STATUSES, type AffiliationStatus } from "@/domain/types";
 import { formatShortDateTime } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
-import { listRegistrations, pageNumber } from "@/server/queries/panel";
+import { listRegistrations, listVerificationQueue, pageNumber, queueCounts } from "@/server/queries/panel";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Inscrições" };
 
+/** "Aguardando conferência" não entra aqui: é a própria fila, o primeiro filtro. */
+const STATUS_FILTERS = AFFILIATION_STATUSES.filter((status) => status !== "PENDING");
+
 export default async function RegistrationsPage({ searchParams }: PageProps<"/painel/inscricoes">) {
-  await requirePageActor("viewPanel");
+  const actor = await requirePageActor("viewPanel");
   const query = await searchParams;
   const q = typeof query.q === "string" ? query.q : undefined;
-  const statusParam = typeof query.filtro === "string" ? query.filtro : "";
-  const status = (AFFILIATION_STATUSES as readonly string[]).includes(statusParam) ? (statusParam as AffiliationStatus) : null;
+  const filtro = typeof query.filtro === "string" ? query.filtro : "";
   const page = pageNumber(query.page);
-  const data = await listRegistrations({ q, status, page });
+  const counts = await queueCounts();
+  // Sem filtro escolhido, abre direto na fila quando há inscrição esperando conferência. O filtro vai
+  // para o endereço: ao conferir a última, a tela fica em "Fila zerada" em vez de pular para a lista.
+  if (!filtro && counts.pending > 0) redirect(q ? `/painel/inscricoes?filtro=conferir&q=${encodeURIComponent(q)}` : "/painel/inscricoes?filtro=conferir");
+  const inQueue = filtro === "conferir" || filtro === "PENDING";
+  const status = !inQueue && (STATUS_FILTERS as readonly string[]).includes(filtro) ? (filtro as AffiliationStatus) : null;
+  const current = inQueue ? "conferir" : (status ?? "todas");
+  const [queue, list] = await Promise.all([
+    inQueue ? listVerificationQueue({ kind: "PENDING", q, page }) : null,
+    inQueue ? null : listRegistrations({ q, status, page }),
+  ]);
+  const data = queue ?? list!;
 
   return (
     <div>
       <PageHeader
-        eyebrow="Grupos"
+        eyebrow={inQueue ? "Fila de conferência" : "Grupos"}
         title="Inscrições"
-        description={`${plural(data.total, "inscrição", "inscrições")}: cada uma é o(a) professor(a) ou filiado(a) e, se houver, o convidado.`}
+        description={
+          inQueue
+            ? "Confira se quem declarou ser filiado(a) realmente é filiado(a) ao SINDSERM. Quem espera há mais tempo aparece primeiro."
+            : `${plural(data.total, "inscrição", "inscrições")}: cada uma é o(a) professor(a) ou filiado(a) e, se houver, o convidado.`
+        }
         actions={
           <Button asChild>
             <Link href="/painel/inscricoes/nova">
@@ -38,21 +59,42 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
       />
       <ChipFilters
         basePath="/painel/inscricoes"
-        current={status ?? ""}
+        current={current}
         params={{ q }}
-        options={[{ value: "", label: "Todas" }, ...AFFILIATION_STATUSES.map((s) => ({ value: s, label: AFFILIATION_STATUS_SHORT[s] }))]}
+        options={[
+          { value: "conferir", label: "Para conferir", count: counts.pending, attention: counts.pending > 0 },
+          { value: "todas", label: "Todas" },
+          ...STATUS_FILTERS.map((s) => ({ value: s, label: AFFILIATION_STATUS_SHORT[s] })),
+        ]}
       />
       <FilterBar action="/painel/inscricoes" q={q}>
-        {status ? <input type="hidden" name="filtro" value={status} /> : null}
+        <input type="hidden" name="filtro" value={current} />
       </FilterBar>
-      {data.rows.length === 0 ? (
-        <EmptyState icon={List} title="Nenhuma inscrição">
-          As inscrições feitas no site e na hora aparecem aqui.
+
+      {queue ? (
+        queue.rows.length === 0 ? (
+          <EmptyState icon={Check} title={q ? "Nada encontrado" : "Fila zerada"}>
+            <p>{q ? "Ninguém na fila corresponde à busca." : "Todas as filiações declaradas já foram conferidas."}</p>
+            <Button asChild variant="outline" size="sm" className="mt-4">
+              <Link href="/painel/inscricoes?filtro=todas">Ver todas as inscrições</Link>
+            </Button>
+          </EmptyState>
+        ) : (
+          <AnimatedList
+            items={queue.rows.map((row) => ({
+              key: row.registrationId,
+              content: <VerificationCard row={row} canDecide={can(actor.role, "validateAffiliation")} />,
+            }))}
+          />
+        )
+      ) : list && list.rows.length === 0 ? (
+        <EmptyState icon={List} title={q || status ? "Nada encontrado" : "Nenhuma inscrição"}>
+          {q || status ? "Ajuste a busca ou o filtro." : "As inscrições feitas no site e na hora aparecem aqui."}
         </EmptyState>
-      ) : (
+      ) : list ? (
         <div className="overflow-hidden rounded-xl border border-line bg-surface">
           <ul className="divide-y divide-line">
-            {data.rows.map((row) => (
+            {list.rows.map((row) => (
               <li key={row.registrationId}>
                 <Link
                   href={`/painel/inscricoes/${row.registrationId}`}
@@ -88,8 +130,8 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
             ))}
           </ul>
         </div>
-      )}
-      <Pagination page={data.page} pages={data.pages} basePath="/painel/inscricoes" params={{ q, filtro: status ?? undefined }} />
+      ) : null}
+      <Pagination page={data.page} pages={data.pages} basePath="/painel/inscricoes" params={{ q, filtro: current }} />
     </div>
   );
 }

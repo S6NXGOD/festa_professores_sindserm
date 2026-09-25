@@ -257,17 +257,25 @@ test.describe.serial("festa das professoras e professores", () => {
       await context.close();
     });
 
-    await test.step("atendimento confirma a filiação na fila de conferência", async () => {
+    await test.step("atendimento confirma a filiação na fila de conferência (em Inscrições)", async () => {
       const context = await browser.newContext();
       const page = await context.newPage();
       await login(page, ATTENDANT);
-      await page.goto("/painel/conferencia");
+      // O menu mostra a fila em Inscrições, e a página abre direto nela quando há o que conferir.
+      await expect(page.getByTestId("nav-badge-pending").first()).toHaveText("1");
+      await page.goto("/painel/inscricoes");
+      await expect(page.getByTestId("chip-conferir")).toHaveAttribute("aria-current", "page");
       const item = page.getByTestId("queue-item").filter({ hasText: MEMBER.name });
       await expect(item).toContainText("529.982.247-25");
       await item.getByTestId("queue-confirm").click();
       await page.getByTestId("confirm-dialog-action").click();
       await expect(page.getByText(`Filiação de ${MEMBER.name} confirmada.`)).toBeVisible();
       await expect(page.getByTestId("queue-item")).toHaveCount(0);
+      await expect(page.getByText("Fila zerada")).toBeVisible();
+      await expect(page.getByTestId("nav-badge-pending")).toHaveCount(0);
+      // O endereço antigo da conferência continua levando à fila.
+      await page.goto("/painel/conferencia");
+      await expect(page).toHaveURL(/\/painel\/inscricoes\?filtro=conferir$/);
       await context.close();
     });
 
@@ -468,6 +476,15 @@ test.describe.serial("festa das professoras e professores", () => {
       const context = await browser.newContext({ viewport: { width: 412, height: 915 } });
       const page = await context.newPage();
       await login(page, ATTENDANT);
+
+      // A ficha do site entra na fila de assinatura de Fichas de filiação, com os documentos em dia.
+      await page.goto("/painel/filiacoes");
+      await expect(page.getByTestId("chip-assinar")).toHaveAttribute("aria-current", "page");
+      const signatureItem = page.getByTestId("signature-item").filter({ hasText: NEW_MEMBER.name });
+      await expect(signatureItem.getByTestId("signature-documents")).toContainText("RG");
+      await expect(signatureItem.getByTestId("signature-documents")).toContainText("Contracheque");
+      await expect(signatureItem.getByTestId("queue-signature")).toBeVisible();
+      await expect(signatureItem.getByTestId("queue-attach")).toHaveCount(0);
 
       await openPersonAtGate(page, "Beatriz", NEW_MEMBER.name);
       await expect(page.getByTestId("gate-status-title")).toHaveText("FALTA ASSINAR A FICHA DE FILIAÇÃO");

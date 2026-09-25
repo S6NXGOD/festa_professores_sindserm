@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConfirmActionDialog } from "@/components/common/confirm-action-dialog";
-import { Cancel, Check, Pencil, Printer } from "@/components/icons/pixel";
+import { Cancel, Check, Pencil, Printer, Upload } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { cancelAffiliationFormAction, formalizeAffiliationAction } from "@/server/actions/affiliation-forms";
 import { decideAffiliationAction } from "@/server/actions/operations";
 
@@ -12,7 +13,7 @@ import { decideAffiliationAction } from "@/server/actions/operations";
 export function AffiliationDecisionButtons({ registrationId, name, isTeacher }: { registrationId: string; name: string; isTeacher: boolean }) {
   const router = useRouter();
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
       <ConfirmActionDialog
         trigger={
           <Button variant="success" data-testid="queue-confirm">
@@ -48,31 +49,45 @@ export function AffiliationDecisionButtons({ registrationId, name, isTeacher }: 
   );
 }
 
-/** Ficha preenchida antes da festa: imprimir, confirmar a assinatura ou cancelar. */
-export function SignatureButtons({ formId, name }: { formId: string; name: string }) {
+/**
+ * Ficha esperando assinatura: imprimir, confirmar a assinatura ou cancelar.
+ * Sem o RG e o contracheque anexados a assinatura não vale: no lugar do
+ * "Assinada" aparece o atalho para anexar na ficha.
+ */
+export function SignatureButtons({ formId, name, missingDocuments = false }: { formId: string; name: string; missingDocuments?: boolean }) {
   const router = useRouter();
+  // No celular, a ação principal ocupa a linha de cima; imprimir e cancelar dividem a de baixo.
+  const primary = "col-span-2 order-first sm:order-none";
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
       <Button asChild variant="outline">
         <Link href={`/painel/filiacoes/${formId}/imprimir`} target="_blank">
           <Printer /> Imprimir
         </Link>
       </Button>
-      <ConfirmActionDialog
-        trigger={
-          <Button variant="success" data-testid="queue-signature">
-            <Pencil /> Assinada
-          </Button>
-        }
-        title="A ficha foi assinada?"
-        description={`Confirme só com a ficha impressa assinada. ${name} passa a ser filiado(a) na festa.`}
-        confirmLabel="Confirmar assinatura"
-        tone="success"
-        sound="fanfare"
-        onConfirm={() => formalizeAffiliationAction(formId)}
-        successMessage={`${name} agora é filiado(a)!`}
-        onDone={() => router.refresh()}
-      />
+      {missingDocuments ? (
+        <Button asChild variant="outline" className={cn(primary, "border-warning/60 text-warning hover:text-warning")} data-testid="queue-attach">
+          <Link href={`/painel/filiacoes/${formId}`}>
+            <Upload /> Anexar documentos
+          </Link>
+        </Button>
+      ) : (
+        <ConfirmActionDialog
+          trigger={
+            <Button variant="success" className={primary} data-testid="queue-signature">
+              <Pencil /> Assinada
+            </Button>
+          }
+          title="A ficha foi assinada?"
+          description={`Confirme só com a ficha impressa assinada. ${name} passa a ser filiado(a) na festa.`}
+          confirmLabel="Confirmar assinatura"
+          tone="success"
+          sound="fanfare"
+          onConfirm={() => formalizeAffiliationAction(formId)}
+          successMessage={`${name} agora é filiado(a)!`}
+          onDone={() => router.refresh()}
+        />
+      )}
       <ConfirmActionDialog
         trigger={
           <Button variant="ghost" className="text-danger">

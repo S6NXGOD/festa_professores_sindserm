@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, not, type
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/server/db";
 import {
+  affiliationDocument,
   affiliationForm,
   auditLog,
   checkIn,
@@ -280,12 +281,22 @@ export async function listAffiliationForms(options: {
         formalizedAt: affiliationForm.formalizedAt,
         createdBy: user.name,
         registrationId: affiliationForm.registrationId,
+        cpf: affiliationForm.cpf,
+        whatsapp: affiliationForm.whatsapp,
+        registrationNumber: affiliationForm.registrationNumber,
+        workplace: affiliationForm.workplace,
+        jobTitle: affiliationForm.jobTitle,
+        guestName: sql<string | null>`(SELECT gp.full_name FROM ${guestLink} gl JOIN ${person} gp ON gp.id = gl.guest_person_id WHERE gl.registration_id = ${affiliationForm.registrationId} AND gl.status = 'ACTIVE' LIMIT 1)`,
+        // A assinatura só vale com as cópias do RG e do contracheque anexadas.
+        hasRg: sql<boolean>`EXISTS (SELECT 1 FROM ${affiliationDocument} d WHERE d.form_id = ${affiliationForm.id} AND d.kind = 'RG')`,
+        hasPayslip: sql<boolean>`EXISTS (SELECT 1 FROM ${affiliationDocument} d WHERE d.form_id = ${affiliationForm.id} AND d.kind = 'PAYSLIP')`,
       })
       .from(affiliationForm)
       .leftJoin(user, eq(user.id, affiliationForm.createdByUserId))
       .innerJoin(person, eq(person.id, affiliationForm.personId))
       .where(where)
-      .orderBy(desc(affiliationForm.createdAt))
+      // Fila de assinatura: quem espera há mais tempo primeiro.
+      .orderBy(options.status === "DRAFT" ? asc(affiliationForm.createdAt) : desc(affiliationForm.createdAt))
       .limit(PAGE_SIZE)
       .offset((options.page - 1) * PAGE_SIZE),
     db
@@ -376,13 +387,15 @@ export async function recentCheckIns(limit = 8) {
     .limit(limit);
 }
 
-/** Contadores da fila de conferência (badges do menu). */
+/** Tamanho das filas (badges do menu): inscrições para conferir e fichas para assinar. */
 export async function queueCounts() {
-  const rows = await db
-    .select({ status: registration.status, total: count() })
-    .from(registration)
-    .where(inArray(registration.status, ["PENDING", "AWAITING_SIGNATURE"]))
-    .groupBy(registration.status);
-  const byStatus = new Map(rows.map((r) => [r.status, Number(r.total)]));
-  return { pending: byStatus.get("PENDING") ?? 0, awaitingSignature: byStatus.get("AWAITING_SIGNATURE") ?? 0 };
+  const [[pending], [signature]] = await Promise.all([
+    db.select({ total: count() }).from(registration).where(eq(registration.status, "PENDING")),
+    db.select({ total: count() }).from(affiliationForm).where(eq(affiliationForm.status, "DRAFT")),
+  ]);
+  return { pending: Number(pending?.total ?? 0), signature: Number(signature?.total ?? 0) };
 }
+
+export type QueueCounts = Awaited<ReturnType<typeof queueCounts>>;
+export type VerificationRow = Awaited<ReturnType<typeof listVerificationQueue>>["rows"][number];
+export type AffiliationFormRow = Awaited<ReturnType<typeof listAffiliationForms>>["rows"][number];

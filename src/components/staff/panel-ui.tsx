@@ -238,7 +238,10 @@ export function SelectFilter({
   );
 }
 
-/** Filtros em fichas (links), mais rápidos de tocar no celular. */
+/**
+ * Filtros em fichas (links), mais rápidos de tocar no celular. `attention`
+ * marca uma fila com trabalho esperando (luz âmbar piscando).
+ */
 export function ChipFilters({
   basePath,
   current,
@@ -247,7 +250,7 @@ export function ChipFilters({
 }: {
   basePath: string;
   current: string;
-  options: { value: string; label: string; count?: number }[];
+  options: { value: string; label: string; count?: number; attention?: boolean }[];
   params?: Record<string, string | undefined>;
 }) {
   const href = (value: string) => {
@@ -261,18 +264,27 @@ export function ChipFilters({
     <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
       {options.map((option) => {
         const active = option.value === current;
+        const attention = option.attention && !active;
         return (
           <Link
             key={option.value || "all"}
             href={href(option.value)}
             aria-current={active ? "page" : undefined}
+            data-testid={`chip-${option.value || "all"}`}
             className={cn(
               "inline-flex h-9 shrink-0 items-center gap-2 rounded-md border-2 px-3 text-sm font-bold transition-[border-color,background-color]",
-              active ? "border-red bg-brand-soft text-fg" : "border-line-strong text-fg-muted hover:border-[#55555c] hover:text-fg",
+              active
+                ? "border-red bg-brand-soft text-fg"
+                : attention
+                  ? "border-warning/60 text-warning hover:border-warning"
+                  : "border-line-strong text-fg-muted hover:border-[#55555c] hover:text-fg",
             )}
           >
+            {attention ? <span className="size-1.5 animate-blink rounded-[1px] bg-warning shadow-[0_0_6px_var(--warning)]" aria-hidden /> : null}
             {option.label}
-            {typeof option.count === "number" ? <span className="pixel text-[0.5rem] text-red tabular">{option.count}</span> : null}
+            {typeof option.count === "number" ? (
+              <span className={cn("pixel text-[0.5rem] tabular", attention ? "text-warning" : "text-red")}>{option.count}</span>
+            ) : null}
           </Link>
         );
       })}
