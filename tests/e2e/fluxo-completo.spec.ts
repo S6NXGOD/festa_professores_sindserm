@@ -337,8 +337,12 @@ test.describe.serial("festa das professoras e professores", () => {
       const page = await context.newPage();
       await login(page, ATTENDANT);
       await openPersonAtGate(page, "Luiza", GUEST.name);
-      await expect(page.getByTestId("gate-result")).toContainText(`Sai quando ${MEMBER.name} chegar.`);
+      // Decisão rápida: quem convidou, o que acontece com o kit e o botão fixo no pé da tela.
+      await expect(page.getByTestId("gate-person-role")).toHaveText(`Convidado(a) de ${MEMBER.name}`);
+      await expect(page.getByTestId("kit-on-entry")).toContainText("Fica para depois");
       await expect(page.getByTestId("kit-on-entry")).toContainText(`O kit deste convidado sai quando ${MEMBER.name} chegar.`);
+      await expect(page.getByTestId("gate-details").getByRole("button", { name: /Detalhes/ })).toHaveAttribute("aria-expanded", "false");
+      await expect(page.getByTestId("confirm-entry")).toBeInViewport();
       await expect(page.getByTestId("confirm-entry")).not.toContainText("kit");
       await page.getByTestId("confirm-entry").click();
       await confirmEarlyEntry(page);
@@ -378,9 +382,11 @@ test.describe.serial("festa das professoras e professores", () => {
         // Professor(a) é autodeclarado(a): a portaria é lembrada de conferir.
         await expect(page.getByTestId("teacher-check-reminder")).toBeVisible();
         // A convidada já está lá dentro: o kit dela sai junto com a chegada da professora.
-        await expect(page.getByTestId("kit-on-entry")).toContainText(
-          `Na entrada, entregue 2 kits: o de Maria e o do convidado ${GUEST.name}, que já entrou`,
-        );
+        const kitTile = page.getByTestId("kit-on-entry");
+        await expect(kitTile).toContainText("Entregue 2 kits");
+        await expect(kitTile).toContainText(`O de Maria e o do convidado ${GUEST.name}, que já entrou`);
+        // O botão de confirmar já aparece na tela, sem rolar (barra fixa no pé).
+        await expect(page.getByTestId("confirm-entry")).toBeInViewport();
         await expect(page.getByTestId("deliver-member-kit")).toHaveCount(0);
         await expect(page.getByTestId("confirm-entry")).toHaveText(/Confirmar entrada \+ 2 kits/);
         await page.getByTestId("confirm-entry").click();
@@ -389,11 +395,13 @@ test.describe.serial("festa das professoras e professores", () => {
         const banner = page.getByTestId("entry-kit-result");
         await expect(banner).toContainText("Entregue 2 kits!");
         await expect(banner).toContainText(`Kit do convidado ${GUEST.name}, que já entrou`);
+        await expect(page.getByTestId("scanner-combo")).toHaveText("COMBO x1");
 
-        // O mesmo QR lido novamente não registra uma segunda entrada.
-        await page.getByTestId("scan-next").click();
+        // Sem tocar em nada, o leitor reabre sozinho; o mesmo QR lido de novo não registra uma segunda entrada.
+        await expect(page.getByTestId("auto-next-hint")).toBeVisible();
         await expect(page.getByTestId("gate-status-title")).toHaveText("ENTRADA JÁ REGISTRADA", { timeout: 45_000 });
         await expect(page.getByTestId("confirm-entry")).toHaveCount(0);
+        await expect(page.getByTestId("auto-next-hint")).toHaveCount(0);
         await context.close();
       } finally {
         await cameraBrowser.close();
@@ -564,7 +572,7 @@ test.describe.serial("festa das professoras e professores", () => {
       // Assinou: a tela já puxa o registro da entrada, para ninguém esquecer.
       const prompt = page.getByTestId("entry-prompt");
       await expect(prompt).toContainText("Beatriz já pode entrar!");
-      await expect(prompt).toContainText("1 kit de consumação");
+      await expect(prompt.getByTestId("prompt-kit")).toContainText("Entregue 1 kit");
       await prompt.getByTestId("prompt-confirm-entry").click();
       await confirmEarlyEntry(page);
       await expect(prompt).toHaveCount(0);

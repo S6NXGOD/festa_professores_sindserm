@@ -93,7 +93,7 @@ describe("cadastro interno dos funcionários", () => {
 
     const view = await loadGateView(db, created.personId, ROLE_PRESETS.SECURITY);
     expect(view).toMatchObject({ role: "EMPLOYEE", entry: { kind: "ALLOWED", role: "EMPLOYEE" } });
-    expect(view?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de colaborador(a)" });
+    expect(view?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de colaborador(a)", detail: "Kit de colaborador(a)" });
     const [found] = await searchPeople(db, "Caio Convidado", { fullCpf: false });
     expect(found).toMatchObject({ hostName: "Rosa Financeiro Lima", hostIsEmployee: true });
   });

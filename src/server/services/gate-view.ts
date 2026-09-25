@@ -1,7 +1,7 @@
 import "server-only";
 import type { Executor } from "@/server/db";
 import { eventStartAt, eventStartLabel, hasEventStarted, isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
-import { ENTRY_BLOCK_MESSAGE, ENTRY_KIT_MESSAGE, KIT_BLOCK_MESSAGE } from "@/domain/labels";
+import { ENTRY_BLOCK_MESSAGE, ENTRY_KIT_MESSAGE, KIT_BLOCK_MESSAGE, KIT_TYPE_LABEL } from "@/domain/labels";
 import {
   can,
   canHaveGuest,
@@ -31,7 +31,8 @@ export type KitView =
 
 /** O que acontece com os kits se a entrada for confirmada agora. */
 export type KitOnEntry =
-  | { kind: "WILL_DELIVER"; count: 1 | 2; label: string }
+  /** `label`: a frase inteira ("1 kit de convidado"); `detail`: de quem é o kit, para o cartão da portaria. */
+  | { kind: "WILL_DELIVER"; count: 1 | 2; label: string; detail: string }
   /** Convidado que chega antes de quem convidou: o kit dele sai quando essa pessoa chegar. */
   | { kind: "WAITING"; message: string }
   | { kind: "NONE"; message: string };
@@ -193,7 +194,7 @@ function employeeKitPreview(
       return { kind: "WAITING", message: `O kit deste convidado sai quando ${group.person.fullName} chegar.` };
     }
     const reason = check("GUEST", input);
-    return reason ? { kind: "NONE", message: reason } : { kind: "WILL_DELIVER", count: 1, label: "1 kit de convidado" };
+    return reason ? { kind: "NONE", message: reason } : { kind: "WILL_DELIVER", count: 1, label: "1 kit de convidado", detail: KIT_TYPE_LABEL.GUEST };
   }
 
   const input = employeeKitInput(group, deadlinePassed, { employeeCheckedIn: true });
@@ -203,10 +204,22 @@ function employeeKitPreview(
   const guestOut = waitingGuest ? check("GUEST", input) === null : false;
   if (!ownReason && guestOut) {
     const first = state.person.fullName.split(" ")[0];
-    return { kind: "WILL_DELIVER", count: 2, label: `2 kits: o de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou` };
+    return {
+      kind: "WILL_DELIVER",
+      count: 2,
+      label: `2 kits: o de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
+      detail: `O de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
+    };
   }
-  if (!ownReason) return { kind: "WILL_DELIVER", count: 1, label: "1 kit de colaborador(a)" };
-  if (guestOut) return { kind: "WILL_DELIVER", count: 1, label: `1 kit: o do convidado ${waitingGuest!.fullName}, que já entrou` };
+  if (!ownReason) return { kind: "WILL_DELIVER", count: 1, label: "1 kit de colaborador(a)", detail: KIT_TYPE_LABEL.EMPLOYEE };
+  if (guestOut) {
+    return {
+      kind: "WILL_DELIVER",
+      count: 1,
+      label: `1 kit: o do convidado ${waitingGuest!.fullName}, que já entrou`,
+      detail: `O do convidado ${waitingGuest!.fullName}, que já entrou`,
+    };
+  }
   return { kind: "NONE", message: ownReason };
 }
 
@@ -247,7 +260,7 @@ function kitOnEntryPreview(
       return { kind: "WAITING", message: `O kit deste convidado sai quando ${group.member.fullName} chegar.` };
     }
     const reason = check("GUEST", input);
-    return reason ? { kind: "NONE", message: reason } : { kind: "WILL_DELIVER", count: 1, label: "1 kit de convidado" };
+    return reason ? { kind: "NONE", message: reason } : { kind: "WILL_DELIVER", count: 1, label: "1 kit de convidado", detail: KIT_TYPE_LABEL.GUEST };
   }
 
   const input = kitInput(group, deadlinePassed, { memberCheckedIn: true });
@@ -257,10 +270,22 @@ function kitOnEntryPreview(
   const guestOut = waitingGuest ? check("GUEST", input) === null : false;
   if (!ownReason && guestOut) {
     const first = state.person.fullName.split(" ")[0];
-    return { kind: "WILL_DELIVER", count: 2, label: `2 kits: o de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou` };
+    return {
+      kind: "WILL_DELIVER",
+      count: 2,
+      label: `2 kits: o de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
+      detail: `O de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
+    };
   }
-  if (!ownReason) return { kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação" };
-  if (guestOut) return { kind: "WILL_DELIVER", count: 1, label: `1 kit: o do convidado ${waitingGuest!.fullName}, que já entrou` };
+  if (!ownReason) return { kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação", detail: KIT_TYPE_LABEL.MEMBER };
+  if (guestOut) {
+    return {
+      kind: "WILL_DELIVER",
+      count: 1,
+      label: `1 kit: o do convidado ${waitingGuest!.fullName}, que já entrou`,
+      detail: `O do convidado ${waitingGuest!.fullName}, que já entrou`,
+    };
+  }
   return { kind: "NONE", message: ownReason };
 }
 

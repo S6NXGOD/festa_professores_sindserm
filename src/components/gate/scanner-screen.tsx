@@ -27,6 +27,7 @@ import { callAction } from "@/lib/call-action";
 import { formatDateTime } from "@/lib/datetime";
 import { vibrate } from "@/lib/haptics";
 import { scrollToTop } from "@/lib/scroll";
+import { setAutoNext, useAutoNext } from "@/lib/gate-prefs";
 import { playSound, setSoundEnabled, useSoundEnabled } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { confirmEntryAction, gateViewAction, type LookupResult, lookupCodeAction, scanQrAction } from "@/server/actions/gate";
@@ -34,10 +35,14 @@ import type { GateView } from "@/server/services/gate-view";
 import type { EntryKitResult } from "@/server/services/checkin";
 import { EarlyEntryDialog } from "./early-entry-dialog";
 import { EntryPromptDialog } from "./entry-prompt";
-import { deliveredKitCount, GateResult } from "./gate-result";
+import { Disclosure } from "./disclosure";
+import { canConfirmEntry, ConfirmEntryButton, deliveredKitCount, GateResult } from "./gate-result";
 import { PersonOperations } from "./person-operations";
 
 type CameraState = "starting" | "scanning" | "error";
+
+/** Depois de uma entrada confirmada, o leitor reabre sozinho neste tempo (um toque na tela segura). */
+const AUTO_NEXT_MS = 6000;
 type Feedback = "idle" | "read" | "invalid";
 
 interface Current {
@@ -49,6 +54,20 @@ interface Current {
   entryKit?: EntryKitResult | null;
   /** Na chegada do(a) professor(a): o kit do convidado que já tinha entrado. */
   entryGuestKit?: EntryKitResult | null;
+}
+
+/** "Volta ao leitor em 5 s": a contagem da volta automática, segundo a segundo. */
+function AutoNextHint({ seconds }: { seconds: number }) {
+  const [left, setLeft] = useState(seconds);
+  useEffect(() => {
+    const timer = window.setInterval(() => setLeft((value) => Math.max(1, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <p className="pixel mx-auto mb-2 max-w-2xl text-center text-[0.5rem] text-fg-muted" data-testid="auto-next-hint" aria-live="polite">
+      Volta ao leitor em <span className="text-fg tabular">{left}</span> s · toque na tela para ficar aqui
+    </p>
+  );
 }
 
 function cameraErrorMessage(error: unknown): string {
@@ -83,7 +102,10 @@ export function ScannerScreen() {
   const [code, setCode] = useState("");
   const [combo, setCombo] = useState(0);
   const [confirming, startConfirm] = useTransition();
+  /** Quando o leitor reabre sozinho (null = parado). */
+  const [autoNextAt, setAutoNextAt] = useState<number | null>(null);
   const soundOn = useSoundEnabled();
+  const autoNextOn = useAutoNext();
 
   const showLookup = useCallback((result: LookupResult, method: "QR" | "CODE") => {
     if (result.kind === "FOUND") {
@@ -162,13 +184,35 @@ export function ScannerScreen() {
     };
   }, [facing, handleText]);
 
-  function resume() {
+  const resume = useCallback(() => {
+    setAutoNextAt(null);
     setEntryPrompt(false);
     setCurrent(null);
     setProblem(null);
     setFeedback("idle");
     busyRef.current = false;
     lastRef.current = { text: lastRef.current.text, at: Date.now() };
+  }, []);
+
+  useEffect(() => {
+    if (autoNextAt === null) return;
+    const timer = window.setTimeout(resume, Math.max(0, autoNextAt - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [autoNextAt, resume]);
+
+  /** Qualquer toque no resultado segura a tela (para ler com calma ou fazer outra coisa). */
+  function holdResult() {
+    if (autoNextAt !== null) setAutoNextAt(null);
+  }
+
+  function toggleAutoNext() {
+    const next = !autoNextOn;
+    setAutoNext(next);
+    playSound(next ? "coin" : "blip");
+    toast.success(
+      next ? "Volta automática ligada" : "Volta automática desligada",
+      { description: next ? "Depois de confirmar a entrada, o leitor reabre sozinho." : "Depois de confirmar, toque em Ler próximo." },
+    );
   }
 
   async function toggleTorch() {
@@ -231,6 +275,7 @@ export function ScannerScreen() {
       vibrate(entered ? [40, 40, 120] : [80, 60, 80]);
       playSound(entered ? (kits === 2 ? "fanfare" : kits === 1 ? "powerup" : "coin") : "warn");
       if (entered) setCombo((c) => c + 1);
+      if (entered && autoNextOn) setAutoNextAt(Date.now() + AUTO_NEXT_MS);
       setCurrent({
         ...current,
         view: result.data.view,
@@ -268,6 +313,17 @@ export function ScannerScreen() {
           ) : null}
         </div>
         <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleAutoNext}
+            aria-pressed={autoNextOn}
+            aria-label={autoNextOn ? "Desligar a volta automática ao leitor" : "Ligar a volta automática ao leitor"}
+            title="Volta automática ao leitor depois de confirmar"
+            data-testid="scanner-auto"
+          >
+            <span className={cn("pixel text-[0.5rem]", autoNextOn ? "text-fg" : "text-fg-dim line-through")}>Auto</span>
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -396,9 +452,11 @@ export function ScannerScreen() {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 360, damping: 36 }}
-            className="absolute inset-0 z-40 overflow-y-auto bg-ink"
+            className="absolute inset-0 z-40 overflow-y-auto overscroll-contain bg-ink"
+            onPointerDownCapture={holdResult}
+            onKeyDownCapture={holdResult}
           >
-            <div className="mx-auto max-w-2xl space-y-4 px-3 pt-4 pb-40">
+            <div className="mx-auto max-w-2xl space-y-4 px-3 pt-3 pb-44">
               {current ? (
                 <>
                   <GateResult
@@ -406,17 +464,33 @@ export function ScannerScreen() {
                     justCheckedIn={current.justCheckedIn}
                     entryKit={current.entryKit}
                     entryGuestKit={current.entryGuestKit}
-                    confirming={confirming}
-                    onConfirm={() => confirmEntry()}
+                    mode="gate"
                     hintClassName="z-50 bottom-32"
                   />
                   {current.view.permissions.deliverKits ? (
-                    <PersonOperations
-                      view={current.view}
-                      personBasePath="/portaria/pessoa"
-                      onChanged={refreshCurrent}
-                      onEntryUnlocked={() => setEntryPrompt(true)}
-                    />
+                    // Liberado (ou acabou de entrar): as outras ações ficam a um toque, sem empurrar o botão de entrada.
+                    current.view.entry.kind === "ALLOWED" || current.justCheckedIn ? (
+                      <Disclosure
+                        variant="plain"
+                        title="Mais ações do atendimento"
+                        hint="Convidado, kits e cadastro"
+                        testId="gate-more-actions"
+                      >
+                        <PersonOperations
+                          view={current.view}
+                          personBasePath="/portaria/pessoa"
+                          onChanged={refreshCurrent}
+                          onEntryUnlocked={() => setEntryPrompt(true)}
+                        />
+                      </Disclosure>
+                    ) : (
+                      <PersonOperations
+                        view={current.view}
+                        personBasePath="/portaria/pessoa"
+                        onChanged={refreshCurrent}
+                        onEntryUnlocked={() => setEntryPrompt(true)}
+                      />
+                    )
                   ) : null}
                   <EntryPromptDialog
                     view={current.view}
@@ -460,16 +534,49 @@ export function ScannerScreen() {
                 </div>
               ) : null}
             </div>
+            {/* A ação da vez fica sempre à vista, no polegar: confirmar a entrada ou ler o próximo. */}
             <div className="safe-bottom fixed inset-x-0 bottom-0 z-50 border-t border-line bg-ink/95 px-3 pt-3 backdrop-blur">
-              <div className="mx-auto grid max-w-2xl grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <Button onClick={resume} size="xl" data-testid="scan-next">
-                  <QrCode /> Ler próximo
-                </Button>
-                {current ? (
-                  <Button asChild variant="outline" size="xl" className="text-base">
-                    <Link href={`/portaria/pessoa/${current.view.personId}`}>Cadastro</Link>
-                  </Button>
-                ) : null}
+              {autoNextAt !== null ? <AutoNextHint key={autoNextAt} seconds={AUTO_NEXT_MS / 1000} /> : null}
+              <div className="mx-auto flex max-w-2xl gap-2">
+                {current && canConfirmEntry(current.view) && !current.justCheckedIn ? (
+                  <>
+                    <ConfirmEntryButton view={current.view} confirming={confirming} onConfirm={() => confirmEntry()} className="min-w-0 flex-1" />
+                    <Button
+                      variant="outline"
+                      size="xl"
+                      onClick={resume}
+                      className="h-auto min-h-16 w-[4.5rem] shrink-0 flex-col gap-1.5 px-0"
+                      aria-label="Pular: ler outro QR sem registrar esta entrada"
+                      data-testid="scan-skip"
+                    >
+                      <QrCode className="size-6" />
+                      <span className="pixel text-[0.5rem]">Pular</span>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button onClick={resume} size="xl" className="relative min-w-0 flex-1 overflow-hidden" data-testid="scan-next">
+                      {autoNextAt !== null ? (
+                        <motion.span
+                          key={autoNextAt}
+                          aria-hidden
+                          className="absolute inset-0 origin-left bg-white/25"
+                          initial={{ scaleX: 1 }}
+                          animate={{ scaleX: 0 }}
+                          transition={{ duration: AUTO_NEXT_MS / 1000, ease: "linear" }}
+                        />
+                      ) : null}
+                      <span className="relative flex items-center gap-3">
+                        <QrCode /> Ler próximo
+                      </span>
+                    </Button>
+                    {current ? (
+                      <Button asChild variant="outline" size="xl" className="shrink-0 text-base">
+                        <Link href={`/portaria/pessoa/${current.view.personId}`}>Cadastro</Link>
+                      </Button>
+                    ) : null}
+                  </>
+                )}
               </div>
             </div>
           </motion.div>

@@ -177,6 +177,8 @@ describe("3. o kit do convidado só sai depois que o(a) professor(a) chegou", ()
     // A chegada do(a) professor(a) libera os 2 kits de uma vez.
     const hostPreview = await loadGateView(db, state.member.id, ROLE_PRESETS.SECURITY);
     expect(hostPreview?.kitOnEntry).toMatchObject({ kind: "WILL_DELIVER", count: 2 });
+    // O cartão da portaria diz de quem são os dois kits.
+    expect(hostPreview?.kitOnEntry).toMatchObject({ detail: expect.stringMatching(/^O de .+ e o do convidado .+, que já entrou$/) });
     const entry = await checkInPerson(state.member.id);
     expect(entry).toMatchObject({
       outcome: "CHECKED_IN",
@@ -191,7 +193,7 @@ describe("3. o kit do convidado só sai depois que o(a) professor(a) chegou", ()
     const { state } = await confirmedTeacher({ guest: true });
     await checkInPerson(state.guest!.personId);
     const preview = await loadGateView(db, state.member.id, ROLE_PRESETS.SECURITY);
-    expect(preview?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação" });
+    expect(preview?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação", detail: "Kit do(a) professor(a)" });
     expect(await checkInPerson(state.member.id)).toMatchObject({
       kit: { kind: "DELIVERED", kitType: "MEMBER" },
       guestKit: { kind: "NONE", message: "Sem kit: o estoque acabou." },
@@ -538,7 +540,7 @@ describe("10. estoque nunca fica negativo", () => {
     const first = await confirmedTeacher();
     const second = await confirmedTeacher();
     const preview = await loadGateView(db, first.state.member.id, ROLE_PRESETS.SECURITY);
-    expect(preview?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação" });
+    expect(preview?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação", detail: "Kit do(a) professor(a)" });
     expect(await entryKit(first.state.member.id)).toMatchObject({ kind: "DELIVERED", available: 0, low: true });
 
     // A tela da portaria já avisa antes de confirmar.

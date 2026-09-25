@@ -18,15 +18,17 @@ import {
   Users,
   Warning,
 } from "@/components/icons/pixel";
-import { PixelTag, PlayerTag } from "@/components/retro/bits";
+import { PlayerTag } from "@/components/retro/bits";
 import { ScrollHint } from "@/components/retro/scroll-hint";
+import { CATEGORY_STYLE } from "@/components/staff/employee-category";
 import { AffiliationBadge, ToneBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
-import { AFFILIATION_STATUS_LABEL, CHECK_IN_METHOD_LABEL, EMPLOYEE_CATEGORY_INLINE, EMPLOYEE_CATEGORY_LABEL, EMPLOYEE_CATEGORY_TITLE } from "@/domain/labels";
+import { AFFILIATION_STATUS_LABEL, CHECK_IN_METHOD_LABEL, EMPLOYEE_CATEGORY_INLINE, EMPLOYEE_CATEGORY_TITLE } from "@/domain/labels";
 import { formatShortDateTime, formatTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import type { EntryKitResult } from "@/server/services/checkin";
-import type { GateView, KitView } from "@/server/services/gate-view";
+import type { GateView, KitOnEntry, KitView } from "@/server/services/gate-view";
+import { Disclosure } from "./disclosure";
 
 type Tone = "success" | "warning" | "danger";
 
@@ -36,20 +38,8 @@ function headerFor(view: GateView, justCheckedIn: boolean): { tone: Tone; icon: 
   }
   switch (view.entry.kind) {
     case "ALLOWED":
-      return {
-        tone: "success",
-        icon: Shield,
-        kicker: "Ready",
-        title: "LIBERADO PARA ENTRADA",
-        detail:
-          view.entry.role === "EMPLOYEE"
-            ? `${EMPLOYEE_CATEGORY_TITLE[view.employee?.category ?? "STAFF"]}${view.employee?.jobTitle ? ` · ${view.employee.jobTitle}` : ""}`
-            : view.entry.role === "GUEST"
-            ? `Convidado(a) de ${view.host?.fullName ?? "professor(a)"}${view.host?.kind === "EMPLOYEE" ? ` (${EMPLOYEE_CATEGORY_INLINE[view.host.category ?? "STAFF"]})` : ""}`
-            : view.ownRegistration
-              ? `${view.ownRegistration.isTeacher ? "Professor(a)" : "Filiado(a)"} · ${AFFILIATION_STATUS_LABEL[view.ownRegistration.status]}`
-              : undefined,
-      };
+      // Quem é a pessoa vem logo abaixo do nome: a faixa fica curta e a decisão cabe na tela.
+      return { tone: "success", icon: Shield, kicker: "Ready", title: "LIBERADO PARA ENTRADA" };
     case "ALREADY_IN":
       return {
         tone: "warning",
@@ -76,6 +66,34 @@ const TONE: Record<Tone, string> = {
   warning: "bg-warning text-warning-foreground",
   danger: "bg-danger text-white hazard",
 };
+
+/** Quem é a pessoa na festa, numa linha: "Professor(a) · Filiação confirmada", "Convidado(a) de ...". */
+function roleLine(view: GateView): { icon: PixelIcon; iconClass: string; text: string } | null {
+  if (view.employee && (view.role === "EMPLOYEE" || view.role === "NONE")) {
+    const style = CATEGORY_STYLE[view.employee.category];
+    return {
+      icon: style.icon,
+      iconClass: style.text,
+      text: `${EMPLOYEE_CATEGORY_TITLE[view.employee.category]}${view.employee.jobTitle ? ` · ${view.employee.jobTitle}` : ""}`,
+    };
+  }
+  if (view.role === "GUEST" && view.host) {
+    return {
+      icon: Users,
+      iconClass: "text-fg-muted",
+      text: `Convidado(a) de ${view.host.fullName}${view.host.kind === "EMPLOYEE" ? ` (${EMPLOYEE_CATEGORY_INLINE[view.host.category ?? "STAFF"]})` : ""}`,
+    };
+  }
+  const own = view.ownRegistration;
+  if (own) {
+    return {
+      icon: own.isTeacher ? Teach : Human,
+      iconClass: own.isTeacher ? "text-red" : "text-fg-muted",
+      text: `${own.isTeacher ? "Professor(a)" : "Filiado(a)"} · ${AFFILIATION_STATUS_LABEL[own.status]}`,
+    };
+  }
+  return null;
+}
 
 export function KitStatusText({ kit }: { kit: KitView }) {
   if (kit.kind === "DELIVERED") {
@@ -115,9 +133,115 @@ export function confirmEntryLabel(view: GateView) {
   return kit.count === 2 ? "Confirmar entrada + 2 kits" : "Confirmar entrada + kit";
 }
 
+/** A entrada pode ser confirmada agora, por quem está com o aparelho? */
+export function canConfirmEntry(view: GateView) {
+  return view.permissions.checkIn && view.entry.kind === "ALLOWED";
+}
+
 /** Quantos kits a recepção entrega agora (0, 1 ou 2). */
 export function deliveredKitCount(kit: EntryKitResult | null, guestKit: EntryKitResult | null) {
   return (kit?.kind === "DELIVERED" ? 1 : 0) + (guestKit?.kind === "DELIVERED" ? 1 : 0);
+}
+
+/**
+ * Botão verde de confirmar a entrada. Em duas linhas ("Confirmar entrada" e
+ * "+ 2 kits"): cabe inteiro até nos celulares mais estreitos.
+ */
+export function ConfirmEntryButton({
+  view,
+  confirming,
+  onConfirm,
+  className,
+}: {
+  view: GateView;
+  confirming: boolean;
+  onConfirm: () => void;
+  className?: string;
+}) {
+  const kit = view.kitOnEntry;
+  const extra = kit?.kind === "WILL_DELIVER" ? (kit.count === 2 ? "2 kits" : "kit") : null;
+  return (
+    <Button
+      type="button"
+      variant="success"
+      size="xl"
+      onClick={onConfirm}
+      disabled={confirming}
+      className={cn("h-auto min-h-16 flex-col justify-center gap-1 py-2.5", className)}
+      id="confirm-entry"
+      data-testid="confirm-entry"
+    >
+      <span className="flex items-center gap-2.5 text-xl leading-none min-[400px]:text-2xl">
+        {confirming ? <Loader className="animate-spin-steps" /> : <Login />}
+        Confirmar entrada
+      </span>{" "}
+      {extra ? (
+        <span className="pixel flex items-center gap-1.5 text-[0.55rem] leading-none opacity-90">
+          <Gift className="size-3.5" />+ {extra}
+        </span>
+      ) : null}
+    </Button>
+  );
+}
+
+/**
+ * O que sai de kit com esta entrada, em destaque: a recepção já separa o kit
+ * enquanto confirma.
+ */
+export function KitOnEntryTile({
+  kit,
+  deadline,
+  className,
+  testId = "kit-on-entry",
+}: {
+  kit: KitOnEntry;
+  deadline?: GateView["kitDeadline"];
+  className?: string;
+  testId?: string;
+}) {
+  if (kit.kind === "WILL_DELIVER") {
+    return (
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 420, damping: 22, delay: 0.08 }}
+        className={cn(
+          "flex items-center gap-3.5 rounded-xl border border-red/60 bg-brand-soft px-3.5 py-3 shadow-[0_0_30px_-16px_var(--glow)]",
+          className,
+        )}
+        data-testid={testId}
+      >
+        <span className="relative inline-flex size-12 shrink-0 items-center justify-center rounded-lg bg-red text-white shadow-[0_3px_0_0_var(--brand-strong)]">
+          <Gift className="size-7" />
+          {kit.count === 2 ? (
+            <span className="pixel absolute -top-2 -right-2 rounded-md bg-white px-1 py-0.5 text-[0.55rem] text-red shadow">x2</span>
+          ) : null}
+        </span>
+        <div className="min-w-0">
+          <p className="pixel text-[0.5rem] text-red">Na entrada</p>
+          <p className="display mt-0.5 text-[1.65rem] leading-none text-fg">Entregue {kit.count === 2 ? "2 kits" : "1 kit"}</p>
+          <p className="mt-1 text-sm leading-snug text-fg-muted">
+            {kit.detail}
+            {deadline && !deadline.passed ? <span className="whitespace-nowrap"> · até {formatTime(deadline.at)}</span> : null}
+          </p>
+        </div>
+      </motion.div>
+    );
+  }
+  const waiting = kit.kind === "WAITING";
+  const reason = waiting ? kit.message : reasonText(kit.message);
+  return (
+    <div className={cn("flex items-center gap-3.5 rounded-xl border border-line-strong bg-surface-2 px-3.5 py-3", className)} data-testid={testId}>
+      <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-fg-muted">
+        {waiting ? <Clock className="size-7" /> : <Info className="size-7" />}
+      </span>
+      <div className="min-w-0">
+        <p className="pixel text-[0.5rem] text-fg-dim">{waiting ? "Kit do convidado" : "Kit"}</p>
+        <p className="display mt-0.5 text-[1.65rem] leading-none text-fg">{waiting ? "Fica para depois" : "Sem kit"}</p>
+        {reason !== "Sem kit." ? <p className="mt-1 text-sm leading-snug text-fg-muted">{reason}</p> : null}
+      </div>
+    </div>
+  );
 }
 
 /** Resultado dos kits na hora da entrada: a recepção vê de longe quantos entregar. */
@@ -152,7 +276,7 @@ function EntryKitBanner({ kit, guestKit }: { kit: EntryKitResult; guestKit: Entr
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 380, damping: 18, delay: 0.15 }}
       className={cn(
-        "relative mt-4 flex items-center gap-3 rounded-xl px-4 py-3",
+        "relative mt-3 flex items-center gap-3 rounded-xl px-4 py-3",
         count > 0 ? "bg-ink/85 text-white shadow-[0_0_30px_-8px_rgb(255_255_255/0.5)]" : "bg-black/20",
       )}
       data-testid="entry-kit-result"
@@ -182,7 +306,125 @@ function EntryKitBanner({ kit, guestKit }: { kit: EntryKitResult; guestKit: Entr
   );
 }
 
-/** Resultado da leitura na portaria: faixa de status grande, bem legível à distância. */
+/** Filiação, quem convidou, kits e histórico: o "por quê" de cada status. */
+function DetailRows({ view }: { view: GateView }) {
+  const own = view.ownRegistration;
+  const isGuest = view.role === "GUEST";
+  const deadline = view.kitDeadline ? (
+    <span className={cn("mt-1.5 block text-xs font-bold", view.kitDeadline.passed ? "text-danger" : "text-fg-muted")}>
+      {view.kitDeadline.passed ? "Horário de entregar kits encerrado" : `Kits até ${formatTime(view.kitDeadline.at)}`}
+    </span>
+  ) : null;
+
+  return (
+    <dl className="grid gap-2">
+      {view.employee ? (
+        <InfoRow icon={Building} label={`Kits · ${EMPLOYEE_CATEGORY_TITLE[view.employee.category]}`}>
+          {view.employee.active ? (
+            <>
+              <span className="block">
+                Seu kit: <KitStatusText kit={view.employee.kits.EMPLOYEE} />
+              </span>
+              <span className="mt-1 block">
+                Kit do convidado
+                {view.employee.kits.GUEST.kind === "DELIVERED"
+                  ? ` (${view.employee.kits.GUEST.beneficiaryName})`
+                  : view.employee.guest
+                    ? ` (${view.employee.guest.fullName})`
+                    : ""}
+                : <KitStatusText kit={view.employee.kits.GUEST} />
+              </span>
+              {deadline}
+            </>
+          ) : (
+            <span className="block font-semibold text-danger">Fora da lista de colaboradores</span>
+          )}
+        </InfoRow>
+      ) : null}
+
+      {isGuest && view.host ? (
+        <InfoRow icon={Users} label={view.host.kind === "EMPLOYEE" ? "Colaborador(a) que convidou" : "Professor(a) responsável"}>
+          <span className="font-bold">{view.host.fullName}</span>
+          <span className="mt-1.5 flex flex-wrap gap-2">
+            {view.host.status ? (
+              <AffiliationBadge status={view.host.status} short />
+            ) : (
+              <ToneBadge tone={view.host.active ? "warning" : "danger"} icon={Building}>
+                {view.host.active ? EMPLOYEE_CATEGORY_TITLE[view.host.category ?? "STAFF"] : "Fora da lista"}
+              </ToneBadge>
+            )}
+            <ToneBadge tone={view.host.checkedIn ? "success" : "neutral"} icon={Login}>
+              {view.host.checkedIn ? "Já entrou" : "Ainda não entrou"}
+            </ToneBadge>
+          </span>
+        </InfoRow>
+      ) : null}
+
+      {own ? (
+        <InfoRow icon={own.isTeacher ? Teach : Human} label={isGuest ? "Filiação própria" : "Filiação"}>
+          <AffiliationBadge status={own.status} />
+        </InfoRow>
+      ) : null}
+
+      {own && !isGuest ? (
+        <InfoRow icon={Gift} label="Kits de consumação (saem na entrada)">
+          {own.isTeacher ? (
+            <>
+              <span className="block">
+                Seu kit: <KitStatusText kit={own.kits.MEMBER} />
+              </span>
+              <span className="mt-1 block">
+                Kit do convidado
+                {own.kits.GUEST.kind === "DELIVERED" ? ` (${own.kits.GUEST.beneficiaryName})` : own.guest ? ` (${own.guest.fullName})` : ""}:{" "}
+                <KitStatusText kit={own.kits.GUEST} />
+              </span>
+              {deadline}
+            </>
+          ) : (
+            <span className="text-fg-muted">Sem kit — exclusivo para professoras e professores.</span>
+          )}
+        </InfoRow>
+      ) : null}
+
+      {isGuest && view.guestKit ? (
+        <InfoRow icon={Gift} label="Kit de consumação do convidado">
+          {view.guestKit.delivered && view.guestKit.deliveredAt ? (
+            <span className="font-bold text-success-text">Entregue {formatShortDateTime(view.guestKit.deliveredAt)}.</span>
+          ) : view.guestKit.deliveredForOther ? (
+            <span className="text-fg-muted">O kit de convidado deste grupo já foi entregue a outra pessoa.</span>
+          ) : view.host && !view.host.checkedIn ? (
+            <span className="font-semibold text-fg">
+              Sai quando <strong>{view.host.fullName}</strong> chegar
+              {view.entry.kind === "ALREADY_IN" ? ": entregue junto com a entrada dele(a), para levar ao convidado." : "."}
+            </span>
+          ) : view.entry.kind === "ALREADY_IN" ? (
+            <span className="font-semibold text-fg">
+              Não saiu na entrada. Se ainda houver direito, entregue pelo cadastro de {view.host?.fullName ?? "quem convidou"}.
+            </span>
+          ) : (
+            <span className="text-fg-muted">Sai junto com a entrada deste convidado.</span>
+          )}
+        </InfoRow>
+      ) : null}
+
+      {view.pastGuestLinks.some((p) => p.status === "CONVERTED") ? (
+        <InfoRow icon={Reload} label="Histórico">
+          Convidado(a) originalmente por <strong>{view.pastGuestLinks.find((p) => p.status === "CONVERTED")?.hostName}</strong>; passou a
+          ser filiado(a).
+        </InfoRow>
+      ) : null}
+    </dl>
+  );
+}
+
+/**
+ * Resultado da leitura na portaria: faixa de status grande, nome, quem a pessoa
+ * é e o que sai de kit — o suficiente para decidir de relance.
+ *
+ * `mode="gate"` (portaria): o botão de entrada fica numa barra fixa, fora do
+ * cartão (quem usa passa `onConfirm` só no painel), e enquanto a pessoa está
+ * liberada os detalhes ficam recolhidos. `mode="panel"`: tudo aberto.
+ */
 export function GateResult({
   view,
   justCheckedIn = false,
@@ -190,6 +432,7 @@ export function GateResult({
   entryGuestKit = null,
   confirming = false,
   onConfirm,
+  mode = "panel",
   hintClassName,
 }: {
   view: GateView;
@@ -199,17 +442,23 @@ export function GateResult({
   /** Na chegada de quem convidou: o kit do convidado que já tinha entrado. */
   entryGuestKit?: EntryKitResult | null;
   confirming?: boolean;
+  /** Botão de entrada dentro do cartão (painel). Na portaria, o botão fica na barra fixa. */
   onConfirm?: () => void;
+  mode?: "gate" | "panel";
   /** Posição da seta "tem mais embaixo" (ex.: acima da barra do leitor). */
   hintClassName?: string;
 }) {
   const header = headerFor(view, justCheckedIn);
   const own = view.ownRegistration;
-  const isGuest = view.role === "GUEST";
-  const isEmployee = view.role === "EMPLOYEE";
-  // No celular, o botão de entrada ou a solução do bloqueio podem ficar abaixo da tela: a seta leva até lá.
-  const canConfirm = Boolean(onConfirm) && view.permissions.checkIn && view.entry.kind === "ALLOWED";
+  const role = roleLine(view);
+  const allowed = view.entry.kind === "ALLOWED";
+  const deciding = allowed && !justCheckedIn;
+  // Na portaria o cartão mostra só o essencial; os detalhes abrem sozinhos só para quem já entrou
+  // (é quando se consulta o que saiu de kit). Bloqueado: a faixa já diz o motivo e o que fazer.
+  const quick = mode === "gate" && (allowed || justCheckedIn || view.entry.kind === "BLOCKED");
+  const inlineConfirm = Boolean(onConfirm) && canConfirmEntry(view) && !justCheckedIn;
   const canResolve = view.entry.kind === "BLOCKED" && view.permissions.validateAffiliation;
+  const teacherCheck = Boolean(own?.isTeacher) && view.role === "MEMBER" && deciding;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-line-strong bg-surface shadow-[0_24px_60px_-28px_rgb(0_0_0/0.95)]" data-testid="gate-result">
@@ -218,28 +467,28 @@ export function GateResult({
         initial={{ opacity: 0.4, scaleY: 0.85 }}
         animate={{ opacity: 1, scaleY: 1 }}
         transition={{ type: "spring", stiffness: 500, damping: 30 }}
-        className={cn("relative origin-top px-5 py-5 sm:px-6", TONE[header.tone])}
+        className={cn("relative origin-top px-4 py-3.5 sm:px-6 sm:py-5", TONE[header.tone])}
         role="status"
         aria-live="assertive"
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <motion.span
             key={`${header.title}-icon`}
             initial={{ scale: 0.3, rotate: -25, opacity: 0 }}
             animate={{ scale: 1, rotate: 0, opacity: 1 }}
             transition={{ type: "spring", stiffness: 420, damping: 16 }}
-            className="inline-flex size-14 shrink-0 items-center justify-center rounded-xl bg-black/15"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-black/15 sm:size-14"
           >
-            <header.icon className="size-9" />
+            <header.icon className="size-7 sm:size-9" />
           </motion.span>
           <div className="min-w-0">
-            <p className="pixel text-[0.55rem] opacity-80">{header.kicker}</p>
-            <p className="display mt-1 text-[2.1rem] leading-[0.95] sm:text-5xl" data-testid="gate-status-title">
+            <p className="pixel text-[0.5rem] opacity-80">{header.kicker}</p>
+            <p className="display mt-0.5 text-[1.75rem] leading-[0.92] min-[400px]:text-[2rem] sm:text-5xl" data-testid="gate-status-title">
               {header.title}
             </p>
           </div>
         </div>
-        {header.detail ? <p className="mt-3 text-sm font-bold opacity-95">{header.detail}</p> : null}
+        {header.detail ? <p className="mt-2 text-sm font-bold opacity-95">{header.detail}</p> : null}
         {justCheckedIn && entryKit ? <EntryKitBanner kit={entryKit} guestKit={entryGuestKit} /> : null}
         {justCheckedIn ? (
           <motion.span
@@ -254,201 +503,80 @@ export function GateResult({
         ) : null}
       </motion.div>
 
-      <div className="space-y-4 p-4 sm:p-6">
+      <div className="space-y-3 p-4 sm:space-y-4 sm:p-6">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            {isEmployee ? (
-              <PixelTag tone="warning">{EMPLOYEE_CATEGORY_LABEL[view.employee?.category ?? "STAFF"]}</PixelTag>
-            ) : view.role !== "NONE" ? (
-              <PlayerTag player={isGuest ? 2 : 1} />
-            ) : null}
-            {own && !isGuest && own.isTeacher ? <PixelTag tone="red">Professor(a)</PixelTag> : null}
-            {view.isMinor ? (
-              <ToneBadge tone="warning" icon={Warning} size="lg" className="animate-pulse">
-                MENOR DE 18
-              </ToneBadge>
-            ) : null}
-          </div>
-          <p className="display mt-3 text-4xl break-words text-fg sm:text-5xl" data-testid="gate-person-name">
+          {view.role !== "NONE" || view.isMinor ? (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              {view.role === "EMPLOYEE" && view.employee ? (
+                <span
+                  className={cn(
+                    "pixel inline-flex items-center rounded-[4px] border px-1.5 py-1 text-[0.55rem] leading-none",
+                    CATEGORY_STYLE[view.employee.category].chip,
+                  )}
+                >
+                  Da casa
+                </span>
+              ) : view.role !== "NONE" ? (
+                <PlayerTag player={view.role === "GUEST" ? 2 : 1} />
+              ) : null}
+              {view.isMinor ? (
+                <ToneBadge tone="warning" icon={Warning} size="lg" className="animate-pulse">
+                  MENOR DE 18
+                </ToneBadge>
+              ) : null}
+            </div>
+          ) : null}
+          <p className="display text-[2.15rem] leading-[0.95] break-words text-fg sm:text-5xl" data-testid="gate-person-name">
             {view.fullName}
           </p>
-          <p className="mt-1.5 flex flex-wrap gap-x-3 font-mono text-xs text-fg-muted">
+          {role ? (
+            <p className="mt-2 flex items-start gap-2 text-[0.95rem] leading-snug font-semibold text-fg" data-testid="gate-person-role">
+              <role.icon className={cn("mt-0.5 size-4 shrink-0", role.iconClass)} />
+              <span className="min-w-0">{role.text}</span>
+            </p>
+          ) : null}
+          <p className="mt-1.5 flex flex-wrap gap-x-2 font-mono text-xs text-fg-muted">
             <span>{view.hasCpf ? `CPF ${view.cpf}` : "Sem CPF"}</span>
             {view.voucherCode ? <span>· {view.voucherCode}</span> : null}
           </p>
         </div>
 
-        <dl className="grid gap-2">
-          {view.employee ? (
-            <InfoRow icon={Building} label={EMPLOYEE_CATEGORY_TITLE[view.employee.category]}>
-              <span className="font-bold">{view.employee.jobTitle ?? "Setor não informado"}</span>
-              {view.employee.active ? (
-                <>
-                  <span className="mt-1 block">
-                    Seu kit: <KitStatusText kit={view.employee.kits.EMPLOYEE} />
-                  </span>
-                  <span className="mt-1 block">
-                    Kit do convidado
-                    {view.employee.kits.GUEST.kind === "DELIVERED"
-                      ? ` (${view.employee.kits.GUEST.beneficiaryName})`
-                      : view.employee.guest
-                        ? ` (${view.employee.guest.fullName})`
-                        : ""}
-                    : <KitStatusText kit={view.employee.kits.GUEST} />
-                  </span>
-                  {view.kitDeadline ? (
-                    <span className={cn("mt-1.5 block text-xs font-bold", view.kitDeadline.passed ? "text-danger" : "text-fg-muted")}>
-                      {view.kitDeadline.passed ? "Horário de entregar kits encerrado" : `Kits até ${formatTime(view.kitDeadline.at)}`}
-                    </span>
-                  ) : null}
-                </>
-              ) : (
-                <span className="mt-1 block font-semibold text-danger">Fora da lista de colaboradores</span>
-              )}
-            </InfoRow>
-          ) : null}
+        {deciding && view.kitOnEntry ? <KitOnEntryTile kit={view.kitOnEntry} deadline={view.kitDeadline} /> : null}
 
-          {isGuest && view.host ? (
-            <InfoRow icon={Users} label={view.host.kind === "EMPLOYEE" ? "Colaborador(a) que convidou" : "Professor(a) responsável"}>
-              <span className="font-bold">{view.host.fullName}</span>
-              <span className="mt-1.5 flex flex-wrap gap-2">
-                {view.host.status ? (
-                  <AffiliationBadge status={view.host.status} short />
-                ) : (
-                  <ToneBadge tone={view.host.active ? "warning" : "danger"} icon={Building}>
-                    {view.host.active ? EMPLOYEE_CATEGORY_TITLE[view.host.category ?? "STAFF"] : "Fora da lista"}
-                  </ToneBadge>
-                )}
-                <ToneBadge tone={view.host.checkedIn ? "success" : "neutral"} icon={Login}>
-                  {view.host.checkedIn ? "Já entrou" : "Ainda não entrou"}
-                </ToneBadge>
-              </span>
-            </InfoRow>
-          ) : null}
-
-          {own ? (
-            <InfoRow icon={own.isTeacher ? Teach : Human} label={isGuest ? "Filiação própria" : "Filiação"}>
-              <AffiliationBadge status={own.status} />
-              {own.isTeacher && view.entry.kind !== "ALREADY_IN" ? (
-                <span className="mt-1.5 block text-xs font-bold text-warning" data-testid="teacher-check-reminder">
-                  Declarou ser professor(a): confira os dados antes de confirmar a entrada.
-                </span>
-              ) : null}
-            </InfoRow>
-          ) : null}
-
-          <InfoRow icon={Login} label="Entrada">
-            {view.entry.kind === "ALREADY_IN" ? (
-              <span className="font-bold text-success-text">Registrada {formatShortDateTime(view.entry.at)}</span>
-            ) : (
-              <span className="text-fg-muted">Ainda não registrada</span>
-            )}
-          </InfoRow>
-
-          {own && !isGuest ? (
-            <InfoRow icon={Gift} label="Kits de consumação (saem na entrada)">
-              {own.isTeacher ? (
-                <>
-                  <span className="block">
-                    Seu kit: <KitStatusText kit={own.kits.MEMBER} />
-                  </span>
-                  <span className="mt-1 block">
-                    Kit do convidado
-                    {own.kits.GUEST.kind === "DELIVERED" ? ` (${own.kits.GUEST.beneficiaryName})` : own.guest ? ` (${own.guest.fullName})` : ""}:{" "}
-                    <KitStatusText kit={own.kits.GUEST} />
-                  </span>
-                  {view.kitDeadline ? (
-                    <span className={cn("mt-1.5 block text-xs font-bold", view.kitDeadline.passed ? "text-danger" : "text-fg-muted")}>
-                      {view.kitDeadline.passed ? "Horário de entregar kits encerrado" : `Kits até ${formatTime(view.kitDeadline.at)}`}
-                    </span>
-                  ) : null}
-                </>
-              ) : (
-                <span className="text-fg-muted">Sem kit — exclusivo para professoras e professores.</span>
-              )}
-            </InfoRow>
-          ) : null}
-
-          {isGuest && view.guestKit ? (
-            <InfoRow icon={Gift} label="Kit de consumação do convidado">
-              {view.guestKit.delivered && view.guestKit.deliveredAt ? (
-                <span className="font-bold text-success-text">Entregue {formatShortDateTime(view.guestKit.deliveredAt)}.</span>
-              ) : view.guestKit.deliveredForOther ? (
-                <span className="text-fg-muted">O kit de convidado deste grupo já foi entregue a outra pessoa.</span>
-              ) : view.host && !view.host.checkedIn ? (
-                <span className="font-semibold text-fg">
-                  Sai quando <strong>{view.host.fullName}</strong> chegar
-                  {view.entry.kind === "ALREADY_IN" ? ": entregue junto com a entrada dele(a), para levar ao convidado." : "."}
-                </span>
-              ) : view.entry.kind === "ALREADY_IN" ? (
-                <span className="font-semibold text-fg">
-                  Não saiu na entrada. Se ainda houver direito, entregue pelo cadastro de {view.host?.fullName ?? "quem convidou"}.
-                </span>
-              ) : (
-                <span className="text-fg-muted">Sai junto com a entrada deste convidado.</span>
-              )}
-            </InfoRow>
-          ) : null}
-
-          {view.pastGuestLinks.some((p) => p.status === "CONVERTED") ? (
-            <InfoRow icon={Reload} label="Histórico">
-              Convidado(a) originalmente por <strong>{view.pastGuestLinks.find((p) => p.status === "CONVERTED")?.hostName}</strong>;
-              passou a ser filiado(a).
-            </InfoRow>
-          ) : null}
-        </dl>
-
-        {onConfirm && view.permissions.checkIn ? (
-          view.entry.kind === "ALLOWED" ? (
-            <div className="space-y-2">
-              {view.kitOnEntry ? (
-                <p
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-bold",
-                    view.kitOnEntry.kind === "WILL_DELIVER"
-                      ? "border-red/50 bg-brand-soft text-fg"
-                      : "border-line-strong bg-surface-2 text-fg-muted",
-                  )}
-                  data-testid="kit-on-entry"
-                >
-                  {view.kitOnEntry.kind === "WILL_DELIVER" ? (
-                    <>
-                      <Gift className="size-6 shrink-0 animate-bounce text-red motion-reduce:animate-none" />
-                      <span>
-                        Na entrada, entregue <span className="text-red">{view.kitOnEntry.label}</span>.
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      {view.kitOnEntry.kind === "WAITING" ? <Clock className="size-5 shrink-0" /> : <Info className="size-5 shrink-0" />}
-                      <span>{view.kitOnEntry.message}</span>
-                    </>
-                  )}
-                </p>
-              ) : null}
-              <Button
-                type="button"
-                variant="success"
-                size="xl"
-                onClick={onConfirm}
-                disabled={confirming}
-                className="w-full text-lg min-[380px]:text-xl sm:text-2xl"
-                id="confirm-entry"
-                data-testid="confirm-entry"
-              >
-                {confirming ? <Loader className="animate-spin-steps" /> : <Login />}
-                {confirmEntryLabel(view)}
-              </Button>
-            </div>
-          ) : view.entry.kind === "BLOCKED" ? (
-            <p className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 px-4 py-3 text-sm font-semibold text-fg">
-              <Warning className="mt-0.5 size-4 shrink-0 text-danger" />
-              Entrada bloqueada. {view.permissions.validateAffiliation ? "Resolva abaixo ou pelo Atendimento." : "Encaminhe ao Atendimento."}
-            </p>
-          ) : null
+        {teacherCheck ? (
+          <p
+            className="flex items-start gap-2 rounded-lg border border-warning/45 bg-warning-soft px-3 py-2.5 text-sm font-semibold text-warning"
+            data-testid="teacher-check-reminder"
+          >
+            <Warning className="mt-0.5 size-4 shrink-0" />
+            Declarou ser professor(a): confira antes de confirmar.
+          </p>
         ) : null}
+
+        {view.entry.kind === "BLOCKED" && view.permissions.checkIn && view.permissions.validateAffiliation ? (
+          <p className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 px-4 py-3 text-sm font-semibold text-fg">
+            <Warning className="mt-0.5 size-4 shrink-0 text-danger" />
+            Entrada bloqueada: resolva abaixo ou pelo Atendimento.
+          </p>
+        ) : null}
+
+        {inlineConfirm ? <ConfirmEntryButton view={view} confirming={confirming} onConfirm={onConfirm!} className="w-full" /> : null}
+
+        {mode === "gate" ? (
+          <Disclosure
+            key={quick ? "rapido" : "aberto"}
+            title="Detalhes"
+            hint={own ? "Filiação, kits e convidado" : view.employee ? "Kits e convidado" : "Quem convidou e kit"}
+            defaultOpen={!quick}
+            testId="gate-details"
+          >
+            <DetailRows view={view} />
+          </Disclosure>
+        ) : (
+          <DetailRows view={view} />
+        )}
       </div>
-      {canConfirm && !justCheckedIn ? (
+      {inlineConfirm ? (
         <ScrollHint
           key={`confirmar-${view.personId}`}
           targetId="confirm-entry"

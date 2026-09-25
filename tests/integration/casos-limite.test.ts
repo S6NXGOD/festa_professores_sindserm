@@ -201,7 +201,7 @@ describe("kit do convidado após troca", () => {
     const second = (await reload(group.registrationId)).guest!;
     const secondView = await gateView(second.personId);
     expect(secondView.guestKit).toMatchObject({ delivered: false, deliveredForOther: false });
-    expect(secondView.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de convidado" });
+    expect(secondView.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de convidado", detail: "Kit do convidado" });
     const secondEntry = await registerCheckIn(security, { personId: second.personId, method: "SEARCH" });
     expect(secondEntry).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "DELIVERED", beneficiaryName: "Segunda Convidada Lima" } });
     expect((await gateView(second.personId)).guestKit).toMatchObject({ delivered: true });

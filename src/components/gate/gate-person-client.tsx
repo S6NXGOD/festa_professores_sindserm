@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import { QrCode, Search } from "@/components/icons/pixel";
+import { Button } from "@/components/ui/button";
 import { callAction } from "@/lib/call-action";
 import { vibrate } from "@/lib/haptics";
 import { scrollToTop } from "@/lib/scroll";
@@ -10,9 +13,10 @@ import { playSound } from "@/lib/sound";
 import { confirmEntryAction } from "@/server/actions/gate";
 import type { EntryKitResult } from "@/server/services/checkin";
 import type { GateView } from "@/server/services/gate-view";
+import { Disclosure } from "./disclosure";
 import { EarlyEntryDialog } from "./early-entry-dialog";
 import { EntryPromptDialog } from "./entry-prompt";
-import { deliveredKitCount, GateResult } from "./gate-result";
+import { canConfirmEntry, ConfirmEntryButton, deliveredKitCount, GateResult } from "./gate-result";
 import { PersonOperations } from "./person-operations";
 
 /** Tela da pessoa na portaria: status da entrada + ações do atendimento. */
@@ -33,7 +37,8 @@ export function GatePersonClient({
   const [promptEntry, setPromptEntry] = useState(promptEntryOnLoad);
   const [earlyOpen, setEarlyOpen] = useState(false);
   const [confirming, startConfirm] = useTransition();
-  // Na portaria, depois de confirmar a filiação, já pergunta pela entrada.
+  // Na portaria: decisão rápida (botão na barra fixa, detalhes recolhidos) e,
+  // depois de confirmar a filiação, já pergunta pela entrada.
   const atGate = personBasePath.startsWith("/portaria");
 
   /** Antes do horário de início, pede a confirmação a mais (`early`). */
@@ -71,22 +76,57 @@ export function GatePersonClient({
     });
   }
 
+  const operations = (
+    <PersonOperations
+      view={view}
+      personBasePath={personBasePath}
+      onChanged={() => router.refresh()}
+      onEntryUnlocked={atGate ? () => setPromptEntry(true) : undefined}
+    />
+  );
+  const deciding = canConfirmEntry(view) && !justCheckedIn;
+
   return (
-    <div className="space-y-4">
+    <div className={atGate ? "space-y-4 pb-28" : "space-y-4"}>
       <GateResult
         view={view}
         justCheckedIn={justCheckedIn}
         entryKit={entryKit}
         entryGuestKit={entryGuestKit}
         confirming={confirming}
-        onConfirm={() => confirmEntry()}
+        onConfirm={atGate ? undefined : () => confirmEntry()}
+        mode={atGate ? "gate" : "panel"}
       />
-      <PersonOperations
-        view={view}
-        personBasePath={personBasePath}
-        onChanged={() => router.refresh()}
-        onEntryUnlocked={atGate ? () => setPromptEntry(true) : undefined}
-      />
+      {atGate && (view.entry.kind === "ALLOWED" || justCheckedIn) ? (
+        <Disclosure variant="plain" title="Mais ações do atendimento" hint="Convidado, kits e cadastro" testId="gate-more-actions">
+          {operations}
+        </Disclosure>
+      ) : (
+        operations
+      )}
+      {atGate ? (
+        // Portaria no celular: a ação da vez fica fixa no pé da tela, sem precisar rolar.
+        <div className="safe-bottom no-print fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/95 px-3 pt-3 backdrop-blur">
+          <div className="mx-auto flex max-w-2xl gap-2">
+            {deciding ? (
+              <ConfirmEntryButton view={view} confirming={confirming} onConfirm={() => confirmEntry()} className="min-w-0 flex-1" />
+            ) : (
+              <>
+                <Button asChild size="xl" className="min-w-0 flex-1 text-lg" data-testid="gate-next-search">
+                  <Link href="/portaria">
+                    <Search /> Próxima pessoa
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="xl" className="shrink-0 text-base">
+                  <Link href="/portaria/scanner" aria-label="Abrir o leitor de QR Code">
+                    <QrCode /> Ler QR
+                  </Link>
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
       <EntryPromptDialog
         view={view}
         open={promptEntry && view.entry.kind === "ALLOWED" && view.permissions.checkIn && !confirming}
