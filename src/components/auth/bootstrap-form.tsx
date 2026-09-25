@@ -55,8 +55,8 @@ export function BootstrapForm() {
       <div className="flex items-start gap-3 rounded-lg border border-red/40 bg-brand-soft p-4 text-sm text-fg">
         <Shield className="mt-0.5 size-5 shrink-0 text-red" />
         <p>
-          Por segurança, informe o <strong>SETUP_TOKEN</strong> definido no arquivo <code>.env.local</code> do servidor.
-          Esta tela só funciona enquanto nenhum usuário existir.
+          Por segurança, informe o <strong>SETUP_TOKEN</strong> do servidor (no Railway, em <strong>Variables</strong>; no
+          computador, no arquivo <code>.env.local</code>). Esta tela só funciona enquanto nenhum usuário existir.
         </p>
       </div>
       <FormField id="setupToken" label="Token de configuração" error={errors.setupToken?.message}>

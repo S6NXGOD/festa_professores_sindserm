@@ -60,7 +60,7 @@ export async function bootstrapFirstAdmin(rawInput: BootstrapAdminInput) {
   const input = bootstrapAdminSchema.parse(rawInput);
   const expected = process.env.SETUP_TOKEN ?? "";
   if (expected.length < 16) {
-    throw new DomainError("INVALID_STATE", "SETUP_TOKEN não está configurado no servidor (.env.local).");
+    throw new DomainError("INVALID_STATE", "SETUP_TOKEN não está configurado no servidor (Variables no Railway ou .env.local).");
   }
   if (!safeEqual(input.setupToken, expected)) {
     throw new DomainError("FORBIDDEN", "Token de configuração inválido.", { setupToken: "Token inválido" });
