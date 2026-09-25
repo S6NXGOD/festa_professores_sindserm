@@ -28,7 +28,7 @@ export function employeeShortfall(pool: StockPoolView) {
 export function stockAlertText(pool: StockPoolView) {
   const label = STOCK_POOL_LABEL[pool.pool].toLowerCase();
   if (pool.available === 0) return `${label}: esgotado`;
-  if (pool.pool === "EMPLOYEE") return `${label}: faltam ${employeeShortfall(pool)} para funcionários e convidados deles`;
+  if (pool.pool === "EMPLOYEE") return `${label}: faltam ${employeeShortfall(pool)} para colaboradores e convidados deles`;
   return `${label}: restam ${pool.available}`;
 }
 
@@ -59,8 +59,8 @@ export function StockCard({ stock, demand }: { stock: StockOverview; demand?: St
               <Warning className="size-3.5 animate-blink" />
               {pool.pool === "EMPLOYEE"
                 ? pool.available === 0
-                  ? `Esgotado: ${plural(pool.awaiting ?? 0, "kit", "kits")} ainda por sair (funcionários e convidados)`
-                  : `Faltam ${plural(employeeShortfall(pool), "kit", "kits")} para funcionários e convidados deles`
+                  ? `Esgotado: ${plural(pool.awaiting ?? 0, "kit", "kits")} ainda por sair (colaboradores e convidados)`
+                  : `Faltam ${plural(employeeShortfall(pool), "kit", "kits")} para colaboradores e convidados deles`
                 : pool.available === 0
                   ? "Estoque esgotado"
                   : `Estoque baixo (alerta em ${stock.threshold})`}
@@ -85,11 +85,11 @@ function Forecast({ total, demand, pool }: { total: number; demand: number; pool
       data-testid={`stock-forecast-${pool.toLowerCase()}`}
       title={
         pool === "EMPLOYEE"
-          ? "Funcionários do SINDSERM liberados e os convidados deles."
+          ? "Colaboradores do SINDSERM liberados (diretoria, funcionários e prestadores) e os convidados deles."
           : "Professoras e professores inscritos e seus convidados, contando quem ainda aguarda conferência ou assinatura."
       }
     >
-      {pool === "EMPLOYEE" ? "Funcionários + convidados" : "Previsão com os inscritos"}: {plural(demand, "kit", "kits")} ·{" "}
+      {pool === "EMPLOYEE" ? "Colaboradores + convidados" : "Previsão com os inscritos"}: {plural(demand, "kit", "kits")} ·{" "}
       {short > 0 ? `faltam ${short} se todos vierem` : `sobram ${total - demand}`}
     </p>
   );

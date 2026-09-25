@@ -32,7 +32,7 @@ async function gateActor(): Promise<StaffActor> {
 async function resolve(actor: StaffActor, found: VoucherLookup | null): Promise<LookupResult> {
   if (!found) return { kind: "NOT_FOUND" };
   if (found.revokedAt) return { kind: "REVOKED", revokedAt: found.revokedAt };
-  const view = await loadGateView(db, found.personId, actor.role);
+  const view = await loadGateView(db, found.personId, actor.access);
   if (!view) return { kind: "NOT_FOUND" };
   return { kind: "FOUND", view, voucherId: found.voucherId };
 }
@@ -61,14 +61,14 @@ export async function searchPeopleAction(
 ): Promise<ActionResult<PersonSearchResult[]>> {
   return runAction(async () => {
     const actor = await gateActor();
-    return searchPeople(db, String(query ?? ""), { mode, fullCpf: can(actor.role, "viewFullCpf"), limit: 20 });
+    return searchPeople(db, String(query ?? ""), { mode, fullCpf: can(actor.access, "viewFullCpf"), limit: 20 });
   });
 }
 
 export async function gateViewAction(personId: string): Promise<ActionResult<GateView>> {
   return runAction(async () => {
     const actor = await gateActor();
-    const view = await loadGateView(db, String(personId), actor.role);
+    const view = await loadGateView(db, String(personId), actor.access);
     if (!view) throw new DomainError("NOT_FOUND", "Pessoa não encontrada.");
     return view;
   });
@@ -79,14 +79,21 @@ export async function confirmEntryAction(input: {
   personId: string;
   method: CheckInMethod;
   voucherId?: string | null;
+  /** A portaria viu o aviso "a festa ainda não começou" e confirmou mesmo assim. */
+  early?: boolean;
 }): Promise<
   ActionResult<{ outcome: "CHECKED_IN" | "ALREADY"; view: GateView; kit: EntryKitResult | null; guestKit: EntryKitResult | null }>
 > {
   return runAction(async () => {
     const actor = await requireActionActor();
     const method: CheckInMethod = ["QR", "SEARCH", "CODE"].includes(input.method) ? input.method : "SEARCH";
-    const result = await registerCheckIn(actor, { personId: String(input.personId), method, voucherId: input.voucherId ?? null });
-    const view = await loadGateView(db, String(input.personId), actor.role);
+    const result = await registerCheckIn(actor, {
+      personId: String(input.personId),
+      method,
+      voucherId: input.voucherId ?? null,
+      early: input.early === true,
+    });
+    const view = await loadGateView(db, String(input.personId), actor.access);
     if (!view) throw new DomainError("NOT_FOUND", "Pessoa não encontrada.");
     revalidatePath("/painel", "layout");
     revalidatePath("/portaria", "layout");

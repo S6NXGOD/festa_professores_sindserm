@@ -1,3 +1,4 @@
+import { EMPLOYEE_CATEGORY_LABEL } from "@/domain/labels";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Building, ChevronRight, Login, Users } from "@/components/icons/pixel";
@@ -17,21 +18,21 @@ const FILTERS: { value: ParticipantFilter; label: string }[] = [
   { value: "teachers", label: "Professoras e professores" },
   { value: "members", label: "Filiados" },
   { value: "guests", label: "Convidados" },
-  { value: "employees", label: "Funcionários" },
+  { value: "employees", label: "Colaboradores" },
   { value: "pending", label: "Pendentes" },
   { value: "present", label: "Presentes" },
   { value: "absent", label: "Ausentes" },
 ];
 
 export default async function ParticipantsPage({ searchParams }: PageProps<"/painel/participantes">) {
-  const actor = await requirePageActor("viewPanel");
+  const actor = await requirePageActor("viewParticipants");
   const query = await searchParams;
   const q = typeof query.q === "string" ? query.q : undefined;
   const filterParam = typeof query.filtro === "string" ? query.filtro : "all";
   const filter = (FILTERS.some((f) => f.value === filterParam) ? filterParam : "all") as ParticipantFilter;
   const page = pageNumber(query.page);
   const data = await listParticipants({ q, filter, page });
-  const fullCpf = can(actor.role, "viewFullCpf");
+  const fullCpf = can(actor.access, "viewFullCpf");
 
   return (
     <div>
@@ -68,7 +69,7 @@ export default async function ParticipantsPage({ searchParams }: PageProps<"/pai
                       <span className="font-mono">{displayCpf(row.cpf, fullCpf)}</span>
                       {row.isEmployee ? (
                         <ToneBadge tone="warning" icon={Building}>
-                          Funcionário(a){row.employeeJobTitle ? ` · ${row.employeeJobTitle}` : ""}
+                          {EMPLOYEE_CATEGORY_LABEL[row.employeeCategory ?? "STAFF"]}{row.employeeJobTitle ? ` · ${row.employeeJobTitle}` : ""}
                         </ToneBadge>
                       ) : null}
                       {row.memberStatus ? <AffiliationBadge status={row.memberStatus} short /> : null}
@@ -76,7 +77,7 @@ export default async function ParticipantsPage({ searchParams }: PageProps<"/pai
                       {row.hostName ? (
                         <ToneBadge tone="info" icon={Users}>
                           Convidado de {row.hostName}
-                          {row.hostIsEmployee ? " (funcionário)" : ""}
+                          {row.hostIsEmployee ? " (colaborador)" : ""}
                         </ToneBadge>
                       ) : null}
                       {row.isMinor ? <ToneBadge tone="warning">Menor</ToneBadge> : null}

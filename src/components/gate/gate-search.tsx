@@ -1,5 +1,6 @@
 "use client";
 
+import { EMPLOYEE_CATEGORY_LABEL } from "@/domain/labels";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
@@ -153,14 +154,14 @@ export function GateSearch({
                     <span className="font-mono">{person.cpfDisplay}</span>
                     {person.employee ? (
                       <ToneBadge tone="warning" icon={Building}>
-                        Funcionário(a){person.employee.jobTitle ? ` · ${person.employee.jobTitle}` : ""}
+                        {EMPLOYEE_CATEGORY_LABEL[person.employee.category]}{person.employee.jobTitle ? ` · ${person.employee.jobTitle}` : ""}
                       </ToneBadge>
                     ) : null}
                     {person.memberStatus ? <AffiliationBadge status={person.memberStatus} short /> : null}
                     {person.hostName ? (
                       <ToneBadge tone="info" icon={Users}>
                         Convidado de {person.hostName}
-                        {person.hostIsEmployee ? " (funcionário)" : ""}
+                        {person.hostIsEmployee ? " (colaborador)" : ""}
                       </ToneBadge>
                     ) : null}
                     {person.checkedInAt ? (

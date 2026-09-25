@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/staff/panel-ui";
 import { CreateUserDialog, EditUserDialog, ResetPasswordDialog } from "@/components/staff/user-dialogs";
 import { ToneBadge } from "@/components/status/status-badge";
+import { resolveAccess } from "@/domain/access";
 import { ROLE_LABEL } from "@/domain/labels";
 import { initials } from "@/lib/text";
 import { cn } from "@/lib/utils";
@@ -18,13 +19,13 @@ export default async function UsersPage() {
       <PageHeader
         eyebrow="Acesso ao sistema"
         title="Usuários"
-        description="Logins de Administração, Atendimento e Segurança/Recepção. Quem só trabalha na festa (sem usar o sistema) vai em Funcionários da festa."
+        description="Quem usa o sistema e o que cada pessoa pode fazer, área por área. Colaboradores que só vão à festa (sem usar o sistema) ficam em Colaboradores SINDSERM."
         actions={<CreateUserDialog />}
       />
       <div className="overflow-hidden rounded-xl border border-line bg-surface">
         <ul className="divide-y divide-line">
           {users.map((u) => (
-            <li key={u.id} className={cn("flex flex-wrap items-center gap-4 px-4 py-4 sm:px-5", !u.active && "opacity-60")}>
+            <li key={u.id} className={cn("flex flex-wrap items-center gap-4 px-4 py-4 sm:px-5", !u.active && "opacity-60")} data-testid="user-row">
               <span className="pixel inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-brand text-[0.6rem] text-white shadow-[0_3px_0_0_var(--brand-strong)]">
                 {initials(u.name)}
               </span>
@@ -33,13 +34,26 @@ export default async function UsersPage() {
                   {u.name}
                   {u.id === actor.userId ? <ToneBadge tone="info">Você</ToneBadge> : null}
                   {!u.active ? <ToneBadge tone="danger">Desativado</ToneBadge> : null}
+                  {u.permissions ? <ToneBadge tone="info">Permissões ajustadas</ToneBadge> : null}
+                  {u.mustChangePassword && u.active ? <ToneBadge tone="warning">Senha provisória</ToneBadge> : null}
                 </p>
                 <p className="truncate text-sm text-fg-muted">
                   {u.email} · {ROLE_LABEL[u.role]}
                 </p>
               </div>
               <div className="-mt-2 flex w-full gap-1 pl-11 sm:mt-0 sm:w-auto sm:pl-0">
-                <EditUserDialog user={{ userId: u.id, name: u.name, role: u.role, active: u.active, email: u.email }} isSelf={u.id === actor.userId} />
+                <EditUserDialog
+                  user={{
+                    userId: u.id,
+                    name: u.name,
+                    email: u.email,
+                    role: u.role,
+                    access: resolveAccess(u.role, u.permissions),
+                    active: u.active,
+                    mustChangePassword: u.mustChangePassword,
+                  }}
+                  isSelf={u.id === actor.userId}
+                />
                 <ResetPasswordDialog userId={u.id} name={u.name} />
               </div>
             </li>

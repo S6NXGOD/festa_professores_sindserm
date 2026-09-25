@@ -36,27 +36,34 @@ import {
 } from "@/domain/schemas";
 import { callAction } from "@/lib/call-action";
 import { playSound } from "@/lib/sound";
+import type { EmployeeCategory } from "@/domain/types";
 import { cn } from "@/lib/utils";
 import { createEmployeeAction, createEmployeesFromListAction, updateEmployeeAction } from "@/server/actions/employees";
+import { CategoryPicker } from "./employee-category";
 
-/** Setores comuns no sindicato (sugestões; dá para escrever qualquer outro). */
+/** Setores e cargos comuns no sindicato (sugestões; dá para escrever qualquer outro). */
 const SECTOR_SUGGESTIONS = [
+  "Presidência",
+  "Vice-presidência",
+  "Secretaria-geral",
+  "Tesouraria",
   "Administrativo",
   "Secretaria",
   "Financeiro",
   "Jurídico",
   "Comunicação",
   "Recepção",
-  "Diretoria",
   "Assessoria",
   "Serviços gerais",
+  "Limpeza",
+  "Segurança",
   "Motorista",
 ];
 
 function SectorField({ error, register }: { error?: string; register: React.InputHTMLAttributes<HTMLInputElement> }) {
   return (
-    <FormField id="employee-job" label="Setor no sindicato" optional error={error}>
-      <Input id="employee-job" list="employee-job-options" placeholder="Ex.: Financeiro, Jurídico, Secretaria" autoComplete="off" {...register} />
+    <FormField id="employee-job" label="Setor ou cargo" optional error={error}>
+      <Input id="employee-job" list="employee-job-options" placeholder="Ex.: Presidência, Financeiro, Limpeza" autoComplete="off" {...register} />
       <datalist id="employee-job-options">
         {SECTOR_SUGGESTIONS.map((job) => (
           <option key={job} value={job} />
@@ -66,14 +73,14 @@ function SectorField({ error, register }: { error?: string; register: React.Inpu
   );
 }
 
-/** O que cada funcionário(a) liberado(a) ganha (mesmas regras das professoras e professores). */
+/** O que cada colaborador(a) liberado(a) ganha (mesmas regras das professoras e professores). */
 function RightsNote() {
   return (
     <p className="flex items-start gap-2.5 rounded-xl border border-warning/40 bg-warning-soft p-3 text-sm text-fg">
       <Gift className="mt-0.5 size-4 shrink-0 text-warning" />
       <span>
         Ganha voucher próprio, <strong>1 kit de consumação</strong> na entrada e pode levar <strong>1 convidado</strong> (com kit, que
-        sai quando o(a) funcionário(a) chegar). Os kits saem do estoque dos funcionários.
+        sai quando o(a) colaborador(a) chegar). Os kits saem do estoque dos colaboradores.
       </span>
     </p>
   );
@@ -81,12 +88,12 @@ function RightsNote() {
 
 const EMPTY_GUEST = { fullName: "", cpf: "", isMinor: false };
 
-/** Liberar um(a) funcionário(a) do SINDSERM para a festa, já com o convidado (opcional). */
+/** Liberar um(a) colaborador(a) do SINDSERM para a festa, já com o convidado (opcional). */
 export function EmployeeDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const defaults: EmployeeInput = { fullName: "", cpf: "", whatsapp: "", jobTitle: "", guest: null };
+  const defaults: EmployeeInput = { fullName: "", cpf: "", whatsapp: "", jobTitle: "", category: "STAFF", guest: null };
   const form = useForm<EmployeeInput, unknown, EmployeeData>({ resolver: zodResolver(employeeSchema), defaultValues: defaults });
   const e = form.formState.errors;
   const guest = useWatch({ control: form.control, name: "guest" });
@@ -131,18 +138,23 @@ export function EmployeeDialog() {
     >
       <DialogTrigger asChild>
         <Button data-testid="add-employee">
-          <UserPlus /> Novo funcionário
+          <UserPlus /> Novo colaborador
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Liberar funcionário(a) para a festa</DialogTitle>
+          <DialogTitle>Liberar colaborador(a) para a festa</DialogTitle>
           <DialogDescription>
-            Cadastro interno de funcionários do SINDSERM (não aparece no link público). CPF e WhatsApp são opcionais: o WhatsApp
-            serve para mandar os vouchers.
+            Diretoria, funcionários e prestadores de serviço do SINDSERM (cadastro interno, não aparece no link público). CPF e
+            WhatsApp são opcionais: o WhatsApp serve para mandar os vouchers.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4" noValidate id="employee-form">
+          <Controller
+            control={form.control}
+            name="category"
+            render={({ field }) => <CategoryPicker value={(field.value ?? "STAFF") as EmployeeCategory} onChange={field.onChange} />}
+          />
           <FormField id="employee-name" label="Nome completo" error={e.fullName?.message}>
             <Input id="employee-name" autoComplete="off" {...form.register("fullName")} />
           </FormField>
@@ -235,9 +247,10 @@ export interface EmployeeEditValues {
   cpf: string;
   whatsapp: string;
   jobTitle: string;
+  category: EmployeeCategory;
 }
 
-/** Corrigir os dados de um(a) funcionário(a) (o convidado é trocado na tela da pessoa). */
+/** Corrigir os dados de um(a) colaborador(a) (o convidado é trocado na tela da pessoa). */
 export function EditEmployeeDialog({ initial, trigger }: { initial: EmployeeEditValues; trigger: React.ReactNode }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -273,10 +286,15 @@ export function EditEmployeeDialog({ initial, trigger }: { initial: EmployeeEdit
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Editar funcionário(a)</DialogTitle>
+          <DialogTitle>Editar colaborador(a)</DialogTitle>
           <DialogDescription>Para trocar o convidado, abra a pessoa (toque no nome) e use a seção Convidado.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4" noValidate id="edit-employee-form">
+          <Controller
+            control={form.control}
+            name="category"
+            render={({ field }) => <CategoryPicker value={(field.value ?? "STAFF") as EmployeeCategory} onChange={field.onChange} />}
+          />
           <FormField id="edit-employee-name" label="Nome completo" error={e.fullName?.message}>
             <Input id="edit-employee-name" autoComplete="off" {...form.register("fullName")} />
           </FormField>
@@ -308,13 +326,14 @@ export function BulkEmployeesDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
+  const [category, setCategory] = useState<EmployeeCategory>("STAFF");
   const [pending, startTransition] = useTransition();
   const preview = parseEmployeeLines(text);
   const guests = preview.rows.filter((row) => row.guestName).length;
 
   function submit() {
     startTransition(async () => {
-      const result = await callAction(createEmployeesFromListAction({ text }));
+      const result = await callAction(createEmployeesFromListAction({ text, category }));
       if (!result.ok) {
         playSound("error");
         toast.error(result.error);
@@ -323,7 +342,7 @@ export function BulkEmployeesDialog() {
       const { created, guests: guestsCreated, skipped } = result.data;
       playSound(created > 0 ? "fanfare" : "warn");
       toast.success(
-        `${created} ${created === 1 ? "funcionário liberado" : "funcionários liberados"}` +
+        `${created} ${created === 1 ? "colaborador liberado" : "colaboradores liberados"}` +
           (guestsCreated ? `, com ${guestsCreated} ${guestsCreated === 1 ? "convidado" : "convidados"}` : "") +
           "." +
           (skipped.length ? ` ${skipped.length} já estava${skipped.length > 1 ? "m" : ""} na lista.` : ""),
@@ -345,16 +364,17 @@ export function BulkEmployeesDialog() {
         <DialogHeader>
           <DialogTitle>Liberar vários de uma vez</DialogTitle>
           <DialogDescription>
-            Cole a lista do WhatsApp ou da planilha, um funcionário por linha: <strong className="text-fg">Nome; Setor; Convidado</strong>{" "}
+            Cole a lista do WhatsApp ou da planilha, uma pessoa por linha: <strong className="text-fg">Nome; Setor ou cargo; Convidado</strong>{" "}
             (setor e convidado são opcionais). Numeração é ignorada e quem já está na lista é pulado.
           </DialogDescription>
         </DialogHeader>
+        <CategoryPicker value={category} onChange={setCategory} label="Todos desta lista são" />
         <Textarea
           value={text}
           onChange={(event) => setText(event.target.value)}
           rows={7}
           placeholder={"Maria Souza; Financeiro; João Souza\nPedro Lima; Jurídico\nAna Costa;; Bia Costa"}
-          aria-label="Lista de funcionários"
+          aria-label="Lista de colaboradores"
           data-testid="bulk-employees-text"
         />
         {preview.rows.length + preview.errors.length > 0 ? (

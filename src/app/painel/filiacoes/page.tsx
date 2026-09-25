@@ -21,7 +21,7 @@ const STATUS = {
 } as const;
 
 export default async function AffiliationFormsPage({ searchParams }: PageProps<"/painel/filiacoes">) {
-  await requirePageActor("newAffiliation");
+  await requirePageActor("viewForms");
   const query = await searchParams;
   const filtro = typeof query.filtro === "string" ? query.filtro : "";
   const q = typeof query.q === "string" ? query.q : undefined;

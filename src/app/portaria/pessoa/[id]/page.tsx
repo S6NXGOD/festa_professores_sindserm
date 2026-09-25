@@ -13,10 +13,10 @@ export const metadata: Metadata = { title: "Pessoa" };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function GatePersonPage({ params, searchParams }: PageProps<"/portaria/pessoa/[id]">) {
-  const actor = await requirePageActor("checkIn");
+  const actor = await requirePageActor("viewGate");
   const [{ id }, query] = await Promise.all([params, searchParams]);
   if (!UUID.test(id)) notFound();
-  const view = await loadGateView(db, id, actor.role);
+  const view = await loadGateView(db, id, actor.access);
   if (!view) notFound();
   return (
     <div className="space-y-4">

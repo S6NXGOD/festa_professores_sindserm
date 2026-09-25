@@ -3,6 +3,7 @@
  * (ex.: contracheque com o desconto do SINDSERM).
  */
 import { eq } from "drizzle-orm";
+import { ROLE_PRESETS } from "@/domain/access";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { auditLog } from "@/server/db/schema";
@@ -41,8 +42,8 @@ describe("filiação não confirmada, comprovada na hora", () => {
   it("o Atendimento confirma direto, registrando como a pessoa comprovou", async () => {
     const { registrationId, state } = await registerMember({ guest: true });
     await decideAffiliation(attendant, { registrationId, decision: "REJECT", note: "Não encontrada na lista" });
-    expect((await loadGateView(db, state.member.id, "SECURITY"))?.entry.kind).toBe("BLOCKED");
-    expect((await loadGateView(db, state.guest!.personId, "SECURITY"))?.entry.kind).toBe("BLOCKED");
+    expect((await loadGateView(db, state.member.id, ROLE_PRESETS.SECURITY))?.entry.kind).toBe("BLOCKED");
+    expect((await loadGateView(db, state.guest!.personId, ROLE_PRESETS.SECURITY))?.entry.kind).toBe("BLOCKED");
 
     // Segurança não confirma filiação; a comprovação precisa ser descrita.
     await expectDomainError(confirmAfterProof(security, { registrationId, justification: PROOF }), "FORBIDDEN");

@@ -259,7 +259,7 @@ export async function removeDocument(actor: Actor, id: string) {
       .select({ status: affiliationForm.status, fullName: affiliationForm.fullName })
       .from(affiliationForm)
       .where(eq(affiliationForm.id, row.formId));
-    if (form && form.status !== "DRAFT" && !can(actor.role, "adminCorrections")) {
+    if (form && form.status !== "DRAFT" && !can(actor.access, "adminCorrections")) {
       throw new DomainError("FORBIDDEN", "Depois da assinatura, só o administrador apaga documentos.");
     }
     await tx.delete(affiliationDocument).where(eq(affiliationDocument.id, row.id));

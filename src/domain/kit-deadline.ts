@@ -1,4 +1,4 @@
-import { zonedLocalToUtc } from "@/lib/datetime";
+import { formatClock, formatPlainDate, zonedLocalToUtc } from "@/lib/datetime";
 
 function toMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -26,6 +26,25 @@ export function kitDeadlineAt(config: KitDeadlineConfig): Date | null {
   const crossesMidnight = toMinutes(config.kitDeadlineTime) < toMinutes(config.startTime);
   const day = crossesMidnight ? addDays(config.eventDate, 1) : config.eventDate;
   return zonedLocalToUtc(`${day}T${config.kitDeadlineTime.slice(0, 5)}`);
+}
+
+/** Início da festa: dia + horário de início, no fuso do evento. */
+export function eventStartAt(config: { eventDate: string; startTime: string }): Date | null {
+  return zonedLocalToUtc(`${config.eventDate}T${config.startTime.slice(0, 5)}`);
+}
+
+/** "16/10/2026, às 19h" — para avisos da portaria. */
+export function eventStartLabel(config: { eventDate: string; startTime: string }): string {
+  return `${formatPlainDate(config.eventDate)}, às ${formatClock(config.startTime)}`;
+}
+
+/**
+ * A festa já começou? Antes disso, a portaria só registra entrada com uma
+ * confirmação a mais. Sem festa configurada, não trava nada.
+ */
+export function hasEventStarted(config: { eventDate: string; startTime: string } | null, now = new Date()): boolean {
+  const start = config ? eventStartAt(config) : null;
+  return start === null || now.getTime() >= start.getTime();
 }
 
 export function isKitDeadlinePassed(config: KitDeadlineConfig | null, now = new Date()): boolean {

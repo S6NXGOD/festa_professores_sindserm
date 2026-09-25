@@ -219,8 +219,8 @@ export async function saveAffiliationForm(actor: Actor, rawInput: AffiliationFor
       }
       await assertMatriculaFree(tx, data.registrationNumber, personId);
       if (await isActiveEmployee(tx, personId)) {
-        throw new DomainError("CONFLICT", "Esta pessoa está na lista de funcionários do SINDSERM. Tire da lista antes de fazer a ficha.", {
-          cpf: "Funcionário(a) do SINDSERM",
+        throw new DomainError("CONFLICT", "Esta pessoa está na lista de colaboradores do SINDSERM. Tire da lista antes de fazer a ficha.", {
+          cpf: "Colaborador(a) do SINDSERM",
         });
       }
 

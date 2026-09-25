@@ -104,8 +104,8 @@ export function StockFields({
         {numberField(
           "totalEmployee",
           "stock-employee",
-          "Kits de funcionários (estoque separado)",
-          `Para os funcionários do SINDSERM e os convidados deles (1 kit cada). Deixe 0 se não houver funcionários liberados.${
+          "Kits dos colaboradores (estoque separado)",
+          `Para a diretoria, os funcionários e os prestadores de serviço do SINDSERM e os convidados deles (1 kit cada). Deixe 0 se ninguém da casa for liberado.${
             delivered?.employee ? ` Já entregues: ${delivered.employee}.` : ""
           }`,
         )}
@@ -115,7 +115,7 @@ export function StockFields({
         "lowStockThreshold",
         "stock-threshold",
         "Alertar quando restarem até",
-        "Quando o saldo chegar a este número, o painel avisa que o estoque está baixo. Nos kits de funcionários, o aviso aparece quando o que resta não dá para os funcionários e convidados que ainda vão receber.",
+        "Quando o saldo chegar a este número, o painel avisa que o estoque está baixo. Nos kits dos colaboradores, o aviso aparece quando o que resta não dá para os colaboradores e convidados que ainda vão receber.",
       )}
     </div>
   );

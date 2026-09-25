@@ -12,7 +12,6 @@ import type {
   GroupKitType,
   KitType,
   ParticipantRole,
-  StaffRole,
   StockMode,
   StockPool,
 } from "./types";
@@ -225,30 +224,7 @@ export function guestRemovalCheck(input: { guestCheckedIn: boolean; guestKitDeli
 }
 
 // ---------------------------------------------------------------------------
-// Permissões por papel (verificadas no servidor)
+// Permissões (verificadas no servidor): por área do sistema, ver ./access
 // ---------------------------------------------------------------------------
 
-export const PERMISSIONS = {
-  checkIn: ["ADMIN", "ATTENDANT", "SECURITY"],
-  search: ["ADMIN", "ATTENDANT", "SECURITY"],
-  viewPanel: ["ADMIN", "ATTENDANT"],
-  validateAffiliation: ["ADMIN", "ATTENDANT"],
-  registerAtEvent: ["ADMIN", "ATTENDANT"],
-  newAffiliation: ["ADMIN", "ATTENDANT"],
-  manageGuests: ["ADMIN", "ATTENDANT"],
-  deliverKits: ["ADMIN", "ATTENDANT"],
-  viewFullCpf: ["ADMIN", "ATTENDANT"],
-  reissueVoucher: ["ADMIN", "ATTENDANT"],
-  adminCorrections: ["ADMIN"],
-  manageEmployees: ["ADMIN"],
-  manageUsers: ["ADMIN"],
-  manageSettings: ["ADMIN"],
-  viewAudit: ["ADMIN"],
-} as const satisfies Record<string, readonly StaffRole[]>;
-
-export type Permission = keyof typeof PERMISSIONS;
-
-export function can(role: StaffRole | null | undefined, permission: Permission): boolean {
-  if (!role) return false;
-  return (PERMISSIONS[permission] as readonly StaffRole[]).includes(role);
-}
+export { can, type Permission } from "./access";

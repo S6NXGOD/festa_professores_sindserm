@@ -1,7 +1,7 @@
 import "server-only";
 import { connection } from "next/server";
 import { cache } from "react";
-import { kitDeadlineAt } from "@/domain/kit-deadline";
+import { eventStartLabel, hasEventStarted, kitDeadlineAt } from "@/domain/kit-deadline";
 import { DEFAULT_EVENT_NAME } from "@/domain/labels";
 import { formatClock, formatPlainDate, formatPlainDateLong, formatTime, zonedLocalToUtc } from "@/lib/datetime";
 import { mapsEmbedUrl, mapsOpenUrl } from "@/lib/maps";
@@ -45,6 +45,10 @@ export interface EventInfo {
   timeLabel: string;
   /** Início da festa (para contagem regressiva). */
   startsAt: Date | null;
+  /** "16/10/2026, às 19h" */
+  startLabel: string;
+  /** A festa já começou (agora, nesta requisição)? */
+  started: boolean;
   kitDeadline: { at: Date; label: string } | null;
   venue: VenueInfo | null;
   /** WhatsApp da organização para dúvidas (somente dígitos). */
@@ -68,6 +72,8 @@ export const getEventInfo = cache(async (): Promise<EventInfo | null> => {
       ? `${formatClock(config.startTime)} às ${formatClock(config.endTime)}`
       : formatClock(config.startTime),
     startsAt: zonedLocalToUtc(`${config.eventDate}T${config.startTime.slice(0, 5)}`),
+    startLabel: eventStartLabel(config),
+    started: hasEventStarted(config),
     kitDeadline: deadline ? { at: deadline, label: formatTime(deadline) } : null,
     venue: hasVenue
       ? {

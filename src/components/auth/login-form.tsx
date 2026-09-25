@@ -7,11 +7,7 @@ import { Eye, EyeOff, Loader, Login, Warning } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
-
-function safeNext(next: string | null | undefined) {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return "/painel";
-  return next;
-}
+import { postLoginDestinationAction } from "@/server/actions/users";
 
 export function LoginForm({ next }: { next?: string }) {
   const router = useRouter();
@@ -37,7 +33,14 @@ export function LoginForm({ next }: { next?: string }) {
         setError("Falha de comunicação com o servidor. Verifique a conexão.");
         return;
       }
-      router.replace(safeNext(next));
+      // Direto ao lugar certo: criar a senha (se for provisória) ou a primeira área permitida.
+      let destination = "/painel";
+      try {
+        destination = await postLoginDestinationAction(next ?? null);
+      } catch {
+        // sem resposta: o próprio painel redireciona
+      }
+      router.replace(destination);
       router.refresh();
     });
   }

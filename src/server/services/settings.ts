@@ -223,6 +223,29 @@ export async function updateHelpSettings(actor: Actor, data: HelpSettingsData) {
   });
 }
 
+/**
+ * Mensagem de divulgação da organização (vazio = volta a mensagem automática,
+ * montada com os dados da festa).
+ */
+export async function updateShareMessage(actor: Actor, raw: string | null) {
+  assertPermission(actor, "manageSettings");
+  const message = raw?.trim() ? raw.trim().slice(0, 2000) : null;
+  return withTx(async (tx) => {
+    const [current] = await tx.select().from(eventConfig).where(eq(eventConfig.id, 1)).for("update");
+    if (!current) throw new DomainError("INVALID_STATE", "Conclua a configuração inicial primeiro.");
+    if (current.shareMessage === message) return;
+    await tx.update(eventConfig).set({ shareMessage: message }).where(eq(eventConfig.id, 1));
+    await writeAudit(tx, actor, {
+      action: "SHARE_MESSAGE_UPDATED",
+      entityType: "event",
+      entityId: "1",
+      summary: message ? "Mensagem de divulgação salva." : "Mensagem de divulgação voltou a ser a automática.",
+      before: { shareMessage: current.shareMessage },
+      after: { shareMessage: message },
+    });
+  });
+}
+
 export interface StockPoolView {
   pool: StockPool;
   total: number;

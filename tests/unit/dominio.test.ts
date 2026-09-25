@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ROLE_PRESETS } from "@/domain/access";
 import { formatCpf, isValidCpf, maskCpf, normalizeCpf } from "@/lib/cpf";
 import { formatPhone, isValidPhone, normalizePhone } from "@/lib/phone";
 import { utcToZonedLocalInput, zonedLocalToUtc } from "@/lib/datetime";
@@ -253,9 +254,9 @@ describe("Regras de kits e convidado", () => {
     expect(isLowEmployeeStock(0, 0)).toBe(false);
   });
   it("só o administrador libera funcionários", () => {
-    expect(can("ADMIN", "manageEmployees")).toBe(true);
-    expect(can("ATTENDANT", "manageEmployees")).toBe(false);
-    expect(can("SECURITY", "manageEmployees")).toBe(false);
+    expect(can(ROLE_PRESETS.ADMIN, "manageEmployees")).toBe(true);
+    expect(can(ROLE_PRESETS.ATTENDANT, "manageEmployees")).toBe(false);
+    expect(can(ROLE_PRESETS.SECURITY, "manageEmployees")).toBe(false);
   });
 });
 

@@ -10,6 +10,7 @@ import { playSound } from "@/lib/sound";
 import { confirmEntryAction } from "@/server/actions/gate";
 import type { EntryKitResult } from "@/server/services/checkin";
 import type { GateView } from "@/server/services/gate-view";
+import { EarlyEntryDialog } from "./early-entry-dialog";
 import { EntryPromptDialog } from "./entry-prompt";
 import { deliveredKitCount, GateResult } from "./gate-result";
 import { PersonOperations } from "./person-operations";
@@ -30,15 +31,28 @@ export function GatePersonClient({
   const [entryKit, setEntryKit] = useState<EntryKitResult | null>(null);
   const [entryGuestKit, setEntryGuestKit] = useState<EntryKitResult | null>(null);
   const [promptEntry, setPromptEntry] = useState(promptEntryOnLoad);
+  const [earlyOpen, setEarlyOpen] = useState(false);
   const [confirming, startConfirm] = useTransition();
   // Na portaria, depois de confirmar a filiação, já pergunta pela entrada.
   const atGate = personBasePath.startsWith("/portaria");
 
-  function confirmEntry() {
+  /** Antes do horário de início, pede a confirmação a mais (`early`). */
+  function confirmEntry(early = false) {
     setPromptEntry(false);
+    if (!early && !view.eventStart.started) {
+      playSound("warn");
+      setEarlyOpen(true);
+      return;
+    }
     startConfirm(async () => {
-      const result = await callAction(confirmEntryAction({ personId: view.personId, method: "SEARCH" }));
+      const result = await callAction(confirmEntryAction({ personId: view.personId, method: "SEARCH", early }));
+      setEarlyOpen(false);
       if (!result.ok) {
+        if (result.code === "EVENT_NOT_STARTED") {
+          playSound("warn");
+          setEarlyOpen(true);
+          return;
+        }
         playSound("error");
         toast.error(result.error);
         return;
@@ -65,7 +79,7 @@ export function GatePersonClient({
         entryKit={entryKit}
         entryGuestKit={entryGuestKit}
         confirming={confirming}
-        onConfirm={confirmEntry}
+        onConfirm={() => confirmEntry()}
       />
       <PersonOperations
         view={view}
@@ -76,8 +90,17 @@ export function GatePersonClient({
       <EntryPromptDialog
         view={view}
         open={promptEntry && view.entry.kind === "ALLOWED" && view.permissions.checkIn && !confirming}
-        onConfirm={confirmEntry}
+        onConfirm={() => confirmEntry()}
         onClose={() => setPromptEntry(false)}
+      />
+      <EarlyEntryDialog
+        open={earlyOpen}
+        name={view.fullName}
+        startLabel={view.eventStart.label}
+        startAt={view.eventStart.at}
+        pending={confirming}
+        onConfirm={() => confirmEntry(true)}
+        onCancel={() => setEarlyOpen(false)}
       />
     </div>
   );

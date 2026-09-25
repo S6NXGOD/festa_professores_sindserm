@@ -22,12 +22,15 @@ import { DeadlineTimer } from "@/components/retro/countdown";
 import { LiveRefresh } from "@/components/retro/live-refresh";
 import { Equalizer } from "@/components/staff/equalizer";
 import { EmptyState, PageHeader, Panel, SegmentMeter, StatTile } from "@/components/staff/panel-ui";
+import { ShareDialog } from "@/components/staff/share-dialog";
 import { StockCard, stockAlertText } from "@/components/staff/stock-card";
 import { Button } from "@/components/ui/button";
 import { formatDateTime, formatShortDateTime, formatTime } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
 import { db } from "@/server/db";
-import { getEventInfo, getRegistrationWindow } from "@/server/queries/config";
+import { getConfig, getEventInfo, getRegistrationWindow } from "@/server/queries/config";
+import { defaultShareMessage, shareSummary } from "@/server/queries/share";
+import { publicBaseUrl } from "@/server/public-url";
 import { listAffiliationForms, listVerificationQueue, recentCheckIns } from "@/server/queries/panel";
 import { getCheckInTimeline, getDashboardStats } from "@/server/services/stats";
 import { can } from "@/domain/rules";
@@ -36,9 +39,10 @@ import { requirePageActor } from "@/server/session";
 export const metadata: Metadata = { title: "Placar" };
 
 export default async function DashboardPage() {
-  const actor = await requirePageActor("viewPanel");
-  const isAdmin = can(actor.role, "manageEmployees");
-  const [event, window, stats, pending, drafts, checkIns, timeline] = await Promise.all([
+  const actor = await requirePageActor("viewDashboard");
+  const isAdmin = can(actor.access, "manageEmployees");
+  const [config, event, window, stats, pending, drafts, checkIns, timeline] = await Promise.all([
+    getConfig(),
     getEventInfo(),
     getRegistrationWindow(),
     getDashboardStats(db),
@@ -48,6 +52,7 @@ export default async function DashboardPage() {
     getCheckInTimeline(db, 6),
   ]);
   const stock = stats.stock;
+  const shareUrl = `${publicBaseUrl() ?? ""}/`;
   const employeePool = stock?.pools.find((pool) => pool.pool === "EMPLOYEE") ?? null;
   const presence = stats.expected > 0 ? Math.round((stats.present / stats.expected) * 100) : 0;
   // As duas filas do Atendimento, na ordem em que a recepção costuma resolver.
@@ -90,16 +95,30 @@ export default async function DashboardPage() {
         }
         actions={
           <>
-            <Button asChild variant="outline">
-              <Link href="/painel/inscricoes/nova">
-                <UserPlus /> Cadastrar na hora
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href="/portaria">
-                <QrCode /> Portaria
-              </Link>
-            </Button>
+            {event ? (
+              <ShareDialog
+                url={shareUrl}
+                autoMessage={defaultShareMessage(event, window, shareUrl)}
+                savedMessage={config?.shareMessage ?? null}
+                canEdit={can(actor.access, "manageSettings")}
+                title={event.name}
+                summary={shareSummary(event, window)}
+              />
+            ) : null}
+            {can(actor.access, "registerAtEvent") ? (
+              <Button asChild variant="outline">
+                <Link href="/painel/inscricoes/nova">
+                  <UserPlus /> Cadastrar na hora
+                </Link>
+              </Button>
+            ) : null}
+            {can(actor.access, "viewGate") ? (
+              <Button asChild>
+                <Link href="/portaria">
+                  <QrCode /> Portaria
+                </Link>
+              </Button>
+            ) : null}
           </>
         }
       />
@@ -148,7 +167,7 @@ export default async function DashboardPage() {
             icon={Gift}
             tone={stock?.anyLow ? "danger" : "brand"}
             href="/painel/kits"
-            hint={employeePool ? `${(stock?.totalAvailable ?? 0) - employeePool.available} gerais · ${employeePool.available} funcionários` : undefined}
+            hint={employeePool ? `${(stock?.totalAvailable ?? 0) - employeePool.available} gerais · ${employeePool.available} colaboradores` : undefined}
             testId="stat-kits-available"
           />
           <StatTile
@@ -187,7 +206,7 @@ export default async function DashboardPage() {
           label="Convidados"
           value={stats.guests + stats.employeeGuests}
           icon={Users}
-          hint={stats.employeeGuests ? `${stats.employeeGuests} de funcionários` : undefined}
+          hint={stats.employeeGuests ? `${stats.employeeGuests} de colaboradores` : undefined}
           testId="stat-guests"
         />
         <StatTile label="Filiados confirmados" value={stats.confirmed} icon={Check} tone="success" testId="stat-confirmed" />
@@ -204,12 +223,12 @@ export default async function DashboardPage() {
         />
         {stats.employees > 0 || isAdmin ? (
           <StatTile
-            label="Funcionários"
+            label="Colaboradores"
             value={stats.employeesPresent}
             icon={Building}
             tone="warning"
-            href={isAdmin ? "/painel/funcionarios" : undefined}
-            hint={stats.employees ? `de ${plural(stats.employees, "liberado", "liberados")} já entraram` : "Libere os funcionários do SINDSERM"}
+            href={isAdmin ? "/painel/colaboradores" : undefined}
+            hint={stats.employees ? `de ${plural(stats.employees, "liberado", "liberados")} já entraram` : "Libere os colaboradores do SINDSERM"}
             testId="stat-employees-present"
           />
         ) : null}

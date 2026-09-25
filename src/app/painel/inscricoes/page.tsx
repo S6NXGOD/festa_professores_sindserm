@@ -7,12 +7,11 @@ import { ChipFilters, EmptyState, FilterBar, PageHeader, Pagination } from "@/co
 import { VerificationCard } from "@/components/staff/queue-cards";
 import { AffiliationBadge, TeacherBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
-import { AFFILIATION_STATUS_SHORT } from "@/domain/labels";
 import { can } from "@/domain/rules";
 import { AFFILIATION_STATUSES, type AffiliationStatus } from "@/domain/types";
 import { formatShortDateTime } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
-import { listRegistrations, listVerificationQueue, pageNumber, queueCounts } from "@/server/queries/panel";
+import { listRegistrations, listVerificationQueue, pageNumber, queueCounts, registrationStatusCounts } from "@/server/queries/panel";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Inscrições" };
@@ -20,13 +19,21 @@ export const metadata: Metadata = { title: "Inscrições" };
 /** "Aguardando conferência" não entra aqui: é a própria fila, o primeiro filtro. */
 const STATUS_FILTERS = AFFILIATION_STATUSES.filter((status) => status !== "PENDING");
 
+/** Rótulos dos filtros no plural (são grupos de inscrições, não ações). */
+const FILTER_LABEL: Record<Exclude<AffiliationStatus, "PENDING">, string> = {
+  AWAITING_SIGNATURE: "Esperando assinatura",
+  CONFIRMED: "Confirmadas",
+  REJECTED: "Não confirmadas",
+  JOINED_AT_EVENT: "Filiaram-se na festa",
+};
+
 export default async function RegistrationsPage({ searchParams }: PageProps<"/painel/inscricoes">) {
-  const actor = await requirePageActor("viewPanel");
+  const actor = await requirePageActor("viewRegistrations");
   const query = await searchParams;
   const q = typeof query.q === "string" ? query.q : undefined;
   const filtro = typeof query.filtro === "string" ? query.filtro : "";
   const page = pageNumber(query.page);
-  const counts = await queueCounts();
+  const [counts, statusCounts] = await Promise.all([queueCounts(), registrationStatusCounts()]);
   // Sem filtro escolhido, abre direto na fila quando há inscrição esperando conferência. O filtro vai
   // para o endereço: ao conferir a última, a tela fica em "Fila zerada" em vez de pular para a lista.
   if (!filtro && counts.pending > 0) redirect(q ? `/painel/inscricoes?filtro=conferir&q=${encodeURIComponent(q)}` : "/painel/inscricoes?filtro=conferir");
@@ -63,8 +70,12 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
         params={{ q }}
         options={[
           { value: "conferir", label: "Para conferir", count: counts.pending, attention: counts.pending > 0 },
-          { value: "todas", label: "Todas" },
-          ...STATUS_FILTERS.map((s) => ({ value: s, label: AFFILIATION_STATUS_SHORT[s] })),
+          { value: "todas", label: "Todas", count: statusCounts.total },
+          ...STATUS_FILTERS.filter((s) => (statusCounts.byStatus[s] ?? 0) > 0 || status === s).map((s) => ({
+            value: s,
+            label: FILTER_LABEL[s as Exclude<AffiliationStatus, "PENDING">],
+            count: statusCounts.byStatus[s] ?? 0,
+          })),
         ]}
       />
       <FilterBar action="/painel/inscricoes" q={q}>
@@ -83,7 +94,7 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
           <AnimatedList
             items={queue.rows.map((row) => ({
               key: row.registrationId,
-              content: <VerificationCard row={row} canDecide={can(actor.role, "validateAffiliation")} />,
+              content: <VerificationCard row={row} canDecide={can(actor.access, "validateAffiliation")} />,
             }))}
           />
         )

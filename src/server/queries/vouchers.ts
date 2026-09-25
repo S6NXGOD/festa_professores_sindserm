@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import { db } from "@/server/db";
 import { voucher } from "@/server/db/schema";
 import { isActiveMember } from "@/domain/rules";
-import type { AffiliationStatus } from "@/domain/types";
+import type { AffiliationStatus, EmployeeCategory } from "@/domain/types";
 import { formatVoucherCode, qrPayloadFor } from "@/server/crypto";
 import { findRegistrationByAccessToken } from "@/server/services/registration";
 import { loadPersonState, loadRegistrationState, type PersonState } from "@/server/services/state";
@@ -16,7 +16,7 @@ export interface VoucherCardData {
   code: string;
   qrSvg: string;
   fullName: string;
-  /** EMPLOYEE: voucher de funcionário(a) do SINDSERM (visual próprio). */
+  /** EMPLOYEE: voucher de colaborador(a) do SINDSERM (visual próprio, com a categoria). */
   kind: "MEMBER" | "GUEST" | "EMPLOYEE";
   isMinor: boolean;
   checkedInAt: Date | null;
@@ -31,6 +31,8 @@ export interface VoucherCardData {
   hostIsEmployee?: boolean;
   /** Funcionário(a): setor ou cargo no sindicato. */
   jobTitle?: string | null;
+  /** Categoria do(a) colaborador(a) (diretoria, funcionário(a), prestador(a)). */
+  category?: EmployeeCategory | null;
 }
 
 export async function qrSvgFor(token: string): Promise<string> {
@@ -71,7 +73,13 @@ async function cardFromState(state: PersonState, token: string, code: string): P
     checkedInAt: state.checkIn?.checkedInAt ?? null,
   };
   if (state.employee?.active) {
-    return { ...base, kind: "EMPLOYEE", jobTitle: state.employee.jobTitle, guestName: state.employee.guest?.fullName ?? null };
+    return {
+      ...base,
+      kind: "EMPLOYEE",
+      jobTitle: state.employee.jobTitle,
+      category: state.employee.category,
+      guestName: state.employee.guest?.fullName ?? null,
+    };
   }
   const own = state.ownRegistration;
   // Mesma regra da portaria: enquanto a filiação própria não estiver confirmada,

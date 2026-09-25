@@ -10,8 +10,8 @@ import {
   stockSettingsSchema,
 } from "@/domain/schemas";
 import type { StaffRole } from "@/domain/types";
-import { utcToZonedLocalInput } from "@/lib/datetime";
-import { type Actor, PUBLIC_ACTOR, type StaffActor } from "@/server/services/actor";
+import { todayInZone, utcToZonedLocalInput } from "@/lib/datetime";
+import { type Actor, PUBLIC_ACTOR, type StaffActor, staffActor } from "@/server/services/actor";
 import { storeDocument } from "@/server/services/documents";
 import { createPreAffiliation, createRegistration } from "@/server/services/registration";
 import { completeSetup } from "@/server/services/settings";
@@ -84,7 +84,7 @@ export async function createStaff(role: StaffRole, name?: string): Promise<Staff
     emailVerified: true,
     role,
   });
-  return { kind: "staff", userId: id, name: displayName, role };
+  return staffActor({ userId: id, name: displayName, role });
 }
 
 export async function configureEvent(
@@ -106,8 +106,9 @@ export async function configureEvent(
     event: eventSettingsSchema.parse({
       name: "Festa das Professoras e Professores",
       description: "",
-      eventDate: options.eventDate ?? "2026-10-15",
-      startTime: options.startTime ?? "19:00",
+      // Por padrão, a festa já começou (hoje, 0h): a portaria registra entradas sem o aviso de "ainda não começou".
+      eventDate: options.eventDate ?? todayInZone(),
+      startTime: options.startTime ?? "00:00",
       endTime: "",
       registrationOpensAt: utcToZonedLocalInput(new Date(now - 2 * 86_400_000)),
       registrationClosesAt: utcToZonedLocalInput(new Date(now + 2 * 86_400_000)),

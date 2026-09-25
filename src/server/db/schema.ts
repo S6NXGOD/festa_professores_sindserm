@@ -76,6 +76,12 @@ export const affiliationFormStatusEnum = pgEnum("affiliation_form_status", [
 ]);
 /** PUBLIC: preenchida pelo(a) interessado(a) antes da festa; STAFF: pelo Atendimento. */
 export const affiliationFormOriginEnum = pgEnum("affiliation_form_origin", ["PUBLIC", "STAFF"]);
+/**
+ * Colaboradores do SINDSERM liberados para a festa: funcionários (STAFF, o
+ * padrão de quem já estava na lista), diretoria (BOARD) e prestadores de
+ * serviço (CONTRACTOR). Todos com a mesma regra: voucher próprio, 1 kit e 1 convidado.
+ */
+export const employeeCategoryEnum = pgEnum("employee_category", ["STAFF", "BOARD", "CONTRACTOR"]);
 
 // ---------------------------------------------------------------------------
 // Better Auth (equipe). Participantes não possuem conta.
@@ -89,6 +95,13 @@ export const user = pgTable("user", {
   image: text("image"),
   role: staffRoleEnum("role").notNull().default("SECURITY"),
   active: boolean("active").notNull().default(true),
+  /**
+   * Permissões personalizadas (JSON com o nível de cada área do sistema).
+   * Nulo = as do perfil (`role`), que é o modelo de partida.
+   */
+  permissions: text("permissions"),
+  /** Senha provisória (criada ou redefinida pelo administrador): troca obrigatória no próximo acesso. */
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -173,6 +186,8 @@ export const eventConfig = pgTable(
     venueMapsUrl: text("venue_maps_url"),
     /** WhatsApp da organização para dúvidas (somente dígitos, com DDD). Aparece no botão de ajuda. */
     helpWhatsapp: text("help_whatsapp"),
+    /** Mensagem de divulgação escrita pela organização. Nula = a mensagem automática, montada com os dados da festa. */
+    shareMessage: text("share_message"),
     stockMode: stockModeEnum("stock_mode").notNull(),
     lowStockThreshold: integer("low_stock_threshold").notNull(),
     setupCompletedAt: timestamptz("setup_completed_at").notNull().defaultNow(),
@@ -365,6 +380,7 @@ export const employee = pgTable(
       .references(() => person.id, { onDelete: "restrict" }),
     /** Setor ou cargo no sindicato (ex.: Secretaria, Financeiro, Jurídico). */
     jobTitle: text("job_title"),
+    category: employeeCategoryEnum("category").notNull().default("STAFF"),
     createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

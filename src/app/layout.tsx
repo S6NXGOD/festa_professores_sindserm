@@ -4,7 +4,9 @@ import { HelpProvider } from "@/components/help/help";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
-import { APP_NAME, getConfig } from "@/server/queries/config";
+import { APP_NAME, getConfig, getEventInfo, getRegistrationWindow } from "@/server/queries/config";
+import { shareSummary } from "@/server/queries/share";
+import { publicBaseUrl } from "@/server/public-url";
 import "./globals.css";
 
 // Saira variável com eixo de largura: corpo normal e títulos condensados como no cartaz.
@@ -20,11 +22,18 @@ const marker = Permanent_Marker({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const config = await getConfig();
+  const [config, event, window] = await Promise.all([getConfig(), getEventInfo(), getRegistrationWindow()]);
   const name = config?.name ?? APP_NAME;
+  // Prévia do link (WhatsApp, redes): quando, onde e o prazo, com os dados do painel.
+  const summary = event ? shareSummary(event, window) : `Inscrição e credenciamento da ${name}.`;
+  const base = publicBaseUrl();
   return {
+    // Endereço público: o WhatsApp precisa do endereço completo da imagem da prévia.
+    metadataBase: base ? new URL(base) : undefined,
     title: { default: name, template: `%s · ${name}` },
-    description: config?.description || `Inscrição e credenciamento da ${name}.`,
+    description: config?.description || summary,
+    openGraph: { type: "website", locale: "pt_BR", siteName: "SINDSERM", title: name, description: summary },
+    twitter: { card: "summary_large_image", title: name, description: summary },
     robots: { index: false, follow: false },
   };
 }

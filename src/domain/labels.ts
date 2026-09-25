@@ -1,5 +1,5 @@
 import type { EntryBlockCode, KitBlockCode } from "./rules";
-import type { AffiliationStatus, CheckInMethod, DocumentKind, KitType, StaffRole, StockMode, StockPool } from "./types";
+import type { AffiliationStatus, CheckInMethod, DocumentKind, KitType, StaffRole, StockMode, StockPool, EmployeeCategory } from "./types";
 
 /** Nome da entidade organizadora (sistema de uso exclusivo do sindicato). */
 export const ORG_NAME = "SINDSERM";
@@ -43,7 +43,7 @@ export const ROLE_LABEL: Record<StaffRole, string> = {
 };
 
 export const ROLE_DESCRIPTION: Record<StaffRole, string> = {
-  ADMIN: "Acesso total: configurações, funcionários do SINDSERM, usuários, relatórios e auditoria.",
+  ADMIN: "Acesso total: configurações, colaboradores do SINDSERM, usuários e auditoria.",
   ATTENDANT: "Portaria, conferência de filiação, fichas, convidados e kits.",
   SECURITY: "Somente leitura de QR, pesquisa e registro de entrada.",
 };
@@ -51,7 +51,7 @@ export const ROLE_DESCRIPTION: Record<StaffRole, string> = {
 export const KIT_TYPE_LABEL: Record<KitType, string> = {
   MEMBER: "Kit do(a) professor(a)",
   GUEST: "Kit do convidado",
-  EMPLOYEE: "Kit de funcionário(a)",
+  EMPLOYEE: "Kit de colaborador(a)",
 };
 
 export const STOCK_MODE_LABEL: Record<StockMode, string> = {
@@ -63,7 +63,7 @@ export const STOCK_POOL_LABEL: Record<StockPool, string> = {
   ALL: "Kits (estoque único)",
   MEMBER: "Kits de professor(a)",
   GUEST: "Kits de convidado",
-  EMPLOYEE: "Kits de funcionários",
+  EMPLOYEE: "Kits dos colaboradores",
 };
 
 export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
@@ -71,8 +71,35 @@ export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   PAYSLIP: "Contracheque",
 };
 
-/** Funcionário(a) do SINDSERM: o nome que aparece no voucher e na portaria. */
-export const EMPLOYEE_LABEL = "Funcionário(a) do SINDSERM";
+/** Colaborador(a) do SINDSERM, quando a categoria não importa. */
+export const EMPLOYEE_LABEL = "Colaborador(a) do SINDSERM";
+
+export const EMPLOYEE_CATEGORY_LABEL: Record<EmployeeCategory, string> = {
+  BOARD: "Diretoria",
+  STAFF: "Funcionário(a)",
+  CONTRACTOR: "Prestador(a) de serviço",
+};
+
+/** "1 da diretoria", "3 funcionários", "1 prestador(a)". */
+export function employeeCategoryCount(category: EmployeeCategory, count: number): string {
+  const one = { BOARD: "da diretoria", STAFF: "funcionário(a)", CONTRACTOR: "prestador(a)" }[category];
+  const many = { BOARD: "da diretoria", STAFF: "funcionários", CONTRACTOR: "prestadores" }[category];
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/** Como a pessoa aparece no voucher e na portaria. */
+export const EMPLOYEE_CATEGORY_TITLE: Record<EmployeeCategory, string> = {
+  BOARD: "Diretoria do SINDSERM",
+  STAFF: "Funcionário(a) do SINDSERM",
+  CONTRACTOR: "Prestador(a) de serviço do SINDSERM",
+};
+
+/** Dentro de frases ("convidado(a) de Ana, diretoria do SINDSERM"). */
+export const EMPLOYEE_CATEGORY_INLINE: Record<EmployeeCategory, string> = {
+  BOARD: "diretoria do SINDSERM",
+  STAFF: "funcionário(a) do SINDSERM",
+  CONTRACTOR: "prestador(a) de serviço do SINDSERM",
+};
 
 export const CHECK_IN_METHOD_LABEL: Record<CheckInMethod, string> = {
   QR: "QR Code",
@@ -105,12 +132,12 @@ export const ENTRY_BLOCK_MESSAGE: Record<EntryBlockCode, { title: string; detail
     detail: "Convidado só entra vinculado a um(a) professor(a) filiado(a). Procure o Atendimento.",
   },
   HOST_EMPLOYEE_REMOVED: {
-    title: "Funcionário(a) responsável fora da lista",
-    detail: "Este convidado só entra vinculado a um(a) funcionário(a) da lista do SINDSERM. Procure a organização.",
+    title: "Colaborador(a) responsável fora da lista",
+    detail: "Este convidado só entra vinculado a um(a) colaborador(a) da lista do SINDSERM. Procure a organização.",
   },
   EMPLOYEE_REMOVED: {
-    title: "Fora da lista de funcionários",
-    detail: "Este voucher foi retirado da lista de funcionários do SINDSERM liberados para a festa. Procure a organização.",
+    title: "Fora da lista de colaboradores",
+    detail: "Este voucher foi retirado da lista de colaboradores do SINDSERM liberados para a festa. Procure a organização.",
   },
   NO_ACTIVE_REGISTRATION: {
     title: "Sem inscrição ativa",
@@ -127,7 +154,7 @@ export const KIT_BLOCK_MESSAGE: Record<KitBlockCode, string> = {
   HOST_NOT_CHECKED_IN: "Sai depois que quem convidou chegar.",
   GUEST_NOT_CHECKED_IN: "Sai junto com a entrada do convidado.",
   MEMBER_GOT_GUEST_KIT: "Já recebeu o kit quando entrou como convidado(a).",
-  EMPLOYEE_REMOVED: "Fora da lista de funcionários.",
+  EMPLOYEE_REMOVED: "Fora da lista de colaboradores.",
   EMPLOYEE_NOT_CHECKED_IN: "Sai junto com a entrada.",
 };
 
@@ -136,9 +163,9 @@ export const ENTRY_KIT_MESSAGE: Record<
   KitBlockCode | "ALREADY" | "GUEST_KIT_USED" | "OUT_OF_STOCK" | "NO_STOCK_CONFIG" | "NO_EMPLOYEE_STOCK",
   string
 > = {
-  EMPLOYEE_REMOVED: "Sem kit: fora da lista de funcionários.",
+  EMPLOYEE_REMOVED: "Sem kit: fora da lista de colaboradores.",
   EMPLOYEE_NOT_CHECKED_IN: "Sem kit.",
-  NO_EMPLOYEE_STOCK: "Sem kit: cadastre o estoque de kits dos funcionários (Kits e estoque).",
+  NO_EMPLOYEE_STOCK: "Sem kit: cadastre o estoque de kits dos colaboradores (Kits e estoque).",
   NOT_ACTIVE_MEMBER: "Sem kit: a filiação ainda não foi confirmada.",
   NOT_TEACHER: "Sem kit: não é professor(a).",
   DEADLINE_PASSED: "Sem kit: o horário de entregar kits já passou.",

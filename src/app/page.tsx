@@ -14,6 +14,7 @@ import {
 } from "@/components/icons/pixel";
 import { Reveal } from "@/components/motion/reveal";
 import { PublicShell } from "@/components/public/public-shell";
+import { StickyCta } from "@/components/public/sticky-cta";
 import { VenueSection } from "@/components/public/venue";
 import { PixelTag, TapeLabel } from "@/components/retro/bits";
 import { Countdown } from "@/components/retro/countdown";
@@ -82,7 +83,7 @@ export default async function HomePage() {
   ];
 
   return (
-    <PublicShell eventName={event.name} wide backdrop="hero">
+    <PublicShell eventName={event.name} wide backdrop="hero" help={open ? { className: "bottom-28 sm:bottom-6" } : undefined} bottomBar={open}>
       <Marquee items={marquee} className="-mx-4 -mt-4 mb-6 sm:mx-0 sm:rounded-lg sm:border" />
 
       <section className="grid grid-cols-1 items-center gap-8 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] md:gap-10">
@@ -116,7 +117,7 @@ export default async function HomePage() {
           <Reveal delay={0.2} className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             {open ? (
               <Button asChild size="xl" className="w-full sm:w-auto" data-testid="cta-inscricao">
-                <Link href="/inscricao">
+                <Link href="/inscricao" id="cta-inscricao">
                   <Login /> Fazer minha inscrição <ArrowRight />
                 </Link>
               </Button>
@@ -133,6 +134,9 @@ export default async function HomePage() {
           ) : null}
         </div>
       </section>
+
+      {/* Celular: a inscrição sempre à mão (barra fixa quando o botão principal sai da tela). */}
+      {open ? <StickyCta targetId="cta-inscricao" caption={statusLine} /> : null}
 
       {event.venue ? <VenueSection venue={event.venue} className="mt-16" /> : null}
 

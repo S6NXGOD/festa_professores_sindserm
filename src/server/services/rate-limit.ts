@@ -20,6 +20,8 @@ export const RATE_LIMITS = {
   bootstrap: { scope: "bootstrap", limit: 10, windowSeconds: 900 },
   gateLookup: { scope: "gate-lookup", limit: 240, windowSeconds: 300 },
   sensitiveWrite: { scope: "sensitive-write", limit: 120, windowSeconds: 60 },
+  // Troca da própria senha: pede a senha atual, então poucas tentativas por pessoa.
+  passwordChange: { scope: "password-change", limit: 8, windowSeconds: 600 },
 } satisfies Record<string, RateLimitRule>;
 
 /**

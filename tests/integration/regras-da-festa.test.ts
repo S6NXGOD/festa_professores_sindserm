@@ -3,10 +3,11 @@
  * para professoras e professores, horário limite para retirada de kits e ficha de filiação
  * preenchida antes da festa (assinatura na recepção).
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { ROLE_PRESETS } from "@/domain/access";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
-import { affiliationForm, registration } from "@/server/db/schema";
+import { affiliationForm, auditLog, registration } from "@/server/db/schema";
 import { preAffiliationSchema } from "@/domain/schemas";
 import { decideAffiliation } from "@/server/services/affiliation";
 import { PUBLIC_ACTOR, type StaffActor } from "@/server/services/actor";
@@ -64,7 +65,7 @@ describe("filiado(a) que não é professor(a)", () => {
   it("entra na festa, mas sem kit e sem convidado", async () => {
     const member = await registerMember({ isTeacher: false, memberName: "Carlos Servidor Costa" });
     await decideAffiliation(attendant, { registrationId: member.registrationId, decision: "CONFIRM" });
-    const before = await loadGateView(db, member.state.member.id, "SECURITY");
+    const before = await loadGateView(db, member.state.member.id, ROLE_PRESETS.SECURITY);
     expect(before?.kitOnEntry).toEqual({ kind: "NONE", message: "Sem kit: não é professor(a)." });
     const entry = await registerCheckIn(security, { personId: member.state.member.id, method: "SEARCH" });
     expect(entry).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "NONE", message: "Sem kit: não é professor(a)." } });
@@ -79,7 +80,7 @@ describe("filiado(a) que não é professor(a)", () => {
       "INVALID_STATE",
     );
 
-    const view = await loadGateView(db, member.state.member.id, "ATTENDANT");
+    const view = await loadGateView(db, member.state.member.id, ROLE_PRESETS.ATTENDANT);
     expect(view?.ownRegistration).toMatchObject({ isTeacher: false, canHaveGuest: false });
     expect(view?.ownRegistration?.kits.MEMBER).toMatchObject({ kind: "BLOCKED" });
   });
@@ -136,6 +137,38 @@ describe("horário limite para entregar kits", () => {
     const far = new Date("2030-01-01T00:00:00Z");
     const entry = await registerCheckIn(security, { personId: host.state.member.id, method: "SEARCH" }, far);
     expect(entry).toMatchObject({ kit: { kind: "DELIVERED", kitType: "MEMBER" } });
+  });
+});
+
+describe("entrada só a partir do horário da festa", () => {
+  it("antes do início, a portaria só registra com confirmação — e fica anotado", async () => {
+    await configureEvent(admin, { eventDate: "2026-10-15", startTime: "19:00" });
+    const host = await registerMember({ guest: true });
+    await decideAffiliation(attendant, { registrationId: host.registrationId, decision: "CONFIRM" });
+    // 19h de 15/10 em São Paulo = 22h UTC.
+    const early = new Date("2026-10-15T21:59:00Z");
+    const onTime = new Date("2026-10-15T22:00:00Z");
+
+    const view = await loadGateView(db, host.state.member.id, ROLE_PRESETS.SECURITY);
+    expect(view?.eventStart).toMatchObject({ started: false, label: "15/10/2026, às 19h" });
+
+    const blocked = await expectDomainError(
+      registerCheckIn(security, { personId: host.state.member.id, method: "SEARCH" }, early),
+      "EVENT_NOT_STARTED",
+    );
+    expect(blocked.message).toContain("15/10/2026, às 19h");
+
+    const confirmed = await registerCheckIn(security, { personId: host.state.member.id, method: "SEARCH", early: true }, early);
+    expect(confirmed).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "DELIVERED" } });
+    const [log] = await db
+      .select({ summary: auditLog.summary })
+      .from(auditLog)
+      .where(and(eq(auditLog.action, "CHECKIN_REGISTERED"), eq(auditLog.entityId, host.state.member.id)));
+    expect(log?.summary).toMatch(/antes do horário de início/);
+
+    // No horário, sem aviso.
+    const guest = await registerCheckIn(security, { personId: host.state.guest!.personId, method: "QR" }, onTime);
+    expect(guest.outcome).toBe("CHECKED_IN");
   });
 });
 

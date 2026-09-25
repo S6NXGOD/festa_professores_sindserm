@@ -1,6 +1,6 @@
 import "server-only";
 import type { Executor } from "@/server/db";
-import { isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
+import { eventStartAt, eventStartLabel, hasEventStarted, isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
 import { ENTRY_BLOCK_MESSAGE, ENTRY_KIT_MESSAGE, KIT_BLOCK_MESSAGE } from "@/domain/labels";
 import {
   can,
@@ -15,7 +15,8 @@ import {
   type KitRegistrationInput,
   stockPoolFor,
 } from "@/domain/rules";
-import type { AffiliationStatus, CheckInMethod, EmployeeKitType, GroupKitType, ParticipantRole, StaffRole } from "@/domain/types";
+import type { AccessMap } from "@/domain/access";
+import type { AffiliationStatus, CheckInMethod, EmployeeKitType, GroupKitType, ParticipantRole, EmployeeCategory } from "@/domain/types";
 import { displayCpf } from "@/lib/cpf";
 import { formatVoucherCode } from "@/server/crypto";
 import { entryDecisionFor } from "./checkin";
@@ -51,6 +52,8 @@ export interface GuestView {
 }
 
 export interface GateView {
+  /** Antes do horário de início, registrar a entrada pede uma confirmação a mais. */
+  eventStart: { started: boolean; label: string | null; at: string | null };
   personId: string;
   fullName: string;
   /** CPF para exibição (completo, mascarado ou "Sem CPF"). */
@@ -68,17 +71,20 @@ export interface GateView {
     guest: GuestView | null;
     kits: Record<GroupKitType, KitView>;
   };
-  /** Funcionário(a) do SINDSERM (com o convidado e os kits do grupo). */
+  /** Colaborador(a) do SINDSERM (com o convidado e os kits do grupo). */
   employee: null | {
     employeeId: string;
     active: boolean;
     jobTitle: string | null;
+    category: EmployeeCategory;
     guest: GuestView | null;
     kits: Record<EmployeeKitType, KitView>;
   };
-  /** Quem convidou esta pessoa: um(a) professor(a) ou um(a) funcionário(a) do SINDSERM. */
+  /** Quem convidou esta pessoa: um(a) professor(a) ou um(a) colaborador(a) do SINDSERM. */
   host: null | {
     kind: "MEMBER" | "EMPLOYEE";
+    /** Categoria de quem convidou, quando é colaborador(a). */
+    category: EmployeeCategory | null;
     /** Inscrição do(a) professor(a) (nulo quando quem convidou é funcionário(a)). */
     registrationId: string | null;
     employeeId: string | null;
@@ -199,7 +205,7 @@ function employeeKitPreview(
     const first = state.person.fullName.split(" ")[0];
     return { kind: "WILL_DELIVER", count: 2, label: `2 kits: o de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou` };
   }
-  if (!ownReason) return { kind: "WILL_DELIVER", count: 1, label: "1 kit de funcionário(a)" };
+  if (!ownReason) return { kind: "WILL_DELIVER", count: 1, label: "1 kit de colaborador(a)" };
   if (guestOut) return { kind: "WILL_DELIVER", count: 1, label: `1 kit: o do convidado ${waitingGuest!.fullName}, que já entrou` };
   return { kind: "NONE", message: ownReason };
 }
@@ -265,6 +271,7 @@ function hostView(state: PersonState): GateView["host"] {
       kind: "MEMBER",
       registrationId: host.id,
       employeeId: null,
+      category: null,
       guestLinkId: state.guestOf.guestLinkId,
       personId: host.member.id,
       fullName: host.member.fullName,
@@ -279,6 +286,7 @@ function hostView(state: PersonState): GateView["host"] {
       kind: "EMPLOYEE",
       registrationId: null,
       employeeId: host.id,
+      category: host.category,
       guestLinkId: state.guestOfEmployee.guestLinkId,
       personId: host.person.id,
       fullName: host.person.fullName,
@@ -293,7 +301,7 @@ function hostView(state: PersonState): GateView["host"] {
 /** DTO com apenas o necessário para a portaria (CPF mascarado para Segurança). */
 export function buildGateView(
   state: PersonState,
-  role: StaffRole,
+  access: AccessMap,
   config: Pick<EventConfig, "eventDate" | "startTime" | "kitDeadlineTime"> | null,
   now = new Date(),
   stock: StockOverview | null = null,
@@ -331,7 +339,7 @@ export function buildGateView(
   return {
     personId: state.person.id,
     fullName: state.person.fullName,
-    cpf: displayCpf(state.person.cpf, can(role, "viewFullCpf")),
+    cpf: displayCpf(state.person.cpf, can(access, "viewFullCpf")),
     hasCpf: Boolean(state.person.cpf),
     isMinor: state.person.isMinor,
     voucherCode: state.voucher ? formatVoucherCode(state.voucher.code) : null,
@@ -351,6 +359,7 @@ export function buildGateView(
           employeeId: staffGroup.id,
           active: staffGroup.active,
           jobTitle: staffGroup.jobTitle,
+          category: staffGroup.category,
           guest: staffGroup.guest ? guestView(staffGroup.guest, staffGroup.deliveries.GUEST?.beneficiaryPersonId ?? null) : null,
           kits: {
             EMPLOYEE: toKitView(employeeKitAvailability(employeeKitInput(staffGroup, deadlinePassed), "EMPLOYEE")),
@@ -369,23 +378,26 @@ export function buildGateView(
     kitDeadline: deadlineAt ? { at: deadlineAt, passed: deadlinePassed } : null,
     entry,
     kitOnEntry: entry.kind === "ALLOWED" ? kitOnEntryPreview(state, entry.role, deadlinePassed, stock) : null,
+    eventStart: config
+      ? { started: hasEventStarted(config, now), label: eventStartLabel(config), at: eventStartAt(config)?.toISOString() ?? null }
+      : { started: true, label: null, at: null },
     pastGuestLinks: state.pastGuestLinks.map((p) => ({ hostName: p.hostName, status: p.status, endedAt: p.endedAt })),
     openAffiliationForm: state.openAffiliationForm,
     permissions: {
-      checkIn: can(role, "checkIn"),
-      validateAffiliation: can(role, "validateAffiliation"),
-      deliverKits: can(role, "deliverKits"),
-      manageGuests: can(role, "manageGuests"),
-      newAffiliation: can(role, "newAffiliation"),
-      registerAtEvent: can(role, "registerAtEvent"),
-      adminCorrections: can(role, "adminCorrections"),
-      manageEmployees: can(role, "manageEmployees"),
+      checkIn: can(access, "checkIn"),
+      validateAffiliation: can(access, "validateAffiliation"),
+      deliverKits: can(access, "deliverKits"),
+      manageGuests: can(access, "manageGuests"),
+      newAffiliation: can(access, "newAffiliation"),
+      registerAtEvent: can(access, "registerAtEvent"),
+      adminCorrections: can(access, "adminCorrections"),
+      manageEmployees: can(access, "manageEmployees"),
     },
   };
 }
 
 /** Carrega a pessoa e monta a visão da portaria. */
-export async function loadGateView(ex: Executor, personId: string, role: StaffRole): Promise<GateView | null> {
+export async function loadGateView(ex: Executor, personId: string, access: AccessMap): Promise<GateView | null> {
   const [state, config, stock] = await Promise.all([loadPersonState(ex, personId), getEventConfig(ex), getStockOverview(ex)]);
-  return state ? buildGateView(state, role, config, new Date(), stock) : null;
+  return state ? buildGateView(state, access, config, new Date(), stock) : null;
 }

@@ -107,6 +107,7 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
             }))}
             missionId={token.slice(0, 16)}
             eventName={event.name}
+            remind={isNew}
           />
         </Reveal>
 

@@ -2,8 +2,8 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Tx } from "@/server/db";
 import { checkIn, person, voucher } from "@/server/db/schema";
-import { isKitDeadlinePassed } from "@/domain/kit-deadline";
-import { ENTRY_BLOCK_MESSAGE, ENTRY_KIT_MESSAGE } from "@/domain/labels";
+import { eventStartLabel, hasEventStarted, isKitDeadlinePassed } from "@/domain/kit-deadline";
+import { EMPLOYEE_CATEGORY_INLINE, ENTRY_BLOCK_MESSAGE, ENTRY_KIT_MESSAGE } from "@/domain/labels";
 import {
   decideEntry,
   employeeKitAvailability,
@@ -246,9 +246,13 @@ async function deliverKitsOnEntry(
  * não registra nada: esta função só é chamada quando o operador confirma.
  * Entrada é única por pessoa.
  */
+/**
+ * Registra a entrada (e os kits que saem junto). Antes do horário de início da
+ * festa, só com `early: true` — a portaria viu o aviso e confirmou.
+ */
 export async function registerCheckIn(
   actor: Actor,
-  input: { personId: string; method: CheckInMethod; voucherId?: string | null },
+  input: { personId: string; method: CheckInMethod; voucherId?: string | null; early?: boolean },
   now = new Date(),
 ): Promise<CheckInResult> {
   assertPermission(actor, "checkIn");
@@ -268,6 +272,11 @@ export async function registerCheckIn(
         if (!v || v.personId !== input.personId || v.revokedAt) {
           throw new DomainError("INVALID_STATE", "QR Code inválido ou cancelado.");
         }
+      }
+      const config = await getEventConfig(tx);
+      const beforeStart = !hasEventStarted(config, now);
+      if (beforeStart && !input.early) {
+        throw new DomainError("EVENT_NOT_STARTED", `A festa ainda não começou (começa ${eventStartLabel(config!)}).`);
       }
       const role = decision.role;
       const hostName = hostNameOf(state);
@@ -295,8 +304,8 @@ export async function registerCheckIn(
         role === "MEMBER"
           ? "filiado(a)"
           : role === "GUEST"
-            ? `convidado(a) de ${hostName ?? "—"}${state.guestOfEmployee ? ", funcionário(a) do SINDSERM" : ""}`
-            : "funcionário(a) do SINDSERM";
+            ? `convidado(a) de ${hostName ?? "—"}${state.guestOfEmployee ? `, ${EMPLOYEE_CATEGORY_INLINE[state.guestOfEmployee.host.category]}` : ""}`
+            : EMPLOYEE_CATEGORY_INLINE[state.employee!.category];
       await writeAudit(tx, actor, {
         action: "CHECKIN_REGISTERED",
         entityType: "person",
@@ -304,8 +313,10 @@ export async function registerCheckIn(
         summary:
           `Entrada de ${state.person.fullName} (${who})` +
           kitSummary +
-          (guestKit?.kind === "DELIVERED" ? ` Kit do convidado ${guestKit.beneficiaryName} entregue junto.` : ""),
+          (guestKit?.kind === "DELIVERED" ? ` Kit do convidado ${guestKit.beneficiaryName} entregue junto.` : "") +
+          (beforeStart ? " Registrada antes do horário de início, com confirmação da portaria." : ""),
         after: {
+          beforeStart,
           method: input.method,
           role: decision.role,
           kit: kit.kind === "DELIVERED" ? kit.kitType : null,

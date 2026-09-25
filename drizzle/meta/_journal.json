@@ -29,6 +29,13 @@
       "when": 1790354425692,
       "tag": "0003_funcionarios_sindicato_convidados",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790366228402,
+      "tag": "0004_colaboradores_permissoes_senha",
+      "breakpoints": true
     }
   ]
 }

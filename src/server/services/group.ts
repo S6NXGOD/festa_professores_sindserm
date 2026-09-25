@@ -98,7 +98,7 @@ async function lockHost(tx: Tx, input: { registrationId?: string | null; employe
   }
   const state = await lockEmployeeGroup(tx, input.employeeId!);
   if (!state.active) {
-    throw new DomainError("INVALID_STATE", "Funcionário(a) fora da lista: traga de volta antes de cadastrar convidado.");
+    throw new DomainError("INVALID_STATE", "Colaborador(a) fora da lista: traga de volta antes de cadastrar convidado.");
   }
   return hostFromEmployee(state);
 }
@@ -167,7 +167,7 @@ export async function attachGuest(tx: Tx, actor: StaffActor, host: GuestHost, in
       throw new DomainError("CONFLICT", "Esta pessoa já é convidada de outra pessoa.", { cpf: "Já é convidado(a)" });
     }
     if (await isActiveEmployee(tx, existing.id)) {
-      throw new DomainError("CONFLICT", "Esta pessoa está na lista de funcionários do SINDSERM.", { cpf: "Funcionário(a) do SINDSERM" });
+      throw new DomainError("CONFLICT", "Esta pessoa está na lista de colaboradores do SINDSERM.", { cpf: "Colaborador(a) do SINDSERM" });
     }
     personId = existing.id;
     name = existing.fullName;
@@ -247,7 +247,7 @@ export async function addGuest(actor: Actor, rawInput: AddGuestInput) {
         entityId: host.id,
         summary: replaced
           ? `Convidado de ${host.name} trocado: ${replaced.fullName} → ${added.name}.`
-          : `${added.name} cadastrado(a) como convidado(a) de ${host.name}${host.kind === "EMPLOYEE" ? " (funcionário(a) do SINDSERM)" : ""}.`,
+          : `${added.name} cadastrado(a) como convidado(a) de ${host.name}${host.kind === "EMPLOYEE" ? " (colaborador(a) do SINDSERM)" : ""}.`,
         after: {
           guest: added.name,
           cpf: input.cpf ? maskCpf(input.cpf) : "não informado",
@@ -288,7 +288,7 @@ export async function removeGuest(actor: Actor, input: { guestLinkId: string }) 
       await lockEmployeeRows(tx, [link.employeeId!]);
       await lockPersons(tx, [link.guestPersonId]);
       const state = await loadEmployeeGroup(tx, link.employeeId!);
-      if (!state) throw new DomainError("NOT_FOUND", "Funcionário(a) não encontrado(a).");
+      if (!state) throw new DomainError("NOT_FOUND", "Colaborador(a) não encontrado(a).");
       host = hostFromEmployee(state);
     }
     if (host.guest?.guestLinkId !== link.id) throw new DomainError("NOT_FOUND", "Convidado não encontrado.");

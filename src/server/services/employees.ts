@@ -12,6 +12,8 @@ import {
   type UpdateEmployeeInput,
   updateEmployeeSchema,
 } from "@/domain/schemas";
+import { EMPLOYEE_CATEGORY_INLINE, EMPLOYEE_CATEGORY_LABEL } from "@/domain/labels";
+import type { EmployeeCategory } from "@/domain/types";
 import { maskCpf } from "@/lib/cpf";
 import { plural } from "@/lib/plural";
 import { toSearchText } from "@/lib/text";
@@ -26,9 +28,10 @@ import { withTx } from "./tx";
 import { ensureActiveVoucher, revokeActiveVoucher } from "./vouchers";
 
 /*
- * Funcionários do SINDSERM liberados para a festa: cadastro só interno (pelo
- * administrador), voucher próprio, 1 kit do estoque dos funcionários e 1
- * convidado (com kit do mesmo estoque, depois que o funcionário chegar).
+ * Colaboradores do SINDSERM liberados para a festa — diretoria, funcionários e
+ * prestadores de serviço: cadastro só interno, voucher próprio, 1 kit do
+ * estoque dos colaboradores e 1 convidado (com kit do mesmo estoque, depois
+ * que o(a) colaborador(a) chegar).
  */
 
 function mapEmployeeError(error: unknown): never {
@@ -36,7 +39,7 @@ function mapEmployeeError(error: unknown): never {
     throw new DomainError("CPF_TAKEN", "Este CPF acabou de ser cadastrado. Tente de novo.", { cpf: "CPF já cadastrado" });
   }
   if (isUniqueViolation(error, "employee_person_unique")) {
-    throw new DomainError("CONFLICT", "Esta pessoa já está na lista de funcionários.", { cpf: "Já está na lista" });
+    throw new DomainError("CONFLICT", "Esta pessoa já está na lista de colaboradores.", { cpf: "Já está na lista" });
   }
   mapGuestError(error);
 }
@@ -63,7 +66,7 @@ async function insertEmployee(tx: Tx, actor: StaffActor, input: EmployeeFields) 
       await assertNotParticipant(tx, existing.id);
       const [current] = await tx.select().from(employee).where(eq(employee.personId, existing.id)).for("update");
       if (current && !current.removedAt) {
-        throw new DomainError("CONFLICT", "Esta pessoa já está na lista de funcionários.", { cpf: "Já está na lista" });
+        throw new DomainError("CONFLICT", "Esta pessoa já está na lista de colaboradores.", { cpf: "Já está na lista" });
       }
       personId = existing.id;
       restoredId = current?.id ?? null;
@@ -82,12 +85,15 @@ async function insertEmployee(tx: Tx, actor: StaffActor, input: EmployeeFields) 
   }
   let employeeId: string;
   if (restoredId) {
-    await tx.update(employee).set({ jobTitle: input.jobTitle, removedAt: null, removedByUserId: null }).where(eq(employee.id, restoredId));
+    await tx
+      .update(employee)
+      .set({ jobTitle: input.jobTitle, category: input.category, removedAt: null, removedByUserId: null })
+      .where(eq(employee.id, restoredId));
     employeeId = restoredId;
   } else {
     const [created] = await tx
       .insert(employee)
-      .values({ personId, jobTitle: input.jobTitle, createdByUserId: actor.userId })
+      .values({ personId, jobTitle: input.jobTitle, category: input.category, createdByUserId: actor.userId })
       .returning({ id: employee.id });
     employeeId = created!.id;
   }
@@ -120,12 +126,13 @@ export async function createEmployee(actor: Actor, raw: EmployeeInput) {
         entityType: "employee",
         entityId: created.employeeId,
         summary:
-          `${input.fullName} liberado(a) para a festa como funcionário(a) do SINDSERM${input.jobTitle ? ` (${input.jobTitle})` : ""}` +
+          `${input.fullName} liberado(a) para a festa como ${EMPLOYEE_CATEGORY_INLINE[input.category]}${input.jobTitle ? ` (${input.jobTitle})` : ""}` +
           (addedGuest ? `, com convidado(a) ${addedGuest.name}.` : "."),
         after: {
           personId: created.personId,
           cpf: input.cpf ? maskCpf(input.cpf) : "não informado",
           jobTitle: input.jobTitle,
+          category: EMPLOYEE_CATEGORY_LABEL[input.category],
           guest: addedGuest?.name ?? null,
           restored: created.restored,
         },
@@ -170,7 +177,7 @@ export async function createEmployeesFromList(actor: Actor, raw: BulkEmployeesIn
           continue;
         }
         known.add(key);
-        const fields = { fullName: row.fullName, cpf: null, whatsapp: null, jobTitle: row.jobTitle };
+        const fields = { fullName: row.fullName, cpf: null, whatsapp: null, jobTitle: row.jobTitle, category: input.category };
         const employeeRow = await insertEmployee(tx, actor, fields);
         if (row.guestName) {
           const added = await attachGuest(tx, actor, newHost(employeeRow, fields), { fullName: row.guestName, cpf: null, isMinor: false });
@@ -183,7 +190,7 @@ export async function createEmployeesFromList(actor: Actor, raw: BulkEmployeesIn
           action: "EMPLOYEE_ADDED",
           entityType: "employee",
           summary:
-            `${created.length === 1 ? "1 funcionário(a) do SINDSERM liberado(a)" : `${created.length} funcionários do SINDSERM liberados`} pela lista` +
+            `${created.length === 1 ? "1 colaborador(a) do SINDSERM liberado(a)" : `${created.length} colaboradores do SINDSERM liberados`} pela lista (${EMPLOYEE_CATEGORY_LABEL[input.category]})` +
             (guests.length ? `, com ${plural(guests.length, "convidado", "convidados")}.` : "."),
           after: { names: created, guests, skipped },
         });
@@ -209,14 +216,14 @@ export async function updateEmployee(actor: Actor, raw: UpdateEmployeeInput) {
         .update(person)
         .set({ ...personSearchFields(input.fullName), cpf: input.cpf, whatsapp: input.whatsapp })
         .where(eq(person.id, current.person.id));
-      await tx.update(employee).set({ jobTitle: input.jobTitle }).where(eq(employee.id, current.id));
+      await tx.update(employee).set({ jobTitle: input.jobTitle, category: input.category }).where(eq(employee.id, current.id));
       await writeAudit(tx, actor, {
         action: "EMPLOYEE_UPDATED",
         entityType: "employee",
         entityId: current.id,
-        summary: `Cadastro de ${input.fullName} (funcionário(a) do SINDSERM) atualizado.`,
-        before: { fullName: current.person.fullName, jobTitle: current.jobTitle },
-        after: { fullName: input.fullName, jobTitle: input.jobTitle },
+        summary: `Cadastro de ${input.fullName} (${EMPLOYEE_CATEGORY_INLINE[input.category]}) atualizado.`,
+        before: { fullName: current.person.fullName, jobTitle: current.jobTitle, category: EMPLOYEE_CATEGORY_LABEL[current.category] },
+        after: { fullName: input.fullName, jobTitle: input.jobTitle, category: EMPLOYEE_CATEGORY_LABEL[input.category] },
       });
       return { employeeId: current.id, personId: current.person.id };
     });
@@ -245,16 +252,16 @@ export async function removeEmployee(actor: Actor, input: { employeeId: string }
           `O convidado ${current.guest.fullName} já entrou na festa. Para tirar da lista, estorne a entrada dele antes.`,
         );
       }
-      guestName = (await endGuestLink(tx, actor, hostFromEmployee(current), "Funcionário(a) saiu da lista")).fullName;
+      guestName = (await endGuestLink(tx, actor, hostFromEmployee(current), "Colaborador(a) saiu da lista")).fullName;
     }
     await tx.update(employee).set({ removedAt: new Date(), removedByUserId: actor.userId }).where(eq(employee.id, current.id));
-    await revokeActiveVoucher(tx, current.person.id, actor.userId, "Removido(a) da lista de funcionários");
+    await revokeActiveVoucher(tx, current.person.id, actor.userId, "Removido(a) da lista de colaboradores");
     await writeAudit(tx, actor, {
       action: "EMPLOYEE_REMOVED",
       entityType: "employee",
       entityId: current.id,
       summary:
-        `${current.person.fullName} tirado(a) da lista de funcionários; o voucher foi cancelado` +
+        `${current.person.fullName} tirado(a) da lista de colaboradores; o voucher foi cancelado` +
         (guestName ? ` e o convite de ${guestName} também.` : "."),
     });
     return { removed: true, guestRemoved: Boolean(guestName) };
@@ -274,7 +281,7 @@ export async function restoreEmployee(actor: Actor, input: { employeeId: string 
       action: "EMPLOYEE_RESTORED",
       entityType: "employee",
       entityId: current.id,
-      summary: `${current.person.fullName} voltou para a lista de funcionários (voucher novo).`,
+      summary: `${current.person.fullName} voltou para a lista de colaboradores (voucher novo).`,
     });
     return { restored: true };
   });
@@ -299,6 +306,7 @@ export interface EmployeeRow {
   cpf: string | null;
   whatsapp: string | null;
   jobTitle: string | null;
+  category: EmployeeCategory;
   removedAt: Date | null;
   checkedInAt: Date | null;
   kitDeliveredAt: Date | null;
@@ -314,6 +322,7 @@ export async function listEmployees(ex: Executor, options: { includeRemoved?: bo
       cpf: person.cpf,
       whatsapp: person.whatsapp,
       jobTitle: employee.jobTitle,
+      category: employee.category,
       removedAt: employee.removedAt,
     })
     .from(employee)

@@ -51,7 +51,7 @@ function Signatures() {
 }
 
 export default async function PrintAffiliationFormPage({ params }: PageProps<"/painel/filiacoes/[id]/imprimir">) {
-  await requirePageActor("newAffiliation");
+  await requirePageActor("viewForms");
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const data = await getAffiliationForm(id);

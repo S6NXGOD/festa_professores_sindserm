@@ -4,6 +4,7 @@
  * simultâneas.
  */
 import { and, count, eq, isNull } from "drizzle-orm";
+import { ROLE_PRESETS } from "@/domain/access";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { checkIn, guestLink, kitDelivery, person, registration, voucher } from "@/server/db/schema";
@@ -25,7 +26,7 @@ let attendant: StaffActor;
 let security: StaffActor;
 
 async function gateView(personId: string, role: StaffActor["role"] = "SECURITY") {
-  const view = await loadGateView(db, personId, role);
+  const view = await loadGateView(db, personId, ROLE_PRESETS[role]);
   if (!view) throw new Error("Pessoa não encontrada");
   return view;
 }

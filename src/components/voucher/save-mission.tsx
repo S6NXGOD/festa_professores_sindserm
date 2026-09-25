@@ -2,10 +2,12 @@
 
 import confetti from "canvas-confetti";
 import { AnimatePresence, motion } from "motion/react";
-import { useMemo, useState, useSyncExternalStore } from "react";
-import { Camera, Check, Download, Trophy, Whatsapp } from "@/components/icons/pixel";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
+import { Camera, Check, Download, Trophy, Warning, Whatsapp } from "@/components/icons/pixel";
 import { PixelTag } from "@/components/retro/bits";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { slugify } from "@/lib/clipboard";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
@@ -49,17 +51,27 @@ function parse(raw: string): string[] {
 /**
  * "Missão bônus" depois da inscrição: salvar os vouchers no celular e mandar
  * o do convidado. Cada tarefa feita marca o check (com som de moeda); o
- * progresso fica lembrado neste aparelho.
+ * progresso fica lembrado neste aparelho. Com `remind` (inscrição recém-feita),
+ * um aviso abre na tela para ninguém sair sem salvar.
  */
 export function SaveVouchersMission({
   vouchers,
   missionId,
   eventName,
+  remind = false,
 }: {
   vouchers: MissionVoucher[];
   missionId: string;
   eventName: string;
+  remind?: boolean;
 }) {
+  const [reminderOpen, setReminderOpen] = useState(false);
+  // O aviso abre logo depois da comemoração da inscrição.
+  useEffect(() => {
+    if (!remind) return;
+    const timer = window.setTimeout(() => setReminderOpen(true), 1100);
+    return () => window.clearTimeout(timer);
+  }, [remind]);
   const stored = useSyncExternalStore(
     subscribe,
     () => readDone(missionId),
@@ -106,7 +118,66 @@ export function SaveVouchersMission({
     mark(voucher.personId);
   }
 
+  function later() {
+    setReminderOpen(false);
+    if (!complete) toast.info("O link desta página abre os vouchers de novo. Guarde-o (tem o botão de copiar logo abaixo).");
+  }
+
   return (
+    <>
+    <Dialog open={reminderOpen && !complete} onOpenChange={(value) => (value ? setReminderOpen(true) : later())}>
+      <DialogContent data-testid="voucher-reminder">
+        <DialogHeader>
+          <PixelTag tone="red" className="w-fit">
+            Missão principal
+          </PixelTag>
+          <DialogTitle>Não esqueça: salve {vouchers.length > 1 ? "os vouchers" : "o seu voucher"}</DialogTitle>
+          <DialogDescription>
+            É o QR Code que abre a porta da festa. Baixe a imagem (ou tire um print) e guarde no celular: o voucher não é mandado por e-mail.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="grid gap-2">
+          {vouchers.map((voucher) => {
+            const checked = done.has(voucher.personId);
+            const first = voucher.fullName.split(" ")[0];
+            const isGuest = voucher.kind === "GUEST";
+            return (
+              <li key={voucher.personId} className={cn("rounded-xl border p-3", checked ? "border-success/40 bg-success-soft" : "border-line-strong bg-ink/60")}>
+                <p className="flex items-center gap-2 text-sm font-bold text-fg">
+                  {checked ? <Check className="size-4 text-success" /> : null}
+                  {isGuest ? `Voucher de ${first} (convidado)` : "O seu voucher"}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {isGuest ? (
+                    <Button type="button" size="sm" variant="success" onClick={() => sendToGuest(voucher)}>
+                      <Whatsapp /> Mandar
+                    </Button>
+                  ) : null}
+                  <Button asChild size={isGuest ? "sm" : "lg"} variant={isGuest ? "outline" : "default"} className={cn(!isGuest && "col-span-2")}>
+                    <a
+                      href={`/v/${voucher.token}/imagem`}
+                      download={`voucher-${slugify(voucher.fullName)}.png`}
+                      onClick={() => mark(voucher.personId)}
+                      data-testid={`reminder-download-${voucher.kind.toLowerCase()}`}
+                    >
+                      <Download /> {isGuest ? "Baixar" : "Baixar meu voucher"}
+                    </a>
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="flex items-start gap-2 text-xs text-fg-muted">
+          <Warning className="mt-0.5 size-3.5 shrink-0 text-warning" /> Sem internet na porta da festa? A imagem salva funciona do mesmo jeito.
+        </p>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={later} data-testid="reminder-later">
+            Depois
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     <section
       className={cn(
         "no-print rounded-2xl border-2 p-4 sm:p-5",
@@ -192,5 +263,6 @@ export function SaveVouchersMission({
         </p>
       ) : null}
     </section>
+    </>
   );
 }

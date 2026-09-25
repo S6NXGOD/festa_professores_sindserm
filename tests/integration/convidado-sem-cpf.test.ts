@@ -3,6 +3,7 @@
  * cabeça). CPF continua obrigatório e único para filiados.
  */
 import { eq } from "drizzle-orm";
+import { ROLE_PRESETS } from "@/domain/access";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { person } from "@/server/db/schema";
@@ -67,7 +68,7 @@ describe("inscrição com convidado sem CPF", () => {
     expect(state.guest).not.toBeNull();
     expect(state.guest!.cpf).toBeNull();
 
-    const view = await loadGateView(db, state.guest!.personId, "ATTENDANT");
+    const view = await loadGateView(db, state.guest!.personId, ROLE_PRESETS.ATTENDANT);
     expect(view?.cpf).toBe("Sem CPF");
     expect(view?.voucherCode).toBeTruthy();
 

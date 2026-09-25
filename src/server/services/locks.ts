@@ -26,7 +26,7 @@ export async function lockEmployeeRows(tx: Tx, employeeIds: string[]) {
   const ids = [...new Set(employeeIds)];
   if (ids.length === 0) return;
   const rows = await tx.select({ id: employee.id }).from(employee).where(inArray(employee.id, ids)).orderBy(asc(employee.id)).for("update");
-  if (rows.length !== ids.length) throw new DomainError("NOT_FOUND", "Funcionário(a) não encontrado(a).");
+  if (rows.length !== ids.length) throw new DomainError("NOT_FOUND", "Colaborador(a) não encontrado(a).");
 }
 
 export async function lockPersons(tx: Tx, personIds: string[]) {
@@ -60,7 +60,7 @@ export async function lockRegistrationWithPeople(tx: Tx, registrationId: string,
 export async function lockEmployeeGroup(tx: Tx, employeeId: string): Promise<EmployeeGroupState> {
   await lockEmployeeRows(tx, [employeeId]);
   const state = await loadEmployeeGroup(tx, employeeId);
-  if (!state) throw new DomainError("NOT_FOUND", "Funcionário(a) não encontrado(a).");
+  if (!state) throw new DomainError("NOT_FOUND", "Colaborador(a) não encontrado(a).");
   return state;
 }
 
@@ -69,6 +69,6 @@ export async function lockEmployeeGroupWithPeople(tx: Tx, employeeId: string, ex
   const before = await lockEmployeeGroup(tx, employeeId);
   await lockPersons(tx, [before.person.id, ...(before.guest ? [before.guest.personId] : []), ...extraPersonIds]);
   const state = await loadEmployeeGroup(tx, employeeId);
-  if (!state) throw new DomainError("NOT_FOUND", "Funcionário(a) não encontrado(a).");
+  if (!state) throw new DomainError("NOT_FOUND", "Colaborador(a) não encontrado(a).");
   return state;
 }

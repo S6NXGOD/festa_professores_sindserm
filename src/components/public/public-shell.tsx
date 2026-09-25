@@ -16,6 +16,7 @@ export function PublicShell({
   wide = false,
   backdrop = "stage",
   help,
+  bottomBar = false,
 }: {
   eventName: string;
   children: React.ReactNode;
@@ -27,9 +28,11 @@ export function PublicShell({
    * da barra de botões do formulário). `false` esconde o botão.
    */
   help?: { topic?: string; className?: string } | false;
+  /** Há uma barra fixa no rodapé do celular: sobra espaço para ela não cobrir o rodapé da página. */
+  bottomBar?: boolean;
 }) {
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-x-clip print:block print:min-h-0">
+    <div className={cn("relative flex min-h-dvh flex-col overflow-x-clip print:block print:min-h-0", bottomBar && "pb-24 sm:pb-0")}>
       <RetroBackdrop variant={backdrop} />
       <header className="no-print safe-top relative z-10 mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 pb-3">
         <Link href="/" className="min-w-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-red">

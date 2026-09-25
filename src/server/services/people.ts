@@ -4,7 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import type { Executor } from "@/server/db";
 import { affiliationForm, checkIn, employee, guestLink, person, registration, voucher } from "@/server/db/schema";
 import { type PersonCorrectionInput, personCorrectionSchema, registrationNumberKey } from "@/domain/schemas";
-import type { AffiliationStatus } from "@/domain/types";
+import type { AffiliationStatus, EmployeeCategory } from "@/domain/types";
 import { displayCpf, maskCpf } from "@/lib/cpf";
 import { escapeLike, toSearchText } from "@/lib/text";
 import { normalizeVoucherCode } from "@/server/crypto";
@@ -27,7 +27,7 @@ export interface PersonSearchResult {
   hostIsEmployee: boolean;
   checkedInAt: Date | null;
   /** Funcionário(a) do SINDSERM na lista (setor, se informado). */
-  employee: { jobTitle: string | null } | null;
+  employee: { jobTitle: string | null; category: EmployeeCategory } | null;
 }
 
 export type SearchMode = "auto" | "name" | "cpf";
@@ -108,6 +108,7 @@ export async function searchPeople(
       checkedInAt: checkIn.checkedInAt,
       employeeId: employee.id,
       employeeJobTitle: employee.jobTitle,
+      employeeCategory: employee.category,
     })
     .from(person)
     .leftJoin(registration, eq(registration.memberPersonId, person.id))
@@ -121,12 +122,12 @@ export async function searchPeople(
     .where(condition)
     .orderBy(asc(person.searchName))
     .limit(options.limit ?? 25);
-  return rows.map(({ cpf, employeeId, employeeJobTitle, hostMemberName, hostEmployeeName, ...row }) => ({
+  return rows.map(({ cpf, employeeId, employeeJobTitle, employeeCategory, hostMemberName, hostEmployeeName, ...row }) => ({
     ...row,
     hostName: hostMemberName ?? hostEmployeeName ?? null,
     hostIsEmployee: Boolean(hostEmployeeName && !hostMemberName),
     cpfDisplay: displayCpf(cpf, options.fullCpf),
-    employee: employeeId ? { jobTitle: employeeJobTitle } : null,
+    employee: employeeId && employeeCategory ? { jobTitle: employeeJobTitle, category: employeeCategory } : null,
   }));
 }
 

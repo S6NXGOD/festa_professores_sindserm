@@ -126,6 +126,7 @@ export async function listParticipants(options: { q?: string; filter: Participan
         hostIsEmployee: sql<boolean>`${hostEmployee.id} IS NOT NULL`,
         checkedInAt: checkIn.checkedInAt,
         employeeJobTitle: employee.jobTitle,
+        employeeCategory: employee.category,
         isEmployee: sql<boolean>`${employee.id} IS NOT NULL`,
       })
       .from(person)
@@ -365,7 +366,16 @@ export async function listDeliveries(options: { page: number }) {
 
 export async function listStaffUsers() {
   return db
-    .select({ id: user.id, name: user.name, email: user.email, role: user.role, active: user.active, createdAt: user.createdAt })
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      active: user.active,
+      permissions: user.permissions,
+      mustChangePassword: user.mustChangePassword,
+      createdAt: user.createdAt,
+    })
     .from(user)
     .orderBy(desc(user.active), asc(user.name));
 }
@@ -394,6 +404,13 @@ export async function queueCounts() {
     db.select({ total: count() }).from(affiliationForm).where(eq(affiliationForm.status, "DRAFT")),
   ]);
   return { pending: Number(pending?.total ?? 0), signature: Number(signature?.total ?? 0) };
+}
+
+/** Quantas inscrições há em cada situação (para os filtros). */
+export async function registrationStatusCounts() {
+  const rows = await db.select({ status: registration.status, total: count() }).from(registration).groupBy(registration.status);
+  const byStatus = Object.fromEntries(rows.map((row) => [row.status, Number(row.total)])) as Partial<Record<AffiliationStatus, number>>;
+  return { total: rows.reduce((sum, row) => sum + Number(row.total), 0), byStatus };
 }
 
 export type QueueCounts = Awaited<ReturnType<typeof queueCounts>>;

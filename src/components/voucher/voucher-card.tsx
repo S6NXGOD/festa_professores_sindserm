@@ -1,6 +1,8 @@
 import { FestaEmblem, UnionLogo } from "@/components/brand/brand";
 import { Calendar, ClipboardNote, Gift, Info, Login, MapPin, Star, Warning, Whatsapp } from "@/components/icons/pixel";
-import { PixelTag, PlayerTag } from "@/components/retro/bits";
+import { PlayerTag } from "@/components/retro/bits";
+import { EMPLOYEE_CATEGORY_LABEL, EMPLOYEE_CATEGORY_TITLE } from "@/domain/labels";
+import type { EmployeeCategory } from "@/domain/types";
 import { formatShortDateTime } from "@/lib/datetime";
 import { formatPhone, whatsappLink } from "@/lib/phone";
 import { cn } from "@/lib/utils";
@@ -30,9 +32,10 @@ export function voucherEventFrom(event: EventInfo): VoucherEventInfo {
 }
 
 /**
- * Voucher com visual de ingresso de show dos anos 80. Funcionários do SINDSERM
- * ganham o "passe da casa" (dourado), para não confundir com o voucher dos
- * filiados. Componente puro (servidor ou cliente).
+ * Voucher com visual de ingresso de show dos anos 80. Colaboradores do SINDSERM
+ * ganham o "passe da casa", no metal da categoria (diretoria em platina,
+ * funcionários em dourado, prestadores em ciano), para não confundir com o
+ * voucher dos filiados. Componente puro (servidor ou cliente).
  */
 export function VoucherCard({
   card,
@@ -115,7 +118,32 @@ export function VoucherCard({
   );
 }
 
-/** Voucher de funcionário(a) do SINDSERM: o "passe da casa", dourado, diferente do voucher dos filiados. */
+/** O "metal" do passe da casa de cada categoria: a portaria reconhece de longe. */
+const METAL: Record<EmployeeCategory, { card: string; band: string; text: string; tag: string; edge: string }> = {
+  BOARD: {
+    card: "border-[#e4e4e7]/85 shadow-[0_0_46px_-16px_rgb(255_255_255/0.5),0_30px_60px_-30px_rgb(0_0_0/0.9)]",
+    band: "bg-[linear-gradient(90deg,#9f9fa8,#fafafa_45%,#d4d4d8)] text-ink",
+    text: "text-[#f4f4f5]",
+    tag: "bg-[#e4e4e7] text-ink",
+    edge: "border-[#e4e4e7]/70",
+  },
+  STAFF: {
+    card: "border-warning/80 shadow-[0_0_46px_-16px_rgb(248_192_0/0.6),0_30px_60px_-30px_rgb(0_0_0/0.9)]",
+    band: "bg-[linear-gradient(90deg,#c99400,#ffd84a_45%,#f8c000)] text-warning-foreground",
+    text: "text-warning",
+    tag: "bg-warning text-warning-foreground",
+    edge: "border-warning/70",
+  },
+  CONTRACTOR: {
+    card: "border-[#22d3ee]/80 shadow-[0_0_46px_-16px_rgb(34_211_238/0.55),0_30px_60px_-30px_rgb(0_0_0/0.9)]",
+    band: "bg-[linear-gradient(90deg,#0e7490,#67e8f9_45%,#22d3ee)] text-ink",
+    text: "text-[#67e8f9]",
+    tag: "bg-[#22d3ee] text-ink",
+    edge: "border-[#22d3ee]/70",
+  },
+};
+
+/** Voucher de colaborador(a) do SINDSERM: o "passe da casa", diferente do voucher dos filiados. */
 function EmployeePass({
   card,
   event,
@@ -127,22 +155,26 @@ function EmployeePass({
   className?: string;
   eager: boolean;
 }) {
+  const category: EmployeeCategory = card.category ?? "STAFF";
+  const metal = METAL[category];
   return (
     <article
       className={cn(
-        "relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border-2 border-warning/80 bg-[#0e0e0f] text-fg shadow-[0_0_46px_-16px_rgb(248_192_0/0.6),0_30px_60px_-30px_rgb(0_0_0/0.9)] print:border-black print:bg-white print:text-black print:shadow-none",
+        "relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border-2 bg-[#0e0e0f] text-fg print:border-black print:bg-white print:text-black print:shadow-none",
+        metal.card,
         className,
       )}
-      aria-label={`Voucher de funcionário(a) do SINDSERM: ${card.fullName}`}
+      aria-label={`Voucher de ${EMPLOYEE_CATEGORY_TITLE[category]}: ${card.fullName}`}
       data-testid="voucher-card"
       data-kind="employee"
+      data-category={category}
     >
       <div className="relative bg-ink print:bg-white">
         <FestaEmblem className="mx-auto w-[82%] pt-2" sizes="320px" eager={eager} />
         <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0e0e0f] to-transparent print:hidden" />
       </div>
-      {/* Faixa dourada: é assim que a portaria reconhece de longe o voucher de funcionário. */}
-      <div className="flex items-center justify-between bg-[linear-gradient(90deg,#c99400,#ffd84a_45%,#f8c000)] px-5 py-2 text-warning-foreground print:border-y print:border-black print:bg-none">
+      {/* Faixa no metal da categoria: é assim que a portaria reconhece de longe o passe da casa. */}
+      <div className={cn("flex items-center justify-between px-5 py-2 print:border-y print:border-black print:bg-none", metal.band)}>
         <span className="pixel flex items-center gap-1.5 text-[0.7rem]">
           <Star className="size-3.5" /> Passe da casa
         </span>
@@ -151,18 +183,21 @@ function EmployeePass({
 
       <div className="relative px-5 pt-3 pb-4">
         <div className="flex items-center justify-between gap-2">
-          <PixelTag tone="warning">Funcionário(a)</PixelTag>
+          <span className={cn("pixel inline-flex items-center rounded-[4px] px-1.5 py-1 text-[0.55rem] leading-none", metal.tag)} data-testid="voucher-category">
+            {EMPLOYEE_CATEGORY_LABEL[category]}
+          </span>
           <span className="pixel text-[0.5rem] text-fg-muted print:text-black">Admit one</span>
         </div>
         <h3 className="display mt-3 text-[1.9rem] break-words text-fg print:text-black" data-testid="voucher-name">
           {card.fullName}
         </h3>
-        <p className="mt-1 text-sm font-semibold text-warning print:text-black" data-testid="voucher-job">
-          Funcionário(a) do SINDSERM{card.jobTitle ? ` · ${card.jobTitle}` : ""}
+        <p className={cn("mt-1 text-sm font-semibold print:text-black", metal.text)} data-testid="voucher-job">
+          {EMPLOYEE_CATEGORY_TITLE[category]}
+          {card.jobTitle ? ` · ${card.jobTitle}` : ""}
         </p>
       </div>
 
-      <Perforation tone="warning" />
+      <Perforation tone="warning" edgeClassName={metal.edge} />
 
       <div className="flex flex-col items-center px-5 pt-3 pb-5">
         <QrBlock card={card} event={event} />
@@ -195,8 +230,8 @@ function EmployeePass({
 }
 
 /** Picote do ingresso. */
-function Perforation({ tone }: { tone: "red" | "warning" }) {
-  const edge = tone === "red" ? "border-red/60" : "border-warning/70";
+function Perforation({ tone, edgeClassName }: { tone: "red" | "warning"; edgeClassName?: string }) {
+  const edge = edgeClassName ?? (tone === "red" ? "border-red/60" : "border-warning/70");
   return (
     <div className="relative h-5" aria-hidden>
       <span className={cn("absolute top-0 -left-3 size-5 rounded-full border-2 bg-ink print:border-black print:bg-white", edge)} />

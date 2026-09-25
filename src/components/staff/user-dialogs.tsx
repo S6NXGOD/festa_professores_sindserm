@@ -1,9 +1,7 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Controller, type FieldPath, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { FormField } from "@/components/forms/form-field";
 import { Key, Loader, Pencil, UserPlus } from "@/components/icons/pixel";
@@ -19,61 +17,51 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { ROLE_DESCRIPTION, ROLE_LABEL } from "@/domain/labels";
-import { type CreateUserInput, createUserSchema, type UpdateUserInput, updateUserSchema } from "@/domain/schemas";
-import { STAFF_ROLES, type StaffRole } from "@/domain/types";
-import { cn } from "@/lib/utils";
+import { type AccessMap, ROLE_PRESETS } from "@/domain/access";
+import type { StaffRole } from "@/domain/types";
 import { callAction } from "@/lib/call-action";
+import { playSound } from "@/lib/sound";
 import { createUserAction, resetPasswordAction, updateUserAction } from "@/server/actions/users";
+import { AccessEditor } from "./access-editor";
 
-function RolePicker({ value, onChange, disabled }: { value: StaffRole; onChange: (role: StaffRole) => void; disabled?: boolean }) {
-  return (
-    <div className="grid gap-2" role="radiogroup" aria-label="Perfil">
-      {STAFF_ROLES.map((role) => (
-        <button
-          key={role}
-          type="button"
-          role="radio"
-          aria-checked={value === role}
-          disabled={disabled}
-          onClick={() => onChange(role)}
-          className={cn(
-            "rounded-xl border-2 border-line-strong bg-surface-2 p-3 text-left transition-[border-color,background-color] disabled:opacity-50",
-            value === role && "border-red bg-brand-soft",
-          )}
-        >
-          <span className="block text-sm font-bold text-fg">{ROLE_LABEL[role]}</span>
-          <span className="block text-xs text-fg-muted">{ROLE_DESCRIPTION[role]}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
+/** Diálogo alto (permissões por área): rola por dentro, também no celular. */
+const TALL_DIALOG = "max-h-[92dvh] overflow-y-auto";
 
 export function CreateUserDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const form = useForm<CreateUserInput>({
-    resolver: zodResolver(createUserSchema),
-    defaultValues: { name: "", email: "", role: "SECURITY", password: "" },
-  });
-  const e = form.formState.errors;
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [profile, setProfile] = useState<{ role: StaffRole; access: AccessMap }>({ role: "SECURITY", access: ROLE_PRESETS.SECURITY });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const submit = form.handleSubmit((values) => {
+  function reset() {
+    setName("");
+    setEmail("");
+    setPassword("");
+    setProfile({ role: "SECURITY", access: ROLE_PRESETS.SECURITY });
+    setErrors({});
+  }
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
     startTransition(async () => {
-      const result = await callAction(createUserAction(values));
+      const result = await callAction(createUserAction({ name, email, password, role: profile.role, access: profile.access }));
       if (!result.ok) {
+        playSound("error");
         toast.error(result.error);
-        for (const [path, message] of Object.entries(result.fieldErrors ?? {})) form.setError(path as FieldPath<CreateUserInput>, { message });
+        setErrors(result.fieldErrors ?? {});
         return;
       }
-      toast.success("Usuário criado. Informe a senha inicial à pessoa.");
-      form.reset();
+      playSound("coin");
+      toast.success("Usuário criado. No primeiro acesso, a pessoa cria a própria senha.");
+      reset();
       setOpen(false);
       router.refresh();
     });
-  });
+  }
 
   return (
     <Dialog open={open} onOpenChange={(value) => !pending && setOpen(value)}>
@@ -82,27 +70,27 @@ export function CreateUserDialog() {
           <UserPlus /> Novo usuário
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className={TALL_DIALOG}>
         <form onSubmit={submit} className="grid gap-4" noValidate>
           <DialogHeader>
             <DialogTitle>Novo usuário da equipe</DialogTitle>
-            <DialogDescription>A pessoa pode trocar a senha depois em “Trocar senha”.</DialogDescription>
+            <DialogDescription>A senha inicial é provisória: no primeiro acesso, a pessoa cria uma senha só dela.</DialogDescription>
           </DialogHeader>
-          <FormField id="user-name" label="Nome completo" error={e.name?.message}>
-            <Input id="user-name" {...form.register("name")} />
+          <FormField id="user-name" label="Nome completo" error={errors.name}>
+            <Input id="user-name" value={name} onChange={(e) => setName(e.target.value)} />
           </FormField>
-          <FormField id="user-email" label="E-mail" error={e.email?.message}>
-            <Input id="user-email" type="email" {...form.register("email")} />
+          <FormField id="user-email" label="E-mail" error={errors.email}>
+            <Input id="user-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </FormField>
-          <FormField id="user-password" label="Senha inicial" description="Mínimo de 10 caracteres." error={e.password?.message}>
-            <Input id="user-password" type="text" autoComplete="new-password" {...form.register("password")} />
+          <FormField id="user-password" label="Senha inicial (provisória)" description="Mínimo de 10 caracteres." error={errors.password}>
+            <Input id="user-password" type="text" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </FormField>
-          <Controller control={form.control} name="role" render={({ field }) => <RolePicker value={field.value} onChange={field.onChange} />} />
+          <AccessEditor role={profile.role} access={profile.access} onChange={setProfile} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending} data-testid="create-user-submit">
               {pending ? <Loader className="animate-spin-steps" /> : <UserPlus />} Criar usuário
             </Button>
           </DialogFooter>
@@ -112,66 +100,73 @@ export function CreateUserDialog() {
   );
 }
 
-export function EditUserDialog({ user, isSelf }: { user: UpdateUserInput & { email: string }; isSelf: boolean }) {
+export function EditUserDialog({
+  user,
+  isSelf,
+}: {
+  user: { userId: string; name: string; email: string; role: StaffRole; access: AccessMap; active: boolean; mustChangePassword: boolean };
+  isSelf: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const form = useForm<UpdateUserInput>({
-    resolver: zodResolver(updateUserSchema),
-    defaultValues: { userId: user.userId, name: user.name, role: user.role, active: user.active },
-  });
-  const e = form.formState.errors;
+  const [name, setName] = useState(user.name);
+  const [active, setActive] = useState(user.active);
+  const [mustChangePassword, setMustChangePassword] = useState(user.mustChangePassword);
+  const [profile, setProfile] = useState<{ role: StaffRole; access: AccessMap }>({ role: user.role, access: user.access });
 
-  const submit = form.handleSubmit((values) => {
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
     startTransition(async () => {
-      const result = await callAction(updateUserAction(values));
+      const result = await callAction(
+        updateUserAction({ userId: user.userId, name, role: profile.role, access: profile.access, active, mustChangePassword }),
+      );
       if (!result.ok) {
+        playSound("error");
         toast.error(result.error);
         return;
       }
-      toast.success("Usuário atualizado.");
+      playSound("coin");
+      toast.success("Usuário atualizado. As permissões valem já no próximo clique da pessoa.");
       setOpen(false);
       router.refresh();
     });
-  });
+  }
 
   return (
     <Dialog open={open} onOpenChange={(value) => !pending && setOpen(value)}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" data-testid={`edit-user-${user.email}`}>
           <Pencil /> Editar
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className={TALL_DIALOG}>
         <form onSubmit={submit} className="grid gap-4" noValidate>
           <DialogHeader>
             <DialogTitle>Editar usuário</DialogTitle>
             <DialogDescription>{user.email}</DialogDescription>
           </DialogHeader>
-          <FormField id="edit-name" label="Nome completo" error={e.name?.message}>
-            <Input id="edit-name" {...form.register("name")} />
+          <FormField id="edit-name" label="Nome completo">
+            <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} />
           </FormField>
-          <Controller
-            control={form.control}
-            name="role"
-            render={({ field }) => <RolePicker value={field.value} onChange={field.onChange} disabled={isSelf} />}
-          />
-          <Controller
-            control={form.control}
-            name="active"
-            render={({ field }) => (
-              <label className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 p-3 text-sm font-semibold text-fg">
-                Acesso ativo
-                <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSelf} />
-              </label>
-            )}
-          />
-          {isSelf ? <p className="text-xs text-fg-muted">Você não pode alterar o próprio perfil nem se desativar.</p> : null}
+          <AccessEditor role={profile.role} access={profile.access} onChange={setProfile} disabled={isSelf} />
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 p-3">
+            <span>
+              <span className="block text-sm font-bold text-fg">Pedir nova senha no próximo acesso</span>
+              <span className="block text-xs text-fg-muted">A pessoa só usa o sistema depois de criar uma senha só dela.</span>
+            </span>
+            <Switch checked={mustChangePassword} onCheckedChange={setMustChangePassword} disabled={isSelf} data-testid="must-change-password" />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 p-3 text-sm font-semibold text-fg">
+            Acesso ativo
+            <Switch checked={active} onCheckedChange={setActive} disabled={isSelf} />
+          </label>
+          {isSelf ? <p className="text-xs text-fg-muted">Você não pode alterar as próprias permissões nem se desativar.</p> : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending} data-testid="edit-user-submit">
               {pending ? <Loader className="animate-spin-steps" /> : null} Salvar
             </Button>
           </DialogFooter>
@@ -193,7 +188,7 @@ export function ResetPasswordDialog({ userId, name }: { userId: string; name: st
         toast.error(result.fieldErrors?.password ?? result.error);
         return;
       }
-      toast.success(`Senha de ${name} redefinida. As sessões dele(a) foram encerradas.`);
+      toast.success(`Senha provisória de ${name} definida. No próximo acesso, ${name.split(" ")[0]} cria a própria.`);
       setPassword("");
       setOpen(false);
     });
@@ -208,16 +203,18 @@ export function ResetPasswordDialog({ userId, name }: { userId: string; name: st
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Redefinir senha</DialogTitle>
-          <DialogDescription>Nova senha para {name}. As sessões abertas serão encerradas.</DialogDescription>
+          <DialogTitle>Senha provisória</DialogTitle>
+          <DialogDescription>
+            Nova senha para {name}. As sessões abertas são encerradas e, no próximo acesso, a pessoa cria uma senha só dela.
+          </DialogDescription>
         </DialogHeader>
-        <Input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Nova senha (mín. 10 caracteres)" />
+        <Input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Senha provisória (mín. 10 caracteres)" />
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
           <Button onClick={submit} disabled={pending || password.length < 10}>
-            {pending ? <Loader className="animate-spin-steps" /> : <Key />} Redefinir
+            {pending ? <Loader className="animate-spin-steps" /> : <Key />} Definir
           </Button>
         </DialogFooter>
       </DialogContent>

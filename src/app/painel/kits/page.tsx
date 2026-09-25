@@ -18,7 +18,7 @@ import { requirePageActor } from "@/server/session";
 export const metadata: Metadata = { title: "Kits e estoque" };
 
 export default async function KitsPage({ searchParams }: PageProps<"/painel/kits">) {
-  const actor = await requirePageActor("viewPanel");
+  const actor = await requirePageActor("viewKits");
   const query = await searchParams;
   const page = pageNumber(query.page);
   const [stats, deliveries, event] = await Promise.all([getDashboardStats(db), listDeliveries({ page }), getEventInfo()]);
@@ -45,14 +45,14 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
           {stock ? <StockCard stock={stock} demand={stats.kitDemand} /> : null}
           <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <dt className="text-xs text-fg-muted">Entregues (professoras e professores / convidados{stats.employees ? " / funcionários" : ""})</dt>
+              <dt className="text-xs text-fg-muted">Entregues (professoras e professores / convidados{stats.employees ? " / colaboradores" : ""})</dt>
               <dd className="display text-2xl text-fg tabular">
                 {stats.kitsDeliveredMember} / {stats.kitsDeliveredGuest}
                 {stats.employees ? ` / ${stats.kitsDeliveredEmployee}` : ""}
               </dd>
             </div>
             <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <dt className="text-xs text-fg-muted">A entregar na entrada (professoras e professores / convidados{stats.employees ? " / funcionários" : ""})</dt>
+              <dt className="text-xs text-fg-muted">A entregar na entrada (professoras e professores / convidados{stats.employees ? " / colaboradores" : ""})</dt>
               <dd className="display text-2xl text-fg tabular">
                 {stats.kitsOwedMember} / {stats.kitsOwedGuest}
                 {stats.employees ? ` / ${stats.kitsOwedEmployee}` : ""}
@@ -60,7 +60,7 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
             </div>
           </dl>
         </Panel>
-        {can(actor.role, "manageSettings") && stock ? (
+        {can(actor.access, "manageSettings") && stock ? (
           <Panel title="Quantidades" icon={Package}>
             <StockSettingsForm
               delivered={{ member: stats.kitsDeliveredMember, guest: stats.kitsDeliveredGuest, employee: stats.kitsDeliveredEmployee }}
@@ -97,7 +97,7 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
                     <Link href={`/painel/participantes/${row.beneficiaryPersonId}`} className="font-semibold text-fg hover:text-red">
                       {row.beneficiaryName}
                     </Link>
-                    {row.kitType === "EMPLOYEE" ? " · funcionário(a) do SINDSERM" : null}
+                    {row.kitType === "EMPLOYEE" ? " · colaborador(a) do SINDSERM" : null}
                     {row.kitType === "GUEST" ? (
                       <>
                         {" "}
@@ -105,7 +105,7 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
                         <Link href={`/painel/participantes/${row.memberPersonId}`} className="font-semibold text-fg hover:text-red">
                           {row.memberName}
                         </Link>
-                        {row.employeeGroup ? " (funcionário(a), estoque dos funcionários)" : null}
+                        {row.employeeGroup ? " (colaborador(a), estoque dos colaboradores)" : null}
                       </>
                     ) : null}
                     {row.cancelReason ? ` · motivo do estorno: ${row.cancelReason}` : ""}

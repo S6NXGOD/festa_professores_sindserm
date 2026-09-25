@@ -80,6 +80,26 @@ async function login(page: Page, user: { email: string; password: string }) {
   await page.fill("#password", user.password);
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/entrar"));
+  await page.waitForLoadState("networkidle");
+  if (new URL(page.url()).pathname === "/conta") {
+    // Senha provisória (usuário criado pelo administrador): cria a própria para seguir.
+    const own = `${user.password}-propria`;
+    await expect(page.getByTestId("forced-password-notice")).toBeVisible();
+    await page.fill("#current-password", user.password);
+    await page.fill("#new-password", own);
+    await page.fill("#confirm-password", own);
+    await page.getByTestId("change-password-submit").click();
+    await page.waitForURL((url) => url.pathname !== "/conta");
+    user.password = own;
+  }
+}
+
+/** A festa do teste é daqui a 20 dias: a portaria vê o aviso e confirma a entrada antecipada. */
+async function confirmEarlyEntry(page: Page) {
+  const dialog = page.getByTestId("early-entry-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("A festa ainda não começou");
+  await dialog.getByTestId("early-entry-confirm").click();
 }
 
 async function createStaffUser(admin: Page, user: typeof ATTENDANT, roleLabel: RegExp) {
@@ -237,11 +257,15 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(page.getByTestId("voucher-guest-kit")).toContainText(`Ele é entregue na recepção depois que ${MEMBER.name} chegar`);
       await expect(page.getByTestId("voucher-kits")).toContainText("o do convidado, depois que você chegar");
 
-      // Missão bônus: baixar o próprio voucher marca 1 de 2 (o outro é mandar o do convidado).
+      // Logo depois da inscrição, o aviso para salvar os vouchers; baixar o próprio marca 1 de 2 na missão.
       const mission = page.getByTestId("save-mission");
       await expect(mission).toContainText("Agora salve os vouchers no celular");
-      await expect(mission).toContainText("0/2");
-      await page.getByTestId("mission-download-member").click();
+      const reminder = page.getByTestId("voucher-reminder");
+      await expect(reminder).toBeVisible();
+      await expect(reminder).toContainText("Não esqueça: salve os vouchers");
+      await reminder.getByTestId("reminder-download-member").click();
+      await reminder.getByTestId("reminder-later").click();
+      await expect(reminder).toHaveCount(0);
       await expect(mission).toContainText("1/2");
 
       const hrefs = await page.getByTestId("voucher-save").evaluateAll((els) => els.map((el) => el.getAttribute("href") ?? ""));
@@ -288,6 +312,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(page.getByTestId("kit-on-entry")).toContainText(`O kit deste convidado sai quando ${MEMBER.name} chegar.`);
       await expect(page.getByTestId("confirm-entry")).not.toContainText("kit");
       await page.getByTestId("confirm-entry").click();
+      await confirmEarlyEntry(page);
       await expect(page.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
       const banner = page.getByTestId("entry-kit-result");
       await expect(banner).toContainText("Kit fica para depois");
@@ -330,6 +355,7 @@ test.describe.serial("festa das professoras e professores", () => {
         await expect(page.getByTestId("deliver-member-kit")).toHaveCount(0);
         await expect(page.getByTestId("confirm-entry")).toHaveText(/Confirmar entrada \+ 2 kits/);
         await page.getByTestId("confirm-entry").click();
+        await confirmEarlyEntry(page);
         await expect(page.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
         const banner = page.getByTestId("entry-kit-result");
         await expect(banner).toContainText("Entregue 2 kits!");
@@ -511,6 +537,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(prompt).toContainText("Beatriz já pode entrar!");
       await expect(prompt).toContainText("1 kit de consumação");
       await prompt.getByTestId("prompt-confirm-entry").click();
+      await confirmEarlyEntry(page);
       await expect(prompt).toHaveCount(0);
       await expect(page.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
       await expect(page.getByTestId("entry-kit-result")).toContainText("Entregue 1 kit!");
@@ -558,7 +585,7 @@ test.describe.serial("festa das professoras e professores", () => {
     });
 
     await test.step("administrador libera funcionários (com convidado) um a um e colando a lista", async () => {
-      await admin.goto("/painel/funcionarios");
+      await admin.goto("/painel/colaboradores");
       await admin.getByTestId("add-employee").click();
       await admin.fill("#employee-name", STAFF.name);
       await admin.fill("#employee-job", STAFF.job);
@@ -570,9 +597,17 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(row.getByTestId("employee-guest")).toContainText(STAFF.guest);
 
       await admin.getByTestId("bulk-employees").click();
+      // A lista colada inteira é de prestadores de serviço (mesma regra, voucher com a categoria).
+      await admin.getByTestId("category-CONTRACTOR").click();
       await admin.getByTestId("bulk-employees-text").fill("1. Bruno Financeiro Costa; Financeiro; Beto Costa Filho\n2. Clara Juridico Dias - Jurídico");
       await expect(admin.getByTestId("bulk-preview")).toContainText("convidado: Beto Costa Filho");
       await admin.getByTestId("save-bulk-employees").click();
+      await expect(admin.getByTestId("employee-row")).toHaveCount(3);
+      await expect(admin.getByTestId("employee-row").filter({ hasText: "Bruno Financeiro Costa" })).toContainText("Prestador(a) de serviço");
+      await expect(admin.getByTestId("employee-row").filter({ hasText: STAFF.name })).toContainText("Funcionário(a)");
+      await admin.getByTestId("category-filter").getByText("Prestador(a) de serviço").click();
+      await expect(admin.getByTestId("employee-row")).toHaveCount(2);
+      await admin.getByTestId("category-filter").getByText("Todas as categorias").click();
       await expect(admin.getByTestId("employee-row")).toHaveCount(3);
       await expect(admin.getByTestId("stat-employees")).toHaveText("3");
       await expect(admin.getByTestId("stat-employee-guests")).toHaveText("2");
@@ -596,6 +631,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.getByTestId("gate-result")).toContainText(`Convidado(a) de ${STAFF.name} (funcionário(a) do SINDSERM)`);
       await expect(admin.getByTestId("kit-on-entry")).toContainText(`O kit deste convidado sai quando ${STAFF.name} chegar.`);
       await admin.getByTestId("confirm-entry").click();
+      await confirmEarlyEntry(admin);
       await expect(admin.getByTestId("entry-kit-result")).toContainText("Kit fica para depois");
 
       await openPersonAtGate(admin, "Rosa Financeiro", STAFF.name);
@@ -603,13 +639,14 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.getByTestId("gate-result")).toContainText(`Funcionário(a) do SINDSERM · ${STAFF.job}`);
       await expect(admin.getByTestId("confirm-entry")).toHaveText(/Confirmar entrada \+ 2 kits/);
       await admin.getByTestId("confirm-entry").click();
+      await confirmEarlyEntry(admin);
       await expect(admin.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
       const banner = admin.getByTestId("entry-kit-result");
       await expect(banner).toContainText("Entregue 2 kits!");
-      await expect(banner).toContainText("estoque dos funcionários");
+      await expect(banner).toContainText("estoque dos colaboradores");
       await expect(banner).toContainText(`Kit do convidado ${STAFF.guest}, que já entrou`);
 
-      await admin.goto("/painel/funcionarios");
+      await admin.goto("/painel/colaboradores");
       await expect(admin.getByTestId("stat-employees-present")).toHaveText("1");
       await expect(admin.getByTestId("stat-employee-stock")).toHaveText("3");
     });
@@ -619,6 +656,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await openPersonAtGate(admin, "Bruno Financeiro", "Bruno Financeiro Costa");
       await expect(admin.getByTestId("confirm-entry")).toHaveText(/^\s*Confirmar entrada\s*$/);
       await admin.getByTestId("confirm-entry").click();
+      await confirmEarlyEntry(admin);
       await expect(admin.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
       await expect(admin.getByTestId("entry-kit-result")).toContainText("estoque acabou");
 
@@ -628,7 +666,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await admin.getByTestId("confirm-dialog-action").click();
       await expect(admin.getByText("Entrega registrada.")).toBeVisible();
       await expect(admin.getByTestId("deliver-employee-kit")).toHaveCount(0);
-      await admin.goto("/painel/funcionarios");
+      await admin.goto("/painel/colaboradores");
       await expect(admin.getByTestId("stat-employee-stock")).toHaveText("3");
     });
 
@@ -654,7 +692,7 @@ test.describe.serial("festa das professoras e professores", () => {
       const page = await context.newPage();
       await login(page, SECURITY);
       await expect(page).toHaveURL(/\/portaria$/);
-      for (const path of ["/painel", "/painel/usuarios", "/painel/kits", "/painel/funcionarios"]) {
+      for (const path of ["/painel", "/painel/usuarios", "/painel/kits", "/painel/colaboradores", "/painel/funcionarios"]) {
         await page.goto(path);
         await expect(page, `Segurança não entra em ${path}`).toHaveURL(/\/portaria$/);
       }
@@ -670,8 +708,8 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(nav).toContainText("Na festa");
       await expect(nav).toContainText("Pessoas");
       await expect(nav).not.toContainText("Administração");
-      await expect(nav).not.toContainText("Funcionários SINDSERM");
-      for (const path of ["/painel/usuarios", "/painel/configuracoes", "/painel/auditoria", "/painel/funcionarios"]) {
+      await expect(nav).not.toContainText("Colaboradores SINDSERM");
+      for (const path of ["/painel/usuarios", "/painel/configuracoes", "/painel/auditoria", "/painel/colaboradores"]) {
         await page.goto(path);
         await expect(page, `Atendimento não entra em ${path}`).toHaveURL(/\/painel$/);
       }
@@ -688,8 +726,34 @@ test.describe.serial("festa das professoras e professores", () => {
       await login(page, ADMIN);
       const nav = page.getByTestId("panel-nav").first();
       await expect(nav).toContainText("Administração");
-      await expect(nav).toContainText("Funcionários SINDSERM");
+      await expect(nav).toContainText("Colaboradores SINDSERM");
       await expect(nav).toContainText("Acesso ao sistema");
+      await context.close();
+    });
+
+    await test.step("permissões personalizadas: Segurança ganha o Placar (só ver) e o menu acompanha", async () => {
+      const adminContext = await browser.newContext();
+      const admin = await adminContext.newPage();
+      await login(admin, ADMIN);
+      await admin.goto("/painel/usuarios");
+      await admin.getByTestId(`edit-user-${SECURITY.email}`).click();
+      const editor = admin.getByTestId("access-editor");
+      await editor.getByTestId("access-placar-view").click();
+      await expect(editor).toContainText("Personalizado");
+      await admin.getByTestId("edit-user-submit").click();
+      await expect(admin.getByTestId("user-row").filter({ hasText: SECURITY.email })).toContainText("Permissões ajustadas");
+      await adminContext.close();
+
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await login(page, SECURITY);
+      await expect(page).toHaveURL(/\/painel$/);
+      const nav = page.getByTestId("panel-nav").first();
+      await expect(nav).toContainText("Placar");
+      await expect(nav).toContainText("Portaria");
+      await expect(nav).not.toContainText("Inscrições");
+      await page.goto("/painel/inscricoes");
+      await expect(page).toHaveURL(/\/painel$/);
       await context.close();
     });
   });

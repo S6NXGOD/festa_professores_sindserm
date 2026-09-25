@@ -14,7 +14,7 @@ import {
   user,
   voucher,
 } from "@/server/db/schema";
-import type { AffiliationStatus, CheckInInfo, Deliveries, DeliveryInfo, DocumentKind, EmployeeDeliveries } from "@/domain/types";
+import type { AffiliationStatus, CheckInInfo, Deliveries, DeliveryInfo, DocumentKind, EmployeeDeliveries, EmployeeCategory } from "@/domain/types";
 import type { RegistrationOrigin } from "@/server/db/schema";
 
 export interface PersonBasics {
@@ -82,6 +82,7 @@ export interface PastGuestLink {
 export interface EmployeeGroupState {
   id: string;
   jobTitle: string | null;
+  category: EmployeeCategory;
   active: boolean;
   person: PersonBasics;
   /** Entrada do(a) próprio(a) funcionário(a). */
@@ -227,7 +228,7 @@ export async function isActiveEmployee(ex: Executor, personId: string) {
 /** Funcionário(a), convidado ativo, entradas e kits do grupo. */
 export async function loadEmployeeGroup(ex: Executor, employeeId: string): Promise<EmployeeGroupState | null> {
   const [row] = await ex
-    .select({ id: employee.id, jobTitle: employee.jobTitle, removedAt: employee.removedAt, person: personColumns })
+    .select({ id: employee.id, jobTitle: employee.jobTitle, category: employee.category, removedAt: employee.removedAt, person: personColumns })
     .from(employee)
     .innerJoin(person, eq(person.id, employee.personId))
     .where(eq(employee.id, employeeId))
@@ -251,6 +252,7 @@ export async function loadEmployeeGroup(ex: Executor, employeeId: string): Promi
   return {
     id: row.id,
     jobTitle: row.jobTitle,
+    category: row.category,
     active: !row.removedAt,
     person: row.person,
     checkIn: checkIns.get(row.person.id) ?? null,

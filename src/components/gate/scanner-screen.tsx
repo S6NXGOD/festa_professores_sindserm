@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { confirmEntryAction, gateViewAction, type LookupResult, lookupCodeAction, scanQrAction } from "@/server/actions/gate";
 import type { GateView } from "@/server/services/gate-view";
 import type { EntryKitResult } from "@/server/services/checkin";
+import { EarlyEntryDialog } from "./early-entry-dialog";
 import { EntryPromptDialog } from "./entry-prompt";
 import { deliveredKitCount, GateResult } from "./gate-result";
 import { PersonOperations } from "./person-operations";
@@ -75,6 +76,7 @@ export function ScannerScreen() {
   const [feedback, setFeedback] = useState<Feedback>("idle");
   const [current, setCurrent] = useState<Current | null>(null);
   const [entryPrompt, setEntryPrompt] = useState(false);
+  const [earlyOpen, setEarlyOpen] = useState(false);
   const [problem, setProblem] = useState<{ title: string; detail: string } | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
@@ -195,18 +197,31 @@ export function ScannerScreen() {
     showLookup(result.data, "CODE");
   }
 
-  function confirmEntry() {
+  /** Antes do horário de início, pede a confirmação a mais (`early`). */
+  function confirmEntry(early = false) {
     if (!current) return;
     setEntryPrompt(false);
+    if (!early && !current.view.eventStart.started) {
+      playSound("warn");
+      setEarlyOpen(true);
+      return;
+    }
     startConfirm(async () => {
       const result = await callAction(
         confirmEntryAction({
           personId: current.view.personId,
           method: current.method,
           voucherId: current.voucherId,
+          early,
         }),
       );
+      setEarlyOpen(false);
       if (!result.ok) {
+        if (result.code === "EVENT_NOT_STARTED") {
+          playSound("warn");
+          setEarlyOpen(true);
+          return;
+        }
         playSound("error");
         toast.error(result.error);
         return;
@@ -392,7 +407,7 @@ export function ScannerScreen() {
                     entryKit={current.entryKit}
                     entryGuestKit={current.entryGuestKit}
                     confirming={confirming}
-                    onConfirm={confirmEntry}
+                    onConfirm={() => confirmEntry()}
                     hintClassName="z-50 bottom-32"
                   />
                   {current.view.permissions.deliverKits ? (
@@ -406,8 +421,17 @@ export function ScannerScreen() {
                   <EntryPromptDialog
                     view={current.view}
                     open={entryPrompt && current.view.entry.kind === "ALLOWED" && current.view.permissions.checkIn && !confirming}
-                    onConfirm={confirmEntry}
+                    onConfirm={() => confirmEntry()}
                     onClose={() => setEntryPrompt(false)}
+                  />
+                  <EarlyEntryDialog
+                    open={earlyOpen}
+                    name={current.view.fullName}
+                    startLabel={current.view.eventStart.label}
+                    startAt={current.view.eventStart.at}
+                    pending={confirming}
+                    onConfirm={() => confirmEntry(true)}
+                    onCancel={() => setEarlyOpen(false)}
                   />
                 </>
               ) : problem ? (

@@ -3,6 +3,7 @@
  * passando pelos mesmos serviços usados pelas server actions.
  */
 import { and, count, eq, isNull, sql } from "drizzle-orm";
+import { ROLE_PRESETS } from "@/domain/access";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { checkIn, guestLink, kitDelivery, kitStock, person, registration } from "@/server/db/schema";
@@ -162,7 +163,7 @@ describe("3. o kit do convidado só sai depois que o(a) professor(a) chegou", ()
     const host = state.member.fullName;
 
     // A portaria já avisa antes de confirmar a entrada do convidado.
-    const guestPreview = await loadGateView(db, state.guest!.personId, "SECURITY");
+    const guestPreview = await loadGateView(db, state.guest!.personId, ROLE_PRESETS.SECURITY);
     expect(guestPreview?.kitOnEntry).toEqual({ kind: "WAITING", message: `O kit deste convidado sai quando ${host} chegar.` });
     expect(await entryKit(state.guest!.personId)).toEqual({ kind: "WAITING", message: `Sai quando ${host} chegar.` });
     expect((await stockOf()).delivered).toBe(0);
@@ -174,7 +175,7 @@ describe("3. o kit do convidado só sai depois que o(a) professor(a) chegou", ()
     expect(blocked.message).toMatch(/quem convidou chegar/i);
 
     // A chegada do(a) professor(a) libera os 2 kits de uma vez.
-    const hostPreview = await loadGateView(db, state.member.id, "SECURITY");
+    const hostPreview = await loadGateView(db, state.member.id, ROLE_PRESETS.SECURITY);
     expect(hostPreview?.kitOnEntry).toMatchObject({ kind: "WILL_DELIVER", count: 2 });
     const entry = await checkInPerson(state.member.id);
     expect(entry).toMatchObject({
@@ -189,7 +190,7 @@ describe("3. o kit do convidado só sai depois que o(a) professor(a) chegou", ()
     await updateStockSettings(admin, stockSettingsSchema.parse({ stockMode: "SINGLE", totalAll: 1, lowStockThreshold: 0 }));
     const { state } = await confirmedTeacher({ guest: true });
     await checkInPerson(state.guest!.personId);
-    const preview = await loadGateView(db, state.member.id, "SECURITY");
+    const preview = await loadGateView(db, state.member.id, ROLE_PRESETS.SECURITY);
     expect(preview?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação" });
     expect(await checkInPerson(state.member.id)).toMatchObject({
       kit: { kind: "DELIVERED", kitType: "MEMBER" },
@@ -536,12 +537,12 @@ describe("10. estoque nunca fica negativo", () => {
     await updateStockSettings(admin, stockSettingsSchema.parse({ stockMode: "SINGLE", totalAll: 1, lowStockThreshold: 0 }));
     const first = await confirmedTeacher();
     const second = await confirmedTeacher();
-    const preview = await loadGateView(db, first.state.member.id, "SECURITY");
+    const preview = await loadGateView(db, first.state.member.id, ROLE_PRESETS.SECURITY);
     expect(preview?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação" });
     expect(await entryKit(first.state.member.id)).toMatchObject({ kind: "DELIVERED", available: 0, low: true });
 
     // A tela da portaria já avisa antes de confirmar.
-    const outOfStock = await loadGateView(db, second.state.member.id, "SECURITY");
+    const outOfStock = await loadGateView(db, second.state.member.id, ROLE_PRESETS.SECURITY);
     expect(outOfStock?.kitOnEntry).toEqual({ kind: "NONE", message: "Sem kit: o estoque acabou." });
     const entry = await checkInPerson(second.state.member.id);
     expect(entry).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "NONE", message: "Sem kit: o estoque acabou." } });

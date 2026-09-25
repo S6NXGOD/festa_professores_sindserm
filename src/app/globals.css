@@ -100,7 +100,16 @@
   --animate-sun-glow: sun-glow 5s ease-in-out infinite;
   --animate-crt-on: crt-on 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-wiggle: wiggle 2.8s ease-in-out infinite;
 
+  /* Despertador tocando: parado quase o tempo todo, uma sacudida curta. */
+  @keyframes wiggle {
+    0%, 78%, 100% { transform: rotate(0deg); }
+    82% { transform: rotate(-12deg); }
+    86% { transform: rotate(12deg); }
+    90% { transform: rotate(-8deg); }
+    94% { transform: rotate(6deg); }
+  }
   @keyframes flicker {
     0%, 4%, 8%, 12% { opacity: 1; }
     2%, 6% { opacity: 0.35; }
@@ -147,7 +156,11 @@
 /* ------------------------------------------------------------------------- */
 
 :root {
-  color-scheme: dark;
+  /*
+   * O site já é escuro. "only" pede ao navegador que não aplique o escurecimento
+   * automático por cima (ele deixava o título cromado quase invisível no celular).
+   */
+  color-scheme: only dark;
 
   /* Base: o mesmo preto do cartaz da festa, para as artes se fundirem ao fundo. */
   --ink: #080808;
@@ -352,6 +365,17 @@
     color: transparent;
     filter: drop-shadow(0 3px 0 var(--brand)) drop-shadow(0 0 18px rgb(255 38 38 / 0.35));
   }
+  /*
+   * No celular, letra sólida: navegadores com modo escuro forçado (ex.: Samsung
+   * Internet) escurecem o degradê do cromado e o título sumia. O contorno vermelho fica.
+   */
+  @media (max-width: 639px) {
+    .chrome {
+      background: none;
+      color: #f5f4f1;
+      -webkit-text-fill-color: #f5f4f1;
+    }
+  }
 
   /* Fita crepe/papel (como a faixa do cartaz) para rótulos. */
   .tape {
@@ -491,6 +515,13 @@
     print-color-adjust: exact;
     text-shadow: none !important;
     animation: none !important;
+  }
+}
+
+/* O site já nasce escuro: com o tema escuro do aparelho, nada muda (e o navegador não força o dele). */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: only dark;
   }
 }
 

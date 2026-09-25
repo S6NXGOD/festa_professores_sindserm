@@ -182,8 +182,8 @@ export async function recordEmployeeKitDelivery(
     entityId: delivery!.id,
     summary:
       kitType === "EMPLOYEE"
-        ? `Kit de funcionário(a) entregue${where} a ${group.person.fullName}.`
-        : `Kit do convidado ${beneficiary.fullName} entregue${where} (convidado(a) de ${group.person.fullName}, funcionário(a) do SINDSERM).`,
+        ? `Kit de colaborador(a) entregue${where} a ${group.person.fullName}.`
+        : `Kit do convidado ${beneficiary.fullName} entregue${where} (convidado(a) de ${group.person.fullName}, colaborador(a) do SINDSERM).`,
     after: { employeeId: group.id, kitType, pool: "EMPLOYEE", context },
   });
   const available = stock.total - stock.delivered;
@@ -200,7 +200,7 @@ export async function recordEmployeeKitDelivery(
 /** Entrega manual de um kit do grupo de um(a) funcionário(a) que não saiu na entrada. */
 async function deliverEmployeeGroupKit(tx: Tx, actor: StaffActor, employeeId: string, kitType: KitType, now: Date) {
   if (kitType === "MEMBER") {
-    throw new DomainError("KIT_NOT_AVAILABLE", "Funcionário(a) do SINDSERM recebe o kit de funcionário(a), não o de professor(a).");
+    throw new DomainError("KIT_NOT_AVAILABLE", "Colaborador(a) do SINDSERM recebe o kit de colaborador(a), não o de professor(a).");
   }
   const group = await lockEmployeeGroupWithPeople(tx, employeeId);
   const config = await getEventConfig(tx);
@@ -214,7 +214,7 @@ async function deliverEmployeeGroupKit(tx: Tx, actor: StaffActor, employeeId: st
   }
   if (availability.kind === "BLOCKED") throw new DomainError("KIT_NOT_AVAILABLE", KIT_BLOCK_MESSAGE[availability.code]);
   if (!(await hasEmployeeStock(tx))) {
-    throw new DomainError("OUT_OF_STOCK", "Cadastre o estoque de kits dos funcionários (Kits e estoque).");
+    throw new DomainError("OUT_OF_STOCK", "Cadastre o estoque de kits dos colaboradores (Kits e estoque).");
   }
   return recordEmployeeKitDelivery(tx, actor, group, kitType, "MANUAL");
 }
@@ -238,7 +238,7 @@ export async function deliverKit(
       const employeeId = await findEmployeeIdByPerson(tx, input.personId);
       if (employeeId) return deliverEmployeeGroupKit(tx, actor, employeeId, input.kitType, now);
       if (input.kitType === "EMPLOYEE") {
-        throw new DomainError("NOT_FOUND", "Esta pessoa não está na lista de funcionários do SINDSERM.");
+        throw new DomainError("NOT_FOUND", "Esta pessoa não está na lista de colaboradores do SINDSERM.");
       }
       const kitType = input.kitType;
       const own = await findRegistrationIdByMember(tx, input.personId);

@@ -13,7 +13,8 @@ export type DomainErrorCode =
   | "OUT_OF_STOCK"
   | "ALREADY_DELIVERED"
   | "GUEST_CANNOT_RECEIVE_KIT"
-  | "BENEFICIARY_LOCKED";
+  | "BENEFICIARY_LOCKED"
+  | "EVENT_NOT_STARTED";
 
 /** Erro de regra de negócio com mensagem segura para exibir ao usuário. */
 export class DomainError extends Error {

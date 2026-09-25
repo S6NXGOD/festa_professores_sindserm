@@ -4,6 +4,7 @@
  * estoque depois que o(a) funcionário(a) chegar (mesma regra das professoras e professores).
  */
 import { and, eq, isNull } from "drizzle-orm";
+import { ROLE_PRESETS } from "@/domain/access";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { guestLink, kitStock, voucher } from "@/server/db/schema";
@@ -90,11 +91,43 @@ describe("cadastro interno dos funcionários", () => {
     expect(group?.guest?.fullName).toBe(GUEST.fullName);
     expect(group?.whatsapp).toBe("86995361455");
 
-    const view = await loadGateView(db, created.personId, "SECURITY");
+    const view = await loadGateView(db, created.personId, ROLE_PRESETS.SECURITY);
     expect(view).toMatchObject({ role: "EMPLOYEE", entry: { kind: "ALLOWED", role: "EMPLOYEE" } });
-    expect(view?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de funcionário(a)" });
+    expect(view?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de colaborador(a)" });
     const [found] = await searchPeople(db, "Caio Convidado", { fullCpf: false });
     expect(found).toMatchObject({ hostName: "Rosa Financeiro Lima", hostIsEmployee: true });
+  });
+
+  it("categorias (diretoria, funcionário(a), prestador(a)): mesma regra, categoria no voucher, na portaria e na busca", async () => {
+    const board = await createEmployee(admin, employee({ fullName: "Helena Presidenta Rocha", jobTitle: "Presidência", category: "BOARD" }));
+    const card = await loadVoucherForStaff(board.personId);
+    expect(card).toMatchObject({ kind: "EMPLOYEE", category: "BOARD", jobTitle: "Presidência" });
+    const view = await loadGateView(db, board.personId, ROLE_PRESETS.SECURITY);
+    expect(view?.employee?.category).toBe("BOARD");
+    expect(view?.kitOnEntry).toMatchObject({ kind: "WILL_DELIVER", count: 1 });
+
+    // Lista colada: a categoria vale para o lote inteiro.
+    const pasted = await createEmployeesFromList(admin, { text: "Tiago Limpeza Souza; Limpeza\nVera Seguranca Dias; Segurança", category: "CONTRACTOR" });
+    expect(pasted.created).toBe(2);
+    const [found] = await searchPeople(db, "Tiago Limpeza", { fullCpf: false });
+    expect(found?.employee).toEqual({ jobTitle: "Limpeza", category: "CONTRACTOR" });
+
+    // Sem categoria informada, continua sendo funcionário(a) (como quem já estava na lista).
+    const staff = await createEmployee(admin, employee({ fullName: "Otavio Sem Categoria" }));
+    expect((await loadVoucherForStaff(staff.personId))?.category).toBe("STAFF");
+
+    // Trocar a categoria depois.
+    await updateEmployee(admin, {
+      employeeId: staff.employeeId,
+      fullName: "Otavio Sem Categoria",
+      cpf: "",
+      whatsapp: "",
+      jobTitle: "Tesouraria",
+      category: "BOARD",
+    });
+    expect((await loadVoucherForStaff(staff.personId))?.category).toBe("BOARD");
+    const entry = await registerCheckIn(security, { personId: board.personId, method: "QR" });
+    expect(entry).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "DELIVERED", kitType: "EMPLOYEE" } });
   });
 
   it("um voucher por pessoa: funcionário não é também filiado(a), convidado(a) nem faz ficha", async () => {
@@ -204,14 +237,14 @@ describe("entrada e kits do grupo do funcionário", () => {
     const created = await createEmployee(admin, employee({ guest: GUEST }));
     const guestId = created.guest!.personId;
 
-    const guestView = await loadGateView(db, guestId, "SECURITY");
+    const guestView = await loadGateView(db, guestId, ROLE_PRESETS.SECURITY);
     expect(guestView).toMatchObject({ role: "GUEST", entry: { kind: "ALLOWED", role: "GUEST" }, host: { kind: "EMPLOYEE", fullName: "Rosa Financeiro Lima" } });
     expect(guestView?.kitOnEntry).toEqual({ kind: "WAITING", message: "O kit deste convidado sai quando Rosa Financeiro Lima chegar." });
     const guestEntry = await registerCheckIn(security, { personId: guestId, method: "QR" });
     expect(guestEntry).toMatchObject({ outcome: "CHECKED_IN", checkIn: { role: "GUEST" }, kit: { kind: "WAITING", message: "Sai quando Rosa Financeiro Lima chegar." } });
     expect(await stockOf("EMPLOYEE")).toMatchObject({ delivered: 0 });
 
-    const hostView = await loadGateView(db, created.personId, "SECURITY");
+    const hostView = await loadGateView(db, created.personId, ROLE_PRESETS.SECURITY);
     expect(hostView?.kitOnEntry).toMatchObject({ kind: "WILL_DELIVER", count: 2 });
     const hostEntry = await registerCheckIn(security, { personId: created.personId, method: "QR" });
     expect(hostEntry).toMatchObject({
@@ -235,7 +268,7 @@ describe("entrada e kits do grupo do funcionário", () => {
     expect(await stockOf("EMPLOYEE")).toMatchObject({ delivered: 2 });
 
     // Estorno da entrega do kit do convidado (administrador) volta para o estoque dos funcionários.
-    const view = await loadGateView(db, created.personId, "ADMIN");
+    const view = await loadGateView(db, created.personId, ROLE_PRESETS.ADMIN);
     const guestKit = view?.employee?.kits.GUEST;
     expect(guestKit?.kind).toBe("DELIVERED");
     await cancelKitDelivery(admin, { deliveryId: guestKit!.kind === "DELIVERED" ? guestKit!.deliveryId : "", justification: "Kit entregue duas vezes" });
@@ -249,13 +282,13 @@ describe("entrada e kits do grupo do funcionário", () => {
   it("sem estoque cadastrado ou esgotado: entra sem kit e a tela diz o porquê; reposto, sai pelo botão", async () => {
     await setStock(0);
     const noStock = await createEmployee(admin, employee({ fullName: "Sem Estoque Silva" }));
-    expect((await loadGateView(db, noStock.personId, "SECURITY"))?.kitOnEntry).toEqual({
+    expect((await loadGateView(db, noStock.personId, ROLE_PRESETS.SECURITY))?.kitOnEntry).toEqual({
       kind: "NONE",
-      message: "Sem kit: cadastre o estoque de kits dos funcionários (Kits e estoque).",
+      message: "Sem kit: cadastre o estoque de kits dos colaboradores (Kits e estoque).",
     });
     expect(await registerCheckIn(security, { personId: noStock.personId, method: "QR" })).toMatchObject({
       outcome: "CHECKED_IN",
-      kit: { kind: "NONE", message: "Sem kit: cadastre o estoque de kits dos funcionários (Kits e estoque)." },
+      kit: { kind: "NONE", message: "Sem kit: cadastre o estoque de kits dos colaboradores (Kits e estoque)." },
     });
     await expectDomainError(deliverKit(attendant, { personId: noStock.personId, kitType: "EMPLOYEE" }), "OUT_OF_STOCK");
 
@@ -324,7 +357,7 @@ describe("tirar da lista e trazer de volta", () => {
 
     const removed = await removeEmployee(admin, { employeeId: created.employeeId });
     expect(removed).toMatchObject({ removed: true, guestRemoved: true });
-    const blocked = await loadGateView(db, created.personId, "SECURITY");
+    const blocked = await loadGateView(db, created.personId, ROLE_PRESETS.SECURITY);
     expect(blocked?.entry).toMatchObject({ kind: "BLOCKED", code: "EMPLOYEE_REMOVED" });
     await expectDomainError(registerCheckIn(security, { personId: created.personId, method: "SEARCH" }), "ENTRY_BLOCKED");
     // O convidado não fica "sobrando": o convite acaba e o QR dele é cancelado.
@@ -332,7 +365,7 @@ describe("tirar da lista e trazer de volta", () => {
     const [guestVoucher] = await db.select({ id: voucher.id }).from(voucher).where(and(eq(voucher.personId, guestId), isNull(voucher.revokedAt)));
     expect(guestVoucher).toBeUndefined();
     const [link] = await db.select({ status: guestLink.status, endReason: guestLink.endReason }).from(guestLink).where(eq(guestLink.guestPersonId, guestId));
-    expect(link).toEqual({ status: "REMOVED", endReason: "Funcionário(a) saiu da lista" });
+    expect(link).toEqual({ status: "REMOVED", endReason: "Colaborador(a) saiu da lista" });
 
     await restoreEmployee(admin, { employeeId: created.employeeId });
     const [second] = await db

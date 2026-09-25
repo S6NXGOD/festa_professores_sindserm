@@ -5,6 +5,6 @@ import { requirePageActor } from "@/server/session";
 export const metadata: Metadata = { title: "Leitor de QR Code" };
 
 export default async function ScannerPage() {
-  await requirePageActor("checkIn");
+  await requirePageActor("viewGate");
   return <ScannerScreen />;
 }

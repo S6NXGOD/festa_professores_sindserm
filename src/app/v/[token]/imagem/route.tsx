@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
+import { EMPLOYEE_CATEGORY_TITLE } from "@/domain/labels";
+import type { EmployeeCategory } from "@/domain/types";
 import { formatPhone } from "@/lib/phone";
 import { getEventInfo } from "@/server/queries/config";
 import { loadVoucherByToken, qrPngDataUrl } from "@/server/queries/vouchers";
@@ -21,6 +23,13 @@ const WIDTH = 1080;
 const HEIGHT = 1920; // 9:16, formato de story/status
 const RED = "#ff2626";
 const AMBER = "#f8c000";
+
+/** O "metal" do passe da casa por categoria (o mesmo do voucher na tela). */
+const METAL: Record<EmployeeCategory, { accent: string; rgb: string; tagText: string; tag: string }> = {
+  BOARD: { accent: "#e4e4e7", rgb: "228,228,231", tagText: "#0e0e0f", tag: "DIRETORIA" },
+  STAFF: { accent: AMBER, rgb: "248,192,0", tagText: "#1a1300", tag: "FUNCIONÁRIO(A)" },
+  CONTRACTOR: { accent: "#22d3ee", rgb: "34,211,238", tagText: "#0e0e0f", tag: "PRESTADOR(A)" },
+};
 const INK = "#080808";
 
 /** Imagem PNG do voucher (para salvar na galeria ou compartilhar). */
@@ -38,9 +47,12 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
   const emblemSrc = `data:image/jpeg;base64,${emblem.toString("base64")}`;
   const unionLogoSrc = `data:image/png;base64,${unionLogo.toString("base64")}`;
   const isMember = card.kind === "MEMBER";
-  // Funcionário(a) do SINDSERM: "passe da casa" dourado, para não confundir com o voucher dos filiados.
+  // Colaborador(a) do SINDSERM: "passe da casa" no metal da categoria, para não confundir com o voucher dos filiados.
   const isEmployee = card.kind === "EMPLOYEE";
-  const accent = isEmployee ? AMBER : RED;
+  const category: EmployeeCategory = card.category ?? "STAFF";
+  const metal = METAL[category];
+  const accent = isEmployee ? metal.accent : RED;
+  const glowRgb = isEmployee ? metal.rgb : "255,38,38";
   const kitLine = isEmployee
     ? card.guestName
       ? `2 kits de consumação: o seu e o de ${card.guestName}`
@@ -52,9 +64,9 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
           : "1 kit de consumação"
         : "Participação sem kit de consumação"
       : `1 kit de consumação, depois que ${card.hostName ?? "quem te convidou"} chegar`;
-  const tag = isEmployee ? "FUNCIONÁRIO(A)" : isMember ? "PLAYER 1" : "PLAYER 2";
+  const tag = isEmployee ? metal.tag : isMember ? "PLAYER 1" : "PLAYER 2";
   const subtitle = isEmployee
-    ? `Funcionário(a) do SINDSERM${card.jobTitle ? ` · ${card.jobTitle}` : ""}`
+    ? `${EMPLOYEE_CATEGORY_TITLE[category]}${card.jobTitle ? ` · ${card.jobTitle}` : ""}`
     : isMember
       ? card.isTeacher
         ? "Professor(a) filiado(a)"
@@ -81,7 +93,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
             border: `6px solid ${accent}`,
             borderRadius: 48,
             overflow: "hidden",
-            boxShadow: isEmployee ? "0 0 80px rgba(248,192,0,0.4)" : "0 0 80px rgba(255,38,38,0.45)",
+            boxShadow: `0 0 80px rgba(${glowRgb},${isEmployee ? 0.4 : 0.45})`,
           }}
         >
           <div style={{ display: "flex", justifyContent: "center", background: INK, paddingTop: 16 }}>
@@ -98,13 +110,13 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                   fontSize: 36,
                   padding: "14px 18px",
                   borderRadius: 8,
-                  background: isEmployee ? AMBER : isMember ? "#e3000f" : "#232326",
-                  color: isEmployee ? "#1a1300" : "#ffffff",
+                  background: isEmployee ? metal.accent : isMember ? "#e3000f" : "#232326",
+                  color: isEmployee ? metal.tagText : "#ffffff",
                 }}
               >
                 {tag}
               </div>
-              <div style={{ display: "flex", fontFamily: "Pixel", fontSize: 28, letterSpacing: 2, color: isEmployee ? AMBER : "#a8a49e" }}>
+              <div style={{ display: "flex", fontFamily: "Pixel", fontSize: 28, letterSpacing: 2, color: isEmployee ? metal.accent : "#a8a49e" }}>
                 {isEmployee ? "PASSE DA CASA" : "ADMIT ONE"}
               </div>
             </div>
@@ -122,7 +134,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
             >
               {card.fullName}
             </div>
-            <div style={{ display: "flex", marginTop: 14, fontSize: 36, fontWeight: 500, color: isEmployee ? AMBER : "#a8a49e" }}>
+            <div style={{ display: "flex", marginTop: 14, fontSize: 36, fontWeight: 500, color: isEmployee ? metal.accent : "#a8a49e" }}>
               {subtitle}
             </div>
           </div>
@@ -136,7 +148,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                 padding: 18,
                 background: "#ffffff",
                 borderRadius: 28,
-                boxShadow: isEmployee ? "0 0 0 10px rgba(248,192,0,0.3)" : "0 0 0 10px rgba(255,38,38,0.28)",
+                boxShadow: `0 0 0 10px rgba(${glowRgb},${isEmployee ? 0.3 : 0.28})`,
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- renderizado pelo Satori */}
@@ -159,8 +171,8 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                 marginTop: 30,
                 padding: "20px 28px",
                 borderRadius: 20,
-                border: isEmployee ? "3px solid rgba(248,192,0,0.6)" : "3px solid rgba(255,38,38,0.55)",
-                background: isEmployee ? "rgba(248,192,0,0.12)" : "rgba(255,38,38,0.12)",
+                border: `3px solid rgba(${glowRgb},${isEmployee ? 0.6 : 0.55})`,
+                background: `rgba(${glowRgb},0.12)`,
                 fontSize: 30,
                 fontWeight: 700,
                 color: "#f5f4f1",

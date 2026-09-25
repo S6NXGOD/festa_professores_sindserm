@@ -7,7 +7,8 @@ import { isValidCpf, normalizeCpf } from "@/lib/cpf";
 import { normalizeMapsInput } from "@/lib/maps";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeSpaces, toSearchText } from "@/lib/text";
-import { STAFF_ROLES } from "./types";
+import { ACCESS_LEVELS, sanitizeAccess } from "./access";
+import { EMPLOYEE_CATEGORIES, STAFF_ROLES } from "./types";
 
 const NAME_REGEX = /^[\p{L}\p{M}'’. -]+$/u;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -370,14 +371,14 @@ export const teacherStatusSchema = z.object({
 export type TeacherStatusInput = z.input<typeof teacherStatusSchema>;
 
 // ---------------------------------------------------------------------------
-// Funcionários do SINDSERM (cadastro só interno)
+// Colaboradores do SINDSERM: diretoria, funcionários e prestadores (cadastro só interno)
 // ---------------------------------------------------------------------------
 
 /** Setor ou cargo no sindicato (opcional). */
 export const employeeJobTitleField = optionalText(60);
 
 export const SAME_NAME_EMPLOYEE_GUEST_MESSAGE =
-  "Mesmo nome do(a) funcionário(a): informe o CPF do convidado para mostrar que é outra pessoa";
+  "Mesmo nome do(a) colaborador(a): informe o CPF do convidado para mostrar que é outra pessoa";
 
 const employeeFields = z.object({
   fullName: fullNameField(),
@@ -386,6 +387,8 @@ const employeeFields = z.object({
   /** Opcional: para mandar o voucher direto no WhatsApp da pessoa. */
   whatsapp: optionalPhoneField,
   jobTitle: employeeJobTitleField,
+  /** Diretoria, funcionário(a) ou prestador(a) de serviço: mesma regra, voucher com a categoria. */
+  category: z.enum(EMPLOYEE_CATEGORIES).default("STAFF"),
 });
 
 /** Cadastro do(a) funcionário(a), já com o convidado (opcional). */
@@ -412,6 +415,8 @@ export const MAX_BULK_EMPLOYEES = 200;
 
 export const bulkEmployeesSchema = z.object({
   text: z.string().max(20_000, "Lista muito longa"),
+  /** A lista colada inteira é de uma categoria (ex.: só a diretoria). */
+  category: z.enum(EMPLOYEE_CATEGORIES).default("STAFF"),
 });
 export type BulkEmployeesInput = z.input<typeof bulkEmployeesSchema>;
 
@@ -565,7 +570,7 @@ export const stockSettingsSchema = z
     totalMember: optionalIntField("a quantidade de kits de professor(a)"),
     totalGuest: optionalIntField("a quantidade de kits de convidado"),
     /** Estoque dos funcionários (sempre separado). Vazio = 0. */
-    totalEmployee: optionalIntField("a quantidade de kits de funcionários"),
+    totalEmployee: optionalIntField("a quantidade de kits dos colaboradores"),
     lowStockThreshold: intField("o limite de alerta"),
   })
   .superRefine((d, ctx) => {
@@ -609,11 +614,24 @@ export const bootstrapAdminSchema = z
   });
 export type BootstrapAdminInput = z.input<typeof bootstrapAdminSchema>;
 
+/**
+ * Permissões por área. Níveis que a área não aceita viram "sem acesso": dado
+ * adulterado nunca ganha acesso a mais.
+ */
+export const accessMapSchema = z
+  .object({
+    modules: z.record(z.string(), z.enum(ACCESS_LEVELS)),
+    fullCpf: z.boolean(),
+  })
+  .transform((value) => sanitizeAccess(value));
+
 export const createUserSchema = z.object({
   name: fullNameField(),
   email: staffEmailField,
   role: z.enum(STAFF_ROLES),
   password: passwordField,
+  /** Permissões ajustadas; ausente ou igual ao perfil = as do perfil. */
+  access: accessMapSchema.nullish(),
 });
 export type CreateUserInput = z.input<typeof createUserSchema>;
 
@@ -622,8 +640,22 @@ export const updateUserSchema = z.object({
   name: fullNameField(),
   role: z.enum(STAFF_ROLES),
   active: z.boolean(),
+  access: accessMapSchema.nullish(),
+  /** Pedir que a pessoa crie uma senha nova no próximo acesso. */
+  mustChangePassword: z.boolean().optional(),
 });
 export type UpdateUserInput = z.input<typeof updateUserSchema>;
+
+export const changeOwnPasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Informe a senha atual"),
+    newPassword: passwordField,
+  })
+  .refine((d) => d.newPassword !== d.currentPassword, {
+    path: ["newPassword"],
+    message: "Escolha uma senha diferente da atual",
+  });
+export type ChangeOwnPasswordInput = z.input<typeof changeOwnPasswordSchema>;
 
 export const resetPasswordSchema = z.object({
   userId: z.string().min(1),

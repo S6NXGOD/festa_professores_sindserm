@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Entrar" };
 export default async function LoginPage({ searchParams }: PageProps<"/entrar">) {
   const [query, actor, usersExist] = await Promise.all([searchParams, getActor(), hasUsers()]);
   if (!usersExist) redirect("/setup");
-  if (actor) redirect(homePathFor(actor.role));
+  if (actor) redirect(homePathFor(actor.access));
   const next = typeof query.next === "string" ? query.next : undefined;
   return (
     <AuthShell title="Entrar" subtitle="Organização, atendimento e portaria.">

@@ -22,7 +22,7 @@ import { PixelTag, PlayerTag } from "@/components/retro/bits";
 import { ScrollHint } from "@/components/retro/scroll-hint";
 import { AffiliationBadge, ToneBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
-import { AFFILIATION_STATUS_LABEL, CHECK_IN_METHOD_LABEL } from "@/domain/labels";
+import { AFFILIATION_STATUS_LABEL, CHECK_IN_METHOD_LABEL, EMPLOYEE_CATEGORY_INLINE, EMPLOYEE_CATEGORY_LABEL, EMPLOYEE_CATEGORY_TITLE } from "@/domain/labels";
 import { formatShortDateTime, formatTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import type { EntryKitResult } from "@/server/services/checkin";
@@ -43,9 +43,9 @@ function headerFor(view: GateView, justCheckedIn: boolean): { tone: Tone; icon: 
         title: "LIBERADO PARA ENTRADA",
         detail:
           view.entry.role === "EMPLOYEE"
-            ? `Funcionário(a) do SINDSERM${view.employee?.jobTitle ? ` · ${view.employee.jobTitle}` : ""}`
+            ? `${EMPLOYEE_CATEGORY_TITLE[view.employee?.category ?? "STAFF"]}${view.employee?.jobTitle ? ` · ${view.employee.jobTitle}` : ""}`
             : view.entry.role === "GUEST"
-            ? `Convidado(a) de ${view.host?.fullName ?? "professor(a)"}${view.host?.kind === "EMPLOYEE" ? " (funcionário(a) do SINDSERM)" : ""}`
+            ? `Convidado(a) de ${view.host?.fullName ?? "professor(a)"}${view.host?.kind === "EMPLOYEE" ? ` (${EMPLOYEE_CATEGORY_INLINE[view.host.category ?? "STAFF"]})` : ""}`
             : view.ownRegistration
               ? `${view.ownRegistration.isTeacher ? "Professor(a)" : "Filiado(a)"} · ${AFFILIATION_STATUS_LABEL[view.ownRegistration.status]}`
               : undefined,
@@ -130,7 +130,7 @@ function EntryKitBanner({ kit, guestKit }: { kit: EntryKitResult; guestKit: Entr
       kit.kitType === "GUEST"
         ? `Kit de convidado para ${kit.beneficiaryName}.`
         : kit.kitType === "EMPLOYEE"
-          ? "Kit de funcionário(a) (estoque dos funcionários)."
+          ? "Kit de colaborador(a) (estoque dos colaboradores)."
           : "Kit de consumação do(a) professor(a).",
     );
   } else {
@@ -258,7 +258,7 @@ export function GateResult({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             {isEmployee ? (
-              <PixelTag tone="warning">Funcionário(a)</PixelTag>
+              <PixelTag tone="warning">{EMPLOYEE_CATEGORY_LABEL[view.employee?.category ?? "STAFF"]}</PixelTag>
             ) : view.role !== "NONE" ? (
               <PlayerTag player={isGuest ? 2 : 1} />
             ) : null}
@@ -280,7 +280,7 @@ export function GateResult({
 
         <dl className="grid gap-2">
           {view.employee ? (
-            <InfoRow icon={Building} label="Funcionário(a) do SINDSERM">
+            <InfoRow icon={Building} label={EMPLOYEE_CATEGORY_TITLE[view.employee.category]}>
               <span className="font-bold">{view.employee.jobTitle ?? "Setor não informado"}</span>
               {view.employee.active ? (
                 <>
@@ -303,20 +303,20 @@ export function GateResult({
                   ) : null}
                 </>
               ) : (
-                <span className="mt-1 block font-semibold text-danger">Fora da lista de funcionários</span>
+                <span className="mt-1 block font-semibold text-danger">Fora da lista de colaboradores</span>
               )}
             </InfoRow>
           ) : null}
 
           {isGuest && view.host ? (
-            <InfoRow icon={Users} label={view.host.kind === "EMPLOYEE" ? "Funcionário(a) que convidou" : "Professor(a) responsável"}>
+            <InfoRow icon={Users} label={view.host.kind === "EMPLOYEE" ? "Colaborador(a) que convidou" : "Professor(a) responsável"}>
               <span className="font-bold">{view.host.fullName}</span>
               <span className="mt-1.5 flex flex-wrap gap-2">
                 {view.host.status ? (
                   <AffiliationBadge status={view.host.status} short />
                 ) : (
                   <ToneBadge tone={view.host.active ? "warning" : "danger"} icon={Building}>
-                    {view.host.active ? "Funcionário(a) do SINDSERM" : "Fora da lista"}
+                    {view.host.active ? EMPLOYEE_CATEGORY_TITLE[view.host.category ?? "STAFF"] : "Fora da lista"}
                   </ToneBadge>
                 )}
                 <ToneBadge tone={view.host.checkedIn ? "success" : "neutral"} icon={Login}>

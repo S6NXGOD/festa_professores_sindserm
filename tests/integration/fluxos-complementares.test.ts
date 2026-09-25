@@ -3,6 +3,7 @@
  * administrativas, mascaramento de CPF, conversão de convidado, bootstrap e usuários.
  */
 import { count, eq } from "drizzle-orm";
+import { ROLE_PRESETS } from "@/domain/access";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { auditLog, eventConfig, guestLink, kitDelivery, kitStock, person, registration, session, user } from "@/server/db/schema";
@@ -91,9 +92,9 @@ describe("portaria", () => {
   it("Segurança vê CPF mascarado; Atendimento vê completo", async () => {
     const { state, input } = await registerMember();
     const personState = await loadPersonState(db, state.member.id);
-    expect(buildGateView(personState!, "SECURITY", null).cpf).toMatch(/^\*\*\*\.\d{3}\.\d{3}-\*\*$/);
-    expect(buildGateView(personState!, "ATTENDANT", null).cpf!.replace(/\D/g, "")).toBe(input.member.cpf);
-    expect(buildGateView(personState!, "SECURITY", null).permissions.deliverKits).toBe(false);
+    expect(buildGateView(personState!, ROLE_PRESETS.SECURITY, null).cpf).toMatch(/^\*\*\*\.\d{3}\.\d{3}-\*\*$/);
+    expect(buildGateView(personState!, ROLE_PRESETS.ATTENDANT, null).cpf!.replace(/\D/g, "")).toBe(input.member.cpf);
+    expect(buildGateView(personState!, ROLE_PRESETS.SECURITY, null).permissions.deliverKits).toBe(false);
   });
 
   it("convidado de filiado pendente não entra até a conferência do responsável", async () => {

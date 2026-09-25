@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GatePersonClient } from "@/components/gate/gate-person-client";
-import { ArrowLeft, Database, List, User } from "@/components/icons/pixel";
+import { ArrowLeft, Database, List, Pencil, User } from "@/components/icons/pixel";
 import { AuditTimeline } from "@/components/staff/audit-timeline";
 import { Panel } from "@/components/staff/panel-ui";
+import { CategoryChip } from "@/components/staff/employee-category";
+import { EditEmployeeDialog } from "@/components/staff/employee-dialogs";
 import { PersonCorrectionDialog } from "@/components/staff/person-correction-dialog";
 import { Button } from "@/components/ui/button";
 import { can } from "@/domain/rules";
 import { displayCpf, formatCpf } from "@/lib/cpf";
 import { formatDateTime } from "@/lib/datetime";
-import { formatPhone } from "@/lib/phone";
+import { formatPhone, maskPhoneInput } from "@/lib/phone";
 import { db } from "@/server/db";
 import { recentAuditFor } from "@/server/queries/panel";
 import { buildGateView } from "@/server/services/gate-view";
@@ -23,18 +25,21 @@ export const metadata: Metadata = { title: "Participante" };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function ParticipantDetailPage({ params }: PageProps<"/painel/participantes/[id]">) {
-  const actor = await requirePageActor("viewPanel");
+  const actor = await requirePageActor("viewParticipants");
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const [state, config, stock] = await Promise.all([loadPersonState(db, id), getEventConfig(db), getStockOverview(db)]);
   if (!state) notFound();
-  const view = buildGateView(state, actor.role, config, new Date(), stock);
+  const view = buildGateView(state, actor.access, config, new Date(), stock);
   const person = state.person;
   // Histórico da pessoa, da inscrição dela e, para funcionários, do cadastro de funcionário (convidado incluído).
   const entityIds = [person.id, state.ownRegistration?.id, state.employee?.id].filter((v): v is string => Boolean(v));
   const history = await recentAuditFor(entityIds, 40);
-  const fullCpf = can(actor.role, "viewFullCpf");
+  const fullCpf = can(actor.access, "viewFullCpf");
   const groupId = state.ownRegistration?.id ?? state.guestOf?.host.id;
+  // Colaborador(a) do SINDSERM tem cadastro próprio (categoria e setor), sem matrícula nem lotação de filiado.
+  const employee = state.employee;
+  const kind = employee ? "employee" : state.ownRegistration ? "member" : "guest";
 
   return (
     <div className="space-y-4">
@@ -50,8 +55,25 @@ export default async function ParticipantDetailPage({ params }: PageProps<"/pain
             title="Dados cadastrais"
             icon={User}
             action={
-              can(actor.role, "manageGuests") ? (
+              employee && can(actor.access, "manageEmployees") ? (
+                <EditEmployeeDialog
+                  initial={{
+                    employeeId: employee.id,
+                    fullName: person.fullName,
+                    cpf: person.cpf ? formatCpf(person.cpf) : "",
+                    whatsapp: person.whatsapp ? maskPhoneInput(person.whatsapp) : "",
+                    jobTitle: employee.jobTitle ?? "",
+                    category: employee.category,
+                  }}
+                  trigger={
+                    <Button variant="outline" size="sm" data-testid="edit-employee-data">
+                      <Pencil /> Corrigir dados
+                    </Button>
+                  }
+                />
+              ) : can(actor.access, "manageGuests") ? (
                 <PersonCorrectionDialog
+                  kind={kind}
                   initial={{
                     personId: person.id,
                     fullName: person.fullName,
@@ -68,9 +90,24 @@ export default async function ParticipantDetailPage({ params }: PageProps<"/pain
             <dl className="grid grid-cols-2 gap-2 text-sm">
               <Info label="CPF" value={displayCpf(person.cpf, fullCpf)} mono />
               <Info label="WhatsApp" value={formatPhone(person.whatsapp) || "—"} />
-              <Info label="Matrícula" value={person.registrationNumber ?? "—"} />
-              <Info label="Lotação" value={person.workplace ?? "—"} />
-              <Info label="Menor de 18" value={person.isMinor ? "Sim" : "Não"} />
+              {employee ? (
+                <>
+                  <div className="col-span-2 flex flex-wrap items-center gap-2">
+                    <CategoryChip category={employee.category} />
+                    <span className="text-sm font-semibold text-fg">{employee.jobTitle ?? "Setor não informado"}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {kind === "member" ? (
+                    <>
+                      <Info label="Matrícula" value={person.registrationNumber ?? "—"} />
+                      <Info label="Lotação" value={person.workplace ?? "—"} />
+                    </>
+                  ) : null}
+                  <Info label="Menor de 18" value={person.isMinor ? "Sim" : "Não"} />
+                </>
+              )}
               <Info label="Cadastrado em" value={formatDateTime(person.createdAt)} />
             </dl>
             {groupId ? (

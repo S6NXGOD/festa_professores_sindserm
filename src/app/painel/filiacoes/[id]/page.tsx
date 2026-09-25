@@ -23,7 +23,7 @@ export const metadata: Metadata = { title: "Ficha de filiação" };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function AffiliationFormPage({ params }: PageProps<"/painel/filiacoes/[id]">) {
-  const actor = await requirePageActor("newAffiliation");
+  const actor = await requirePageActor("viewForms");
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const [data, documents] = await Promise.all([getAffiliationForm(id), listFormDocuments(db, id)]);
@@ -51,7 +51,7 @@ export default async function AffiliationFormPage({ params }: PageProps<"/painel
       <FormDocuments
         formId={form.id}
         files={files}
-        canRemove={form.status === "DRAFT" || can(actor.role, "adminCorrections")}
+        canRemove={form.status === "DRAFT" || can(actor.access, "adminCorrections")}
         disabled={form.status === "CANCELLED"}
       />
     </Panel>

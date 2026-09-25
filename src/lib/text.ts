@@ -32,3 +32,8 @@ export function initials(fullName: string): string {
 export function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
+
+/** "quinta-feira, 15 de outubro" -> "Quinta-feira, 15 de outubro". */
+export function capitalizeFirst(value: string): string {
+  return value ? value.charAt(0).toLocaleUpperCase("pt-BR") + value.slice(1) : value;
+}

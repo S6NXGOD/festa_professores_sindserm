@@ -45,7 +45,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { DOCUMENT_KIND_LABEL, KIT_TYPE_LABEL } from "@/domain/labels";
+import { DOCUMENT_KIND_LABEL, EMPLOYEE_CATEGORY_TITLE, KIT_TYPE_LABEL } from "@/domain/labels";
 import type { KitType } from "@/domain/types";
 import { callAction } from "@/lib/call-action";
 import { formatShortDateTime } from "@/lib/datetime";
@@ -99,7 +99,7 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
         {staffGroup.active && p.deliverKits ? (
           <GroupKitsSection
             view={view}
-            intro="Os kits saem sozinhos com as entradas, do estoque dos funcionários. O do convidado só sai depois que o(a) funcionário(a) chegar: se o convidado chegou antes, o kit dele sai junto com a entrada do(a) funcionário(a)."
+            intro="Os kits saem sozinhos com as entradas, do estoque dos colaboradores. O do convidado só sai depois que o(a) colaborador(a) chegar: se o convidado chegou antes, o kit dele sai junto com a entrada do(a) colaborador(a)."
             cards={[
               { type: "EMPLOYEE", label: KIT_TYPE_LABEL.EMPLOYEE, detail: `Para ${view.fullName}, na entrada dele(a)`, state: staffGroup.kits.EMPLOYEE },
               {
@@ -119,8 +119,8 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
             host={{ employeeId: staffGroup.employeeId }}
             guest={staffGroup.guest}
             canHaveGuest={staffGroup.active}
-            emptyText="Sem convidado. Cada funcionário(a) pode levar um."
-            blockedText="Fora da lista de funcionários: não é possível cadastrar convidado."
+            emptyText="Sem convidado. Cada colaborador(a) pode levar um."
+            blockedText="Fora da lista de colaboradores: não é possível cadastrar convidado."
             personBasePath={personBasePath}
             onChanged={onChanged}
           />
@@ -141,9 +141,9 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
       ) : null}
 
       {host?.kind === "EMPLOYEE" && !host.active && p.manageGuests ? (
-        <Panel title="Funcionário(a) responsável fora da lista" icon={Unlink}>
+        <Panel title="Colaborador(a) responsável fora da lista" icon={Unlink}>
           <p className="mb-3 text-sm text-fg-muted">
-            {host.fullName} saiu da lista de funcionários do SINDSERM, então {view.fullName} não entra como convidado(a) dele(a).
+            {host.fullName} saiu da lista de colaboradores do SINDSERM, então {view.fullName} não entra como convidado(a) dele(a).
             Desvincule para ligar a outra pessoa ou fazer a filiação.
           </p>
           <ConfirmActionDialog
@@ -219,12 +219,12 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
 
 // ---------------------------------------------------------------------------
 
-/** Funcionário(a) do SINDSERM: setor, convidado e voucher. */
+/** Colaborador(a) do SINDSERM: categoria, setor, convidado e voucher. */
 function EmployeeSection({ view }: { view: GateView }) {
   const staffGroup = view.employee!;
   const p = view.permissions;
   return (
-    <Panel title="Funcionário(a) do SINDSERM" icon={Building} action={<PixelTag tone="warning">Da casa</PixelTag>}>
+    <Panel title={EMPLOYEE_CATEGORY_TITLE[staffGroup.category]} icon={Building} action={<PixelTag tone="warning">Da casa</PixelTag>}>
       {staffGroup.active ? (
         <>
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
@@ -247,8 +247,8 @@ function EmployeeSection({ view }: { view: GateView }) {
             ) : null}
             {p.manageEmployees ? (
               <Button asChild variant="ghost">
-                <Link href="/painel/funcionarios">
-                  <Users /> Lista de funcionários
+                <Link href="/painel/colaboradores">
+                  <Users /> Lista de colaboradores
                 </Link>
               </Button>
             ) : null}
@@ -256,10 +256,10 @@ function EmployeeSection({ view }: { view: GateView }) {
         </>
       ) : (
         <p className="text-sm text-fg-muted">
-          {view.fullName} foi tirado(a) da lista de funcionários: o voucher não vale mais.{" "}
+          {view.fullName} foi tirado(a) da lista de colaboradores: o voucher não vale mais.{" "}
           {p.manageEmployees ? (
-            <Link href="/painel/funcionarios?filtro=removidos" className="font-semibold text-fg underline underline-offset-4">
-              Ver na lista de funcionários
+            <Link href="/painel/colaboradores?filtro=removidos" className="font-semibold text-fg underline underline-offset-4">
+              Ver na lista de colaboradores
             </Link>
           ) : (
             "Procure a organização."
@@ -966,7 +966,7 @@ function AdminSection({ view, onChanged }: { view: GateView; onChanged?: () => v
             title={`Estornar ${KIT_TYPE_LABEL[type].toLowerCase()}?`}
             description={
               staffGroup
-                ? "A entrega é cancelada e o kit volta ao estoque dos funcionários."
+                ? "A entrega é cancelada e o kit volta ao estoque dos colaboradores."
                 : "A entrega é cancelada e o kit volta ao estoque."
             }
             confirmLabel="Estornar entrega"

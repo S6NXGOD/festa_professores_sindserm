@@ -68,7 +68,7 @@ export default async function NewAffiliationPage({ searchParams }: PageProps<"/p
                 state.guestOf
                   ? ` (hoje convidado(a) de ${state.guestOf.host.member.fullName})`
                   : state.guestOfEmployee
-                    ? ` (hoje convidado(a) de ${state.guestOfEmployee.host.person.fullName}, funcionário(a) do SINDSERM)`
+                    ? ` (hoje convidado(a) de ${state.guestOfEmployee.host.person.fullName}, colaborador(a) do SINDSERM)`
                     : ""
               }.`
             : "Mesmos campos da ficha em papel do SINDSERM. Se o CPF já existir no sistema, a pessoa é reaproveitada."

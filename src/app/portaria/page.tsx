@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CountUp } from "@/components/count-up";
 import { GateSearch } from "@/components/gate/gate-search";
-import { Clock, Login, QrCode, Search, Users } from "@/components/icons/pixel";
+import { AlarmClock, Clock, Login, QrCode, Search, Users } from "@/components/icons/pixel";
 import { Panel } from "@/components/retro/bits";
 import { DeadlineTimer } from "@/components/retro/countdown";
 import { LiveRefresh } from "@/components/retro/live-refresh";
@@ -17,10 +17,21 @@ export const metadata: Metadata = { title: "Portaria" };
 
 export default async function GateHomePage() {
   // O layout também verifica, mas páginas podem renderizar em paralelo ao layout.
-  const actor = await requirePageActor("checkIn");
+  const actor = await requirePageActor("viewGate");
   const [stats, event] = await Promise.all([getDashboardStats(db), getEventInfo()]);
+  const notStarted = event ? !event.started : false;
   return (
     <div className="space-y-5">
+      {notStarted && event?.startsAt ? (
+        <div className="flex items-center gap-3 rounded-xl border border-warning/50 bg-warning-soft p-4" data-testid="gate-not-started">
+          <AlarmClock className="size-7 shrink-0 animate-wiggle text-warning" />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-fg">A festa começa {event.startLabel}</p>
+            <p className="text-xs text-fg-muted">Entradas antes disso pedem uma confirmação a mais (e ficam anotadas).</p>
+          </div>
+          <DeadlineTimer deadline={event.startsAt} className="shrink-0 text-xs" />
+        </div>
+      ) : null}
       <Link
         href="/portaria/scanner"
         className="arcade group relative flex h-44 flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl bg-brand text-white outline-none focus-visible:ring-4 focus-visible:ring-red/60"
@@ -55,7 +66,7 @@ export default async function GateHomePage() {
           </div>
           <SegmentMeter className="mt-3" value={stats.present} max={stats.expected} label={`${stats.present} de ${stats.expected} presentes`} />
         </div>
-        {event?.kitDeadline && can(actor.role, "deliverKits") ? (
+        {event?.kitDeadline && can(actor.access, "deliverKits") ? (
           <div className="col-span-2 flex items-center justify-between rounded-xl border border-line bg-surface p-4">
             <p className="flex items-center gap-2 text-sm font-semibold text-fg">
               <Clock className="size-5 text-red" /> Kits até {event.kitDeadline.label}
@@ -66,7 +77,7 @@ export default async function GateHomePage() {
       </div>
 
       <Panel title="Localizar pessoa" icon={Search}>
-        <GateSearch requireFullCpf={!can(actor.role, "viewFullCpf")} />
+        <GateSearch requireFullCpf={!can(actor.access, "viewFullCpf")} />
       </Panel>
     </div>
   );

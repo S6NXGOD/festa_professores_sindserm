@@ -25,7 +25,20 @@ import type { z } from "zod";
 import { callAction } from "@/lib/call-action";
 import { correctPersonAction } from "@/server/actions/operations";
 
-export function PersonCorrectionDialog({ initial }: { initial: PersonCorrectionInput }) {
+/** Quem é a pessoa: define quais campos fazem sentido na correção. */
+export type CorrectionKind = "member" | "guest" | "employee";
+
+const CPF_HINT: Record<CorrectionKind, string> = {
+  member: "Obrigatório para filiados.",
+  guest: "Convidado pode ficar sem (ex.: criança).",
+  employee: "Opcional para colaboradores do SINDSERM: ajuda a achar a pessoa na portaria.",
+};
+
+/**
+ * Correção de cadastro. Matrícula e lotação só aparecem para filiados; "menor
+ * de 18" não aparece para colaboradores (os campos escondidos seguem como estão).
+ */
+export function PersonCorrectionDialog({ initial, kind = "member" }: { initial: PersonCorrectionInput; kind?: CorrectionKind }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -63,8 +76,9 @@ export function PersonCorrectionDialog({ initial }: { initial: PersonCorrectionI
           <DialogHeader>
             <DialogTitle>Correção de cadastro</DialogTitle>
             <DialogDescription>
-              CPF e matrícula não podem repetir os de outra pessoa. O CPF de quem tem ficha de filiação não muda. Tudo fica na
-              auditoria.
+              {kind === "member"
+                ? "CPF e matrícula não podem repetir os de outra pessoa. O CPF de quem tem ficha de filiação não muda. Tudo fica na auditoria."
+                : "O CPF não pode repetir o de outra pessoa. Tudo fica na auditoria."}
             </DialogDescription>
           </DialogHeader>
           <FormField id="fix-name" label="Nome completo" error={errors.fullName?.message}>
@@ -74,7 +88,7 @@ export function PersonCorrectionDialog({ initial }: { initial: PersonCorrectionI
             id="fix-cpf"
             label="CPF"
             optional
-            description="Obrigatório para filiados. Convidado pode ficar sem."
+            description={CPF_HINT[kind]}
             error={errors.cpf?.message}
           >
             <Controller
@@ -90,14 +104,17 @@ export function PersonCorrectionDialog({ initial }: { initial: PersonCorrectionI
               render={({ field }) => <PhoneInput id="fix-whatsapp" {...field} value={field.value ?? ""} />}
             />
           </FormField>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField id="fix-registration" label="Matrícula" optional error={errors.registrationNumber?.message}>
-              <Input id="fix-registration" {...form.register("registrationNumber")} />
-            </FormField>
-            <FormField id="fix-workplace" label="Lotação" optional error={errors.workplace?.message}>
-              <Input id="fix-workplace" {...form.register("workplace")} />
-            </FormField>
-          </div>
+          {kind === "member" ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField id="fix-registration" label="Matrícula" optional error={errors.registrationNumber?.message}>
+                <Input id="fix-registration" {...form.register("registrationNumber")} />
+              </FormField>
+              <FormField id="fix-workplace" label="Lotação" optional error={errors.workplace?.message}>
+                <Input id="fix-workplace" {...form.register("workplace")} />
+              </FormField>
+            </div>
+          ) : null}
+          {kind === "employee" ? null : (
           <Controller
             control={form.control}
             name="isMinor"
@@ -108,6 +125,7 @@ export function PersonCorrectionDialog({ initial }: { initial: PersonCorrectionI
               </label>
             )}
           />
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={pending}>
               Cancelar

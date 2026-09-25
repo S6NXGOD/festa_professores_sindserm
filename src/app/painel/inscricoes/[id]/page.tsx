@@ -30,7 +30,7 @@ const ORIGIN_LABEL: Record<RegistrationOrigin, string> = {
 };
 
 export default async function RegistrationDetailPage({ params, searchParams }: PageProps<"/painel/inscricoes/[id]">) {
-  const actor = await requirePageActor("viewPanel");
+  const actor = await requirePageActor("viewRegistrations");
   const [{ id }, query] = await Promise.all([params, searchParams]);
   if (!UUID.test(id)) notFound();
   const registration = await loadRegistrationState(db, id);
@@ -43,7 +43,7 @@ export default async function RegistrationDetailPage({ params, searchParams }: P
     getStockOverview(db),
   ]);
   if (!memberState) notFound();
-  const view = buildGateView(memberState, actor.role, config, new Date(), stock);
+  const view = buildGateView(memberState, actor.access, config, new Date(), stock);
 
   return (
     <div className="space-y-4">

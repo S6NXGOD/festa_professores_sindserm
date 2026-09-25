@@ -12,9 +12,9 @@ import { countCheckInsBy } from "@/server/services/stats";
 import { requirePageActor } from "@/server/session";
 
 export default async function GateLayout({ children }: LayoutProps<"/portaria">) {
-  const actor = await requirePageActor("checkIn");
+  const actor = await requirePageActor("viewGate");
   const [config, score] = await Promise.all([getConfig(), countCheckInsBy(db, actor.userId)]);
-  const showPanel = can(actor.role, "viewPanel");
+  const showPanel = can(actor.access, "viewPanel");
   return (
     <div className="relative min-h-dvh print:min-h-0">
       <RetroBackdrop variant="calm" />
