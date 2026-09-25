@@ -68,7 +68,7 @@ npm run db:reset -- --manter-festa   # mantém data, horários, local, foto e es
 
 O `railway.json` já configura tudo: build `npm run build`, antes de cada deploy `npm run db:deploy` (migrations + primeiro administrador), início `npm start` e verificação em `/api/health` (se falhar, a versão anterior continua no ar).
 
-1. No projeto do Railway: **New → Database → PostgreSQL** e **New → GitHub Repo** (este repositório).
+1. No projeto do Railway: **New → Database → PostgreSQL** e **New → GitHub Repo** (este repositório). O Railway já tenta um deploy na hora; sem as variáveis ele para com "DATABASE_URL não configurada" — é esperado, siga os passos.
 2. No serviço do app, em **Settings → Networking**, clique em **Generate Domain** (HTTPS pronto; a câmera da portaria só funciona em HTTPS).
 3. Em **Variables → Raw Editor**, cole:
    ```
@@ -78,7 +78,7 @@ O `railway.json` já configura tudo: build `npm run build`, antes de cada deploy
    ADMIN_PASSWORD="uma-senha-com-10-ou-mais-caracteres"
    ```
    e os segredos gerados por `npm run env:secrets` (`BETTER_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `SETUP_TOKEN`). O `BETTER_AUTH_URL` pode ficar de fora: vale o domínio gerado pelo Railway. Com domínio próprio, defina `BETTER_AUTH_URL="https://seu.dominio"`.
-4. Deploy. No primeiro, o log mostra "Primeiro administrador criado". Entre, **troque a senha em /conta** e apague `ADMIN_PASSWORD` das variáveis. O assistente `/setup/evento` abre em seguida.
+4. Aplique as mudanças (**Deploy**). No log do pre-deploy aparece "Primeiro administrador criado". Entre, **troque a senha em /conta** e apague `ADMIN_PASSWORD` das variáveis. O assistente `/setup/evento` abre em seguida.
 
 **Guarde o `DATA_ENCRYPTION_KEY`** num lugar seguro: sem ele, os links dos vouchers e os documentos (RG/contracheque) não abrem mais. Faltando alguma variável essencial, o servidor não liga e o log diz qual é.
 

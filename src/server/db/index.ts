@@ -7,7 +7,9 @@ const globalForDb = globalThis as unknown as { __festaPgPool?: Pool };
 
 function createPool() {
   const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
+  // O build só carrega os módulos (todas as páginas são dinâmicas, nada consulta o banco ali):
+  // sem exigir a URL nessa fase, o build passa mesmo antes das variáveis existirem no Railway.
+  if (!connectionString && process.env.NEXT_PHASE !== "phase-production-build") {
     throw new Error("DATABASE_URL não configurada. Veja o README (.env.local).");
   }
   return new Pool({
