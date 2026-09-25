@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Permanent_Marker, Saira, Tiny5 } from "next/font/google";
+import { SiteIconProvider } from "@/components/brand/site-icon";
 import { HelpProvider } from "@/components/help/help";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
+import { siteIconUrl } from "@/lib/site-icon";
 import { cn } from "@/lib/utils";
-import { APP_NAME, getConfig, getEventInfo, getRegistrationWindow } from "@/server/queries/config";
+import { APP_NAME, getConfig, getEventInfo, getRegistrationWindow, getSiteIcon } from "@/server/queries/config";
 import { shareSummary } from "@/server/queries/share";
 import { publicBaseUrl } from "@/server/public-url";
 import "./globals.css";
@@ -22,7 +24,7 @@ const marker = Permanent_Marker({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [config, event, window] = await Promise.all([getConfig(), getEventInfo(), getRegistrationWindow()]);
+  const [config, event, window, icon] = await Promise.all([getConfig(), getEventInfo(), getRegistrationWindow(), getSiteIcon()]);
   const name = config?.name ?? APP_NAME;
   // Prévia do link (WhatsApp, redes): quando, onde e o prazo, com os dados do painel.
   const summary = event ? shareSummary(event, window) : `Inscrição e credenciamento da ${name}.`;
@@ -35,6 +37,14 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: { type: "website", locale: "pt_BR", siteName: "SINDSERM", title: name, description: summary },
     twitter: { card: "summary_large_image", title: name, description: summary },
     robots: { index: false, follow: false },
+    // Ícone trocado em Configurações (sem troca, o emblema da festa). A versão na URL renova o cache do navegador.
+    icons: {
+      icon: [
+        { url: siteIconUrl(32, icon.version), sizes: "32x32", type: "image/png" },
+        { url: siteIconUrl(192, icon.version), sizes: "192x192", type: "image/png" },
+      ],
+      apple: [{ url: siteIconUrl(180, icon.version), sizes: "180x180", type: "image/png" }],
+    },
   };
 }
 
@@ -46,15 +56,17 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const config = await getConfig();
+  const [config, icon] = await Promise.all([getConfig(), getSiteIcon()]);
   return (
     <html lang="pt-BR" className={cn(saira.variable, pixel.variable, marker.variable)}>
       <body className="min-h-dvh antialiased">
         <Providers>
-          {/* WhatsApp de ajuda da organização: disponível em todas as telas, inclusive nas de erro. */}
-          <HelpProvider phone={config?.helpWhatsapp ?? null} eventName={config?.name ?? ""}>
-            {children}
-          </HelpProvider>
+          <SiteIconProvider version={icon.version}>
+            {/* WhatsApp de ajuda da organização: disponível em todas as telas, inclusive nas de erro. */}
+            <HelpProvider phone={config?.helpWhatsapp ?? null} eventName={config?.name ?? ""}>
+              {children}
+            </HelpProvider>
+          </SiteIconProvider>
         </Providers>
         <Toaster />
       </body>

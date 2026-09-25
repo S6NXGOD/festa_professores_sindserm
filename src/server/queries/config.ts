@@ -8,6 +8,7 @@ import { mapsEmbedUrl, mapsOpenUrl } from "@/lib/maps";
 import { db } from "@/server/db";
 import { getEventConfig, registrationWindow } from "@/server/services/settings";
 import { countUsers } from "@/server/services/users";
+import { getSiteIconInfo } from "@/server/services/site-icon";
 import { getEventPhotoMeta } from "@/server/services/venue";
 
 export const APP_NAME = DEFAULT_EVENT_NAME;
@@ -24,6 +25,12 @@ export const hasUsers = cache(async () => {
 });
 
 export const getRegistrationWindow = cache(async () => registrationWindow(await getConfig()));
+
+/** Ícone do site (versão para a URL e se foi trocado em Configurações). */
+export const getSiteIcon = cache(async () => {
+  await connection();
+  return getSiteIconInfo(db);
+});
 
 /** Local da festa (tudo opcional). */
 export interface VenueInfo {

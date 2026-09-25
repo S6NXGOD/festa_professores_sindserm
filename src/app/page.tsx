@@ -21,6 +21,7 @@ import { Countdown } from "@/components/retro/countdown";
 import { Marquee } from "@/components/retro/marquee";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/datetime";
+import { splitEventName } from "@/lib/text";
 import { APP_NAME, getEventInfo, getRegistrationWindow, hasUsers } from "@/server/queries/config";
 
 export default async function HomePage() {
@@ -49,6 +50,7 @@ export default async function HomePage() {
   }
 
   const open = window.state === "OPEN";
+  const heading = splitEventName(event.name);
   const statusLine =
     window.state === "OPEN"
       ? `Inscrições abertas até ${formatDateTime(window.closesAt)}`
@@ -100,7 +102,16 @@ export default async function HomePage() {
           </Reveal>
           <Reveal delay={0.05}>
             <h1 className="display mt-5 text-[2.9rem] leading-[0.88] sm:text-6xl">
-              <span className="chrome block">{event.name}</span>
+              <span className="chrome block">{heading.title}</span>
+              {heading.tagline ? (
+                <>
+                  <span className="sr-only"> – </span>
+                  {/* Fita de papel como a faixa do cartaz: quem faz a festa. */}
+                  <TapeLabel className="mt-4 text-[1.35rem] sm:text-3xl" rotate={-2}>
+                    {heading.tagline}
+                  </TapeLabel>
+                </>
+              ) : null}
             </h1>
           </Reveal>
           <Reveal delay={0.1} className="mt-5 flex flex-wrap gap-2">

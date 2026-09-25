@@ -220,6 +220,24 @@ export const eventPhoto = pgTable(
 );
 
 /**
+ * Ícone do site (aba do navegador, tela inicial do celular e marca do painel),
+ * trocado em Configurações. Guarda a versão quadrada de 512 px em PNG; sem
+ * linha, vale o emblema da festa.
+ */
+export const siteIcon = pgTable(
+  "site_icon",
+  {
+    id: integer("id").primaryKey().default(1),
+    data: bytea("data").notNull(),
+    /** Resumo do conteúdo (vai na URL como ?v=): muda quando a imagem muda. */
+    version: text("version").notNull(),
+    updatedByUserId: text("updated_by_user_id").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("site_icon_singleton", sql`${t.id} = 1`)],
+);
+
+/**
  * Estoque de kits. No modo SINGLE existe apenas o pool ALL; no modo SPLIT,
  * MEMBER e GUEST. `delivered` só aumenta com entrega confirmada e a constraint
  * garante que o estoque nunca fique negativo.

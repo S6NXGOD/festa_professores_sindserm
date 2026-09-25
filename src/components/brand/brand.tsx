@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { useId } from "react";
+import { SiteIconMark } from "@/components/brand/site-icon";
+import { splitEventName } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 /** Emblema da festa (recorte do cartaz). Fundo preto igual ao do site. */
@@ -62,31 +63,11 @@ export function UnionLogo({
   );
 }
 
-/** Sol listrado (marca compacta para cabeçalhos e ícones). */
-export function SunMark({ className }: { className?: string }) {
-  // Id único por marca: com duas na página (ex.: uma escondida no celular), um id
-  // repetido faz a visível usar o degradê da escondida e o sol some.
-  const gradient = `sunmark-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  return (
-    <svg viewBox="0 0 48 32" aria-hidden className={cn("shrink-0", className)}>
-      <defs>
-        <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ff6a3d" />
-          <stop offset="0.5" stopColor="#ff2626" />
-          <stop offset="1" stopColor="#a8000c" />
-        </linearGradient>
-      </defs>
-      <path d="M8 24a16 16 0 0 1 32 0Z" fill={`url(#${gradient})`} />
-      <rect x="6" y="14" width="36" height="1.6" fill="#080808" />
-      <rect x="6" y="17.5" width="36" height="2" fill="#080808" />
-      <rect x="6" y="21" width="36" height="2.4" fill="#080808" />
-      <rect x="2" y="25" width="44" height="1.6" fill="#ff2626" />
-      <rect x="8" y="29" width="32" height="1.2" fill="#ff2626" opacity="0.6" />
-    </svg>
-  );
-}
-
-/** Marca de cabeçalho: sol + nome do evento em caixa-alta condensada. */
+/**
+ * Marca de cabeçalho: ícone do site + nome da festa em caixa-alta condensada.
+ * Com travessão no nome ("Festa ... – SINDSERMTHE 2026"), a parte depois dele
+ * vira a chamada em cima do título, no lugar do `kicker`.
+ */
 export function BrandLockup({
   name,
   kicker,
@@ -99,12 +80,14 @@ export function BrandLockup({
   /** Nome em até duas linhas (barra lateral), em vez de cortar com reticências. */
   wrap?: boolean;
 }) {
+  const { title, tagline } = splitEventName(name);
+  const label = tagline ?? kicker;
   return (
     <span className={cn("flex min-w-0 items-center gap-2.5", className)}>
-      <SunMark className="h-8 w-12" />
+      <SiteIconMark />
       <span className="min-w-0">
-        {kicker ? <span className="pixel block text-[0.5rem] text-red">{kicker}</span> : null}
-        <span className={cn("display block text-lg leading-none text-fg", wrap ? "line-clamp-2" : "truncate")}>{name}</span>
+        {label ? <span className="pixel block truncate text-[0.5rem] text-red">{label}</span> : null}
+        <span className={cn("display block text-lg leading-none text-fg", wrap ? "line-clamp-2" : "truncate")}>{title}</span>
       </span>
     </span>
   );

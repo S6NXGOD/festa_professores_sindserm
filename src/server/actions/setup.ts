@@ -17,6 +17,7 @@ import {
 import type { ActionResult } from "@/lib/action-result";
 import { enforceRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
 import { completeSetup, updateEventSettings, updateHelpSettings, updateStockSettings, updateShareMessage } from "@/server/services/settings";
+import { removeSiteIcon } from "@/server/services/site-icon";
 import { removeEventPhoto, updateVenueSettings } from "@/server/services/venue";
 import { bootstrapFirstAdmin } from "@/server/services/users";
 import { clientIp, requireActionActor } from "@/server/session";
@@ -83,6 +84,14 @@ export async function updateVenueSettingsAction(input: VenueSettingsInput): Prom
 export async function removeEventPhotoAction(): Promise<ActionResult> {
   return runAction(async () => {
     await removeEventPhoto(await requireActionActor());
+    revalidatePath("/", "layout");
+  });
+}
+
+/** Ícone do site volta a ser o emblema da festa. */
+export async function removeSiteIconAction(): Promise<ActionResult> {
+  return runAction(async () => {
+    await removeSiteIcon(await requireActionActor());
     revalidatePath("/", "layout");
   });
 }

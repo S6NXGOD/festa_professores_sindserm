@@ -4,7 +4,7 @@ import { ImageResponse } from "next/og";
 import sharp from "sharp";
 import { APP_NAME, getEventInfo, getRegistrationWindow } from "@/server/queries/config";
 import { registrationLine } from "@/server/queries/share";
-import { capitalizeFirst } from "@/lib/text";
+import { capitalizeFirst, splitEventName } from "@/lib/text";
 
 /*
  * Prévia do link (WhatsApp, Instagram, Facebook): arte da festa + nome, data,
@@ -32,7 +32,8 @@ const INK = "#080808";
 export default async function OpenGraphImage() {
   const [event, window] = await Promise.all([getEventInfo(), getRegistrationWindow()]);
   const [regular, bold, condensed, pixel, emblem, unionLogo] = await assetsPromise;
-  const name = event?.name ?? APP_NAME;
+  // "Festa ... – SINDSERMTHE 2026": a parte depois do travessão vai para a chamada em vermelho.
+  const { title: name, tagline } = splitEventName(event?.name ?? APP_NAME);
   const when = event ? `${capitalizeFirst(event.dateLongLabel.replace(/ de \d{4}$/, ""))} · ${event.timeLabel}` : null;
   const where = event?.venue?.name ?? null;
   const status = registrationLine(window);
@@ -73,7 +74,9 @@ export default async function OpenGraphImage() {
           <img src={`data:image/jpeg;base64,${emblem.toString("base64")}`} width={510} height={437} alt="" />
         </div>
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", flex: 1, padding: "40px 56px 40px 20px" }}>
-          <div style={{ display: "flex", fontFamily: "Pixel", fontSize: 26, color: RED, letterSpacing: 2 }}>SINDSERM APRESENTA</div>
+          <div style={{ display: "flex", fontFamily: "Pixel", fontSize: 26, color: RED, letterSpacing: 2, textTransform: "uppercase" }}>
+            {tagline ?? "SINDSERM apresenta"}
+          </div>
           <div
             style={{
               display: "flex",
@@ -88,7 +91,8 @@ export default async function OpenGraphImage() {
           >
             {name}
           </div>
-          {when ? <div style={{ display: "flex", marginTop: 22, fontSize: 34, fontWeight: 700 }}>{when}</div> : null}
+          {/* Com horário de término ("19h às 23h") a linha cresce: fonte menor para não sobrar "23h" sozinho. */}
+          {when ? <div style={{ display: "flex", marginTop: 22, fontSize: when.length > 36 ? 29 : 34, fontWeight: 700 }}>{when}</div> : null}
           {where ? <div style={{ display: "flex", marginTop: 6, fontSize: 28, fontWeight: 500, color: "#b9b5ae" }}>{where}</div> : null}
           <div style={{ display: "flex", marginTop: 26 }}>
             <div

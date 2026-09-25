@@ -1,4 +1,4 @@
-# Credenciamento — Festa das Professoras e Professores (SINDSERM)
+# Credenciamento — Festa das Professoras e Professores – SINDSERMTHE
 
 Inscrição pública de professoras e professores filiados(as) e do seu convidado, ficha de filiação online para quem ainda não é filiado(a), vouchers individuais com QR Code, portaria com leitor de QR, conferência de filiação, kits entregues junto com a entrada (com horário limite), local da festa (foto, descrição e mapa) e painel administrativo. Visual anos 80 nas cores do SINDSERM.
 
@@ -55,13 +55,13 @@ Porta 3000 ocupada? Use `npm run dev -- -p 3200`. Rodando em `localhost`, o logi
 npm run admin:create -- --email admin@exemplo.org --name "Nome Sobrenome"   # gera e mostra a senha uma vez
 ```
 
-Depois de entrar, o assistente `/setup/evento` configura a festa (dados, período de inscrições, kits e horário limite para entregar kits). Em **Painel → Configurações** ficam também o **local da festa** (nome, endereço, descrição, link do Google Maps e foto — aparecem na página inicial, na inscrição e nos vouchers). Os logins de Atendimento e Segurança/Recepção são criados em **Painel → Acesso ao sistema**. Cada pessoa troca a própria senha em `/conta`.
+Depois de entrar, o assistente `/setup/evento` configura a festa (dados, período de inscrições, kits e horário limite para entregar kits). Em **Painel → Configurações** ficam também o **local da festa** (nome, endereço, descrição, link do Google Maps e foto — aparecem na página inicial, na inscrição e nos vouchers) e o **ícone do site** (aba do navegador, tela do celular e marca ao lado do nome; sem troca, vale o emblema da festa). No nome da festa, o que vem depois de um traço entre espaços (ex.: "Festa das Professoras e Professores – SINDSERMTHE 2026") vira a chamada em destaque no topo do site e na prévia do link. Os logins de Atendimento e Segurança/Recepção são criados em **Painel → Acesso ao sistema**. Cada pessoa troca a própria senha em `/conta`.
 
 **Começar de novo** (ex.: depois de testar), mantendo só os administradores:
 
 ```bash
 npm run db:reset                     # pergunta antes (digite ZERAR); apaga também a configuração da festa
-npm run db:reset -- --manter-festa   # mantém data, horários, local, foto e estoque (entregas voltam a zero)
+npm run db:reset -- --manter-festa   # mantém data, horários, local, foto, ícone e estoque (entregas voltam a zero)
 ```
 
 **Artes:** os originais ficam em `public/` (`logo_festa.png`, `logo_base.png`, `logo_base_branca.png`). Se mudarem, rode `npm run brand` para regenerar as versões otimizadas em `public/brand/`.
@@ -90,8 +90,8 @@ O `railway.json` já configura tudo: build `npm run build`, antes de cada deploy
 
 - Público: `/` · `/inscricao` (`?ficha=1` abre a ficha de filiação) · `/vouchers/[link]` · `/v/[token]` (voucher individual e `/imagem`) · `/local/foto`
 - Equipe: `/entrar` · `/conta` · `/portaria` (leitor em `/portaria/scanner`) · `/painel` (placar, inscrições — abre na fila de conferência quando há o que conferir —, fichas de filiação — abre na fila de assinatura —, participantes, kits, colaboradores do SINDSERM, acesso ao sistema, auditoria, configurações) · `/painel/inscricoes/[id]/vouchers` (imprime os vouchers do(a) professor(a) e do convidado numa folha) · `/painel/colaboradores/vouchers` (vouchers dos colaboradores e dos convidados deles, para imprimir)
-- Divulgação: `/opengraph-image` (prévia do link) · `/divulgacao/qr` (QR Code do link de inscrição)
-- Arquivos: `POST /api/documentos` (envio de RG/contracheque) · `GET /api/documentos/[id]` (só equipe; `?miniatura=1`) · `GET /api/health` (verificação do Railway)
+- Divulgação: `/opengraph-image` (prévia do link) · `/divulgacao/qr` (QR Code do link de inscrição) · `/icone?s=32` (ícone do site; `/favicon.ico` aponta para ele)
+- Arquivos: `POST /api/documentos` (envio de RG/contracheque) · `POST /api/icone` (ícone do site) · `GET /api/documentos/[id]` (só equipe; `?miniatura=1`) · `GET /api/health` (verificação do Railway)
 
 ## 6. Testes
 

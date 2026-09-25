@@ -1,6 +1,7 @@
 "use client";
 
 import { type UseFormReturn, useWatch } from "react-hook-form";
+import { BrandLockup } from "@/components/brand/brand";
 import { FormField } from "@/components/forms/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,11 +13,23 @@ export type EventForm = UseFormReturn<EventSettingsInput, unknown, EventSettings
 export function EventDetailsFields({ form }: { form: EventForm }) {
   const { register, formState } = form;
   const e = formState.errors;
+  const name = useWatch({ control: form.control, name: "name" });
   return (
     <div className="space-y-5">
-      <FormField id="event-name" label="Nome do evento" error={e.name?.message}>
-        <Input id="event-name" placeholder="Ex.: Festa das Professoras e Professores 2026" {...register("name")} />
+      <FormField
+        id="event-name"
+        label="Nome do evento"
+        description="Aparece no topo do site, na aba do navegador, na prévia do link no WhatsApp, nos vouchers e nas mensagens. Com um traço entre espaços ( – ), o que vem depois dele vira a chamada em vermelho."
+        error={e.name?.message}
+      >
+        <Input id="event-name" placeholder="Ex.: Festa das Professoras e Professores – SINDSERMTHE 2026" {...register("name")} />
       </FormField>
+      {name?.trim() ? (
+        <div className="-mt-2 rounded-xl border border-dashed border-line-strong bg-ink/60 px-3 py-2.5" data-testid="event-name-preview">
+          <p className="pixel mb-2 text-[0.45rem] text-fg-dim">Assim fica no topo do site</p>
+          <BrandLockup name={name} kicker="SINDSERM" wrap />
+        </div>
+      ) : null}
       <FormField id="event-description" label="Descrição" optional error={e.description?.message}>
         <Textarea id="event-description" rows={4} placeholder="Atrações, traje, orientações..." {...register("description")} />
       </FormField>

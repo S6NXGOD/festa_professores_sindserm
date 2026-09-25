@@ -5,10 +5,11 @@ import type { AffiliationStatus, CheckInMethod, DocumentKind, KitType, StaffRole
 export const ORG_NAME = "SINDSERM";
 
 /**
- * Nome da festa enquanto o painel não tem um configurado. Sem "do SINDSERM":
- * fica subentendido (decisão da organização).
+ * Nome da festa enquanto o painel não tem um configurado. "– SINDSERMTHE", e não
+ * "do SINDSERM": a festa é do sindicato, não das professoras e professores
+ * lotados nele (decisão da organização).
  */
-export const DEFAULT_EVENT_NAME = "Festa das Professoras e Professores";
+export const DEFAULT_EVENT_NAME = "Festa das Professoras e Professores – SINDSERMTHE";
 
 export const AFFILIATION_STATUS_LABEL: Record<AffiliationStatus, string> = {
   PENDING: "Aguardando conferência",

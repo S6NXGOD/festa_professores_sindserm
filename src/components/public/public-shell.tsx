@@ -36,7 +36,7 @@ export function PublicShell({
       <RetroBackdrop variant={backdrop} />
       <header className="no-print safe-top relative z-10 mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 pb-3">
         <Link href="/" className="min-w-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-red">
-          {/* Nome em até duas linhas: "Festa das Professoras e Professores 2026" não cabe numa linha no celular. */}
+          {/* Nome em até duas linhas (não cabe numa no celular); o que vem depois do travessão vira a chamada. */}
           <BrandLockup name={eventName} kicker="SINDSERM" wrap />
         </Link>
         <div className="flex shrink-0 items-center gap-2">

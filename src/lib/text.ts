@@ -37,3 +37,14 @@ export function pluralize(count: number, singular: string, plural: string): stri
 export function capitalizeFirst(value: string): string {
   return value ? value.charAt(0).toLocaleUpperCase("pt-BR") + value.slice(1) : value;
 }
+
+/**
+ * "Festa das Professoras e Professores – SINDSERMTHE 2026" vira título
+ * ("Festa das Professoras e Professores") e chamada ("SINDSERMTHE 2026"), para
+ * cabeçalhos e artes. Separador: travessão ou hífen com espaços dos dois lados.
+ */
+export function splitEventName(name: string): { title: string; tagline: string | null } {
+  const match = /^(.+?)\s+[-–—]\s+(.+)$/.exec(name.trim());
+  if (!match?.[1] || !match[2]) return { title: name.trim(), tagline: null };
+  return { title: match[1].trim(), tagline: match[2].trim() };
+}

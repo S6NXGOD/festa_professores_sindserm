@@ -3,7 +3,8 @@ import { ROLE_PRESETS } from "@/domain/access";
 import { formatCpf, isValidCpf, maskCpf, normalizeCpf } from "@/lib/cpf";
 import { formatPhone, isValidPhone, normalizePhone } from "@/lib/phone";
 import { utcToZonedLocalInput, zonedLocalToUtc } from "@/lib/datetime";
-import { toSearchText } from "@/lib/text";
+import { iconSizeFor, siteIconUrl } from "@/lib/site-icon";
+import { splitEventName, toSearchText } from "@/lib/text";
 import { authorizationText, nextMonthValue } from "@/domain/affiliation-text";
 import { isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
 import {
@@ -306,5 +307,28 @@ describe("Tokens e QR", () => {
   it("código curto usa alfabeto sem caracteres ambíguos", () => {
     for (let i = 0; i < 50; i++) expect(generateVoucherCode()).toMatch(/^[0-9A-HJKMNP-TV-Z]{8}$/);
     expect(normalizeVoucherCode("ab1o-il2z")).toBe("AB10112Z");
+  });
+});
+
+describe("Nome da festa e ícone", () => {
+  it("separa título e chamada no travessão (ou hífen entre espaços)", () => {
+    expect(splitEventName("Festa das Professoras e Professores – SINDSERMTHE 2026")).toEqual({
+      title: "Festa das Professoras e Professores",
+      tagline: "SINDSERMTHE 2026",
+    });
+    expect(splitEventName("Festa das Professoras e Professores - SINDSERMTHE 2026").tagline).toBe("SINDSERMTHE 2026");
+    expect(splitEventName("Festa A — B - C")).toEqual({ title: "Festa A", tagline: "B - C" });
+    // Hífen de palavra composta não separa.
+    expect(splitEventName("Festa Pré-Réveillon 2026")).toEqual({ title: "Festa Pré-Réveillon 2026", tagline: null });
+    expect(splitEventName("  Festa 2026  ")).toEqual({ title: "Festa 2026", tagline: null });
+  });
+
+  it("pede o menor tamanho de ícone que cobre a tela e põe a versão na URL", () => {
+    expect(iconSizeFor(1)).toBe(16);
+    expect(iconSizeFor(20)).toBe(32);
+    expect(iconSizeFor(180)).toBe(180);
+    expect(iconSizeFor(4000)).toBe(512);
+    expect(siteIconUrl(32, "q1-abc")).toBe("/icone?s=32&v=q1-abc");
+    expect(siteIconUrl(192)).toBe("/icone?s=192");
   });
 });

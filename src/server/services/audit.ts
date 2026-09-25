@@ -11,6 +11,8 @@ export const AUDIT_ACTIONS = {
   VENUE_UPDATED: "Local da festa alterado",
   VENUE_PHOTO_UPDATED: "Foto do local alterada",
   VENUE_PHOTO_REMOVED: "Foto do local removida",
+  SITE_ICON_UPDATED: "Ícone do site trocado",
+  SITE_ICON_REMOVED: "Ícone do site voltou ao emblema",
   DATABASE_RESET: "Banco de dados zerado",
   STOCK_UPDATED: "Estoque de kits alterado",
   USER_CREATED: "Usuário criado",

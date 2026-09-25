@@ -2,7 +2,7 @@
  * Zera o banco para começar de novo, mantendo só os administradores.
  *
  *   npm run db:reset                      # pergunta antes (digite ZERAR)
- *   npm run db:reset -- --manter-festa    # mantém data, horários, local e estoque (zera as entregas)
+ *   npm run db:reset -- --manter-festa    # mantém data, horários, local, ícone e estoque (zera as entregas)
  *   npm run db:reset -- --sim             # sem pergunta (use com cuidado)
  *
  * Apaga inscrições, pessoas, funcionários da festa, vouchers, entradas,
@@ -17,7 +17,7 @@ import { Client } from "pg";
 import { databaseNameOf, loadLocalEnv } from "./load-env";
 
 const ALWAYS_KEEP = new Set(["user", "account", "session"]);
-const FESTA_TABLES = ["event_config", "kit_stock", "event_photo"];
+const FESTA_TABLES = ["event_config", "kit_stock", "event_photo", "site_icon"];
 
 async function confirm(question: string): Promise<boolean> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -63,7 +63,7 @@ async function main() {
     console.log(`Administradores mantidos: ${admins.rows.map((a) => `${a.name} <${a.email}>`).join(", ")}`);
     console.log(
       keepFesta
-        ? "Mantém a configuração da festa (data, horários, local, foto e estoque); as entregas voltam a zero."
+        ? "Mantém a configuração da festa (data, horários, local, foto, ícone do site e estoque); as entregas voltam a zero."
         : "Apaga também a configuração da festa: ao entrar, o administrador configura tudo de novo.",
     );
     console.log(

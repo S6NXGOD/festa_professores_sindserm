@@ -16,7 +16,7 @@ async function main() {
   try {
     await client.query(`
       TRUNCATE TABLE audit_log, rate_limit, kit_delivery, check_in, voucher, employee, affiliation_document, affiliation_form,
-        guest_link, registration, person, kit_stock, event_photo, event_config, verification, session, account, "user"
+        guest_link, registration, person, kit_stock, event_photo, site_icon, event_config, verification, session, account, "user"
       RESTART IDENTITY CASCADE
     `);
   } finally {

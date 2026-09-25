@@ -21,7 +21,7 @@ export default async function GateLayout({ children }: LayoutProps<"/portaria">)
       <header className="no-print sticky top-0 z-30 border-b border-line bg-ink/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-2xl items-center justify-between gap-3 px-4">
           <Link href="/portaria" className="min-w-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-red">
-            {/* Com o botão "Painel" no celular, fica só o sol: o nome da festa não caberia. */}
+            {/* Com o botão "Painel" no celular, fica só o ícone: o nome da festa não caberia. */}
             <BrandLockup
               name={config?.name ?? APP_NAME}
               kicker="Portaria"

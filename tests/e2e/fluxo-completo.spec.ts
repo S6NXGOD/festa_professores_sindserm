@@ -144,7 +144,9 @@ test.describe.serial("festa das professoras e professores", () => {
 
     await test.step("wizard de configuração da festa (com horário limite dos kits)", async () => {
       const eventDay = new Date(Date.now() + 20 * 86_400_000);
-      await admin.fill("#event-name", "Festa das Professoras e Professores E2E");
+      await admin.fill("#event-name", "Festa das Professoras e Professores – SINDSERMTHE E2E");
+      // Prévia do topo: o que vem depois do travessão vira a chamada.
+      await expect(admin.getByTestId("event-name-preview")).toContainText("SINDSERMTHE E2E");
       await admin.fill("#event-description", "Evento de teste automatizado.");
       await admin.fill("#event-date", localInput(eventDay).slice(0, 10));
       await admin.fill("#event-start", "19:00");
@@ -157,7 +159,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.locator("#stock-threshold")).toHaveValue("15");
       await admin.fill("#kit-deadline", "22:30");
       await admin.getByTestId("setup-next").click();
-      await expect(admin.getByText("Festa das Professoras e Professores E2E")).toBeVisible();
+      await expect(admin.getByText("Festa das Professoras e Professores – SINDSERMTHE E2E")).toBeVisible();
       await expect(admin.getByText("22h30")).toBeVisible();
       await admin.getByTestId("finish-setup").click();
       await admin.waitForURL("**/painel");
@@ -200,6 +202,33 @@ test.describe.serial("festa das professoras e professores", () => {
       await page.goto("/inscricao");
       await expect(page.getByTestId("venue-compact")).toContainText(VENUE.name);
       await visitor.close();
+    });
+
+    await test.step("ícone do site: troca em Configurações e volta ao emblema da festa", async () => {
+      await admin.goto("/painel/configuracoes");
+      const favicon = admin.locator('link[rel="icon"][sizes="32x32"]');
+      const standard = (await favicon.getAttribute("href"))!;
+      expect(standard).toMatch(/\/icone\?s=32&v=/);
+      await expect(admin.getByTestId("site-icon-default")).toBeVisible();
+
+      const square = await sharp({ create: { width: 600, height: 600, channels: 3, background: "#0a84ff" } }).png().toBuffer();
+      await admin.getByTestId("site-icon-input").setInputFiles({ name: "icone.png", mimeType: "image/png", buffer: square });
+      await expect(admin.getByText("Ícone do site trocado.")).toBeVisible();
+      await expect(admin.getByTestId("site-icon-reset")).toBeVisible();
+      await expect(favicon).not.toHaveAttribute("href", standard);
+      const href = (await favicon.getAttribute("href"))!;
+      const icon = await admin.request.get(href);
+      expect(icon.headers()["content-type"]).toBe("image/png");
+      expect(icon.headers()["cache-control"]).toContain("immutable");
+      // A marca do painel (ao lado do nome da festa) usa o mesmo ícone.
+      const version = new URL(href, "http://localhost").searchParams.get("v")!;
+      await expect(admin.locator(`aside img[src*="v=${version}"]`)).toBeVisible();
+
+      await admin.getByTestId("site-icon-reset").click();
+      await admin.getByRole("button", { name: "Voltar ao emblema", exact: true }).click();
+      await expect(admin.getByText("Ícone voltou a ser o emblema da festa.")).toBeVisible();
+      await expect(admin.getByTestId("site-icon-default")).toBeVisible();
+      await expect(favicon).toHaveAttribute("href", standard);
     });
 
     await test.step("inscrição pública de professor(a) com o seu Player 2", async () => {

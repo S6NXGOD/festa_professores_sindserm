@@ -48,6 +48,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // O selo "N" do modo de desenvolvimento cobria o rodapé do menu do painel.
   devIndicators: false,
+  // Quem pede /favicon.ico direto (favoritos, leitores de link) recebe o ícone atual do site.
+  async rewrites() {
+    return [{ source: "/favicon.ico", destination: "/icone?s=48" }];
+  },
   async headers() {
     return [
       { source: "/:path((?!api/documentos/).*)", headers: securityHeaders },

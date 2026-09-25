@@ -20,7 +20,7 @@ import { loadRegistrationState } from "@/server/services/state";
 export async function resetDatabase() {
   await db.execute(sql`
     TRUNCATE TABLE audit_log, rate_limit, kit_delivery, check_in, voucher, employee, affiliation_document,
-      affiliation_form, guest_link, registration, person, kit_stock, event_photo, event_config,
+      affiliation_form, guest_link, registration, person, kit_stock, event_photo, site_icon, event_config,
       verification, session, account, "user"
     RESTART IDENTITY CASCADE
   `);
