@@ -2,6 +2,7 @@ import "server-only";
 import { connection } from "next/server";
 import { cache } from "react";
 import { kitDeadlineAt } from "@/domain/kit-deadline";
+import { DEFAULT_EVENT_NAME } from "@/domain/labels";
 import { formatClock, formatPlainDate, formatPlainDateLong, formatTime, zonedLocalToUtc } from "@/lib/datetime";
 import { mapsEmbedUrl, mapsOpenUrl } from "@/lib/maps";
 import { db } from "@/server/db";
@@ -9,7 +10,7 @@ import { getEventConfig, registrationWindow } from "@/server/services/settings";
 import { countUsers } from "@/server/services/users";
 import { getEventPhotoMeta } from "@/server/services/venue";
 
-export const APP_NAME = "Festa das Professoras e Professores · SINDSERM";
+export const APP_NAME = DEFAULT_EVENT_NAME;
 
 /** Configuração do evento para a requisição atual (sempre dinâmica). */
 export const getConfig = cache(async () => {

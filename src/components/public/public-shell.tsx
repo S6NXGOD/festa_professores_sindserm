@@ -50,7 +50,7 @@ export function PublicShell({
               Carrega junto, mas com prioridade baixa (não atrasa o conteúdo principal). */}
           <UnionLogo className="w-52" sizes="208px" eager fetchPriority="low" />
           <div className="text-xs text-fg-dim">
-            <p>{eventName} · inscrições do SINDSERM.</p>
+            <p>{eventName}</p>
             <HelpLine lead="Dúvidas?" className="mt-1 justify-center text-xs sm:justify-start" />
             <Link href="/entrar" className="mt-1 inline-block font-semibold text-fg-muted underline-offset-4 hover:text-fg hover:underline">
               Acesso da equipe

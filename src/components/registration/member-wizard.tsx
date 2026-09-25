@@ -7,6 +7,7 @@ import { Controller, type FieldPath, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { FormField } from "@/components/forms/form-field";
 import { CpfInput, PhoneInput } from "@/components/forms/masked-input";
+import { useEventName } from "@/components/help/help";
 import { Gift, Info, Printer } from "@/components/icons/pixel";
 import { PixelTag, PlayerTag } from "@/components/retro/bits";
 import { CassetteProgress } from "@/components/retro/cassette";
@@ -47,6 +48,7 @@ type Step = "member" | "guest" | "review";
 /** Inscrição de quem já é filiado(a): dados, convidado (só professoras e professores) e revisão. */
 export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExit?: () => void }) {
   const router = useRouter();
+  const eventName = useEventName();
   const [step, setStep] = useState<Step>("member");
   const [direction, setDirection] = useState(1);
   const [pending, startTransition] = useTransition();
@@ -346,7 +348,7 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
               label="Link dos vouchers"
               whatsapp={{
                 phone: values.member?.whatsapp,
-                text: `Olá! Aqui estão os vouchers da festa do SINDSERM (${values.member?.fullName ?? ""}${guest?.fullName ? ` e ${guest.fullName}` : ""}). Mostre o QR Code na entrada:`,
+                text: `Olá! Aqui estão os vouchers da ${eventName} (${values.member?.fullName ?? ""}${guest?.fullName ? ` e ${guest.fullName}` : ""}). Mostre o QR Code na entrada:`,
               }}
             />
           ) : null}

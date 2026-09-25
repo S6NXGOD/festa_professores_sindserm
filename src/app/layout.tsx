@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const name = config?.name ?? APP_NAME;
   return {
     title: { default: name, template: `%s · ${name}` },
-    description: config?.description ?? "Inscrição e credenciamento da Festa das Professoras e Professores do SINDSERM.",
+    description: config?.description || `Inscrição e credenciamento da ${name}.`,
     robots: { index: false, follow: false },
   };
 }

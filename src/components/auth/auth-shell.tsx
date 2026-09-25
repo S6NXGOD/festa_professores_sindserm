@@ -1,5 +1,6 @@
 import { BrandLockup, FestaEmblem } from "@/components/brand/brand";
 import { RetroBackdrop } from "@/components/retro/retro-backdrop";
+import { DEFAULT_EVENT_NAME } from "@/domain/labels";
 import { cn } from "@/lib/utils";
 
 /** Moldura das telas de login, primeiro acesso e conta. */
@@ -9,7 +10,7 @@ export function AuthShell({
   subtitle,
   children,
   wide = false,
-  eventName = "Festa das Professoras e Professores",
+  eventName = DEFAULT_EVENT_NAME,
 }: {
   title: string;
   kicker?: string;

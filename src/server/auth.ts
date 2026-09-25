@@ -4,6 +4,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { eq } from "drizzle-orm";
+import { DEFAULT_EVENT_NAME } from "@/domain/labels";
 import { db } from "@/server/db";
 import { account, session, user, verification } from "@/server/db/schema";
 import { publicBaseUrl } from "@/server/public-url";
@@ -26,7 +27,7 @@ const extraOrigins = [
  * têm conta. Não há cadastro público: usuários são criados pelo administrador.
  */
 export const auth = betterAuth({
-  appName: "Festa das Professoras e Professores",
+  appName: DEFAULT_EVENT_NAME,
   baseURL,
   secret: process.env.BETTER_AUTH_SECRET,
   trustedOrigins: extraOrigins,

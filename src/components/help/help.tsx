@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { Whatsapp } from "@/components/icons/pixel";
+import { DEFAULT_EVENT_NAME } from "@/domain/labels";
 import { formatPhone, whatsappLink } from "@/lib/phone";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
@@ -24,8 +25,13 @@ export function HelpProvider({ phone, eventName, children }: HelpContact & { chi
 }
 
 export function helpMessage(eventName: string, topic?: string) {
-  const festa = eventName || "Festa das Professoras e Professores";
+  const festa = eventName || DEFAULT_EVENT_NAME;
   return topic ? `Olá! Preciso de ajuda para ${topic} (${festa}).` : `Olá! Tenho uma dúvida sobre a ${festa}.`;
+}
+
+/** Nome da festa configurado no painel, em qualquer tela (vem do layout principal). */
+export function useEventName() {
+  return useContext(HelpContext).eventName || DEFAULT_EVENT_NAME;
 }
 
 /** Link pronto para o WhatsApp da organização (null se não houver número). */
