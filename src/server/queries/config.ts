@@ -1,7 +1,7 @@
 import "server-only";
 import { connection } from "next/server";
 import { cache } from "react";
-import { eventStartLabel, hasEventStarted, kitDeadlineAt } from "@/domain/kit-deadline";
+import { eventStartLabel, hasEventStarted, isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
 import { DEFAULT_EVENT_NAME } from "@/domain/labels";
 import { formatClock, formatPlainDate, formatPlainDateLong, formatTime, zonedLocalToUtc } from "@/lib/datetime";
 import { mapsEmbedUrl, mapsOpenUrl } from "@/lib/maps";
@@ -56,7 +56,8 @@ export interface EventInfo {
   startLabel: string;
   /** A festa já começou (agora, nesta requisição)? */
   started: boolean;
-  kitDeadline: { at: Date; label: string } | null;
+  /** Horário limite dos kits (`passed`: já encerrou, nesta requisição). */
+  kitDeadline: { at: Date; label: string; passed: boolean } | null;
   venue: VenueInfo | null;
   /** WhatsApp da organização para dúvidas (somente dígitos). */
   helpWhatsapp: string | null;
@@ -81,7 +82,7 @@ export const getEventInfo = cache(async (): Promise<EventInfo | null> => {
     startsAt: zonedLocalToUtc(`${config.eventDate}T${config.startTime.slice(0, 5)}`),
     startLabel: eventStartLabel(config),
     started: hasEventStarted(config),
-    kitDeadline: deadline ? { at: deadline, label: formatTime(deadline) } : null,
+    kitDeadline: deadline ? { at: deadline, label: formatTime(deadline), passed: isKitDeadlinePassed(config) } : null,
     venue: hasVenue
       ? {
           name: config.venueName,

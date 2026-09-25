@@ -165,6 +165,12 @@ test.describe.serial("festa das professoras e professores", () => {
       await admin.getByTestId("finish-setup").click();
       await admin.waitForURL("**/painel");
       await expect(admin.getByTestId("stat-kits-available")).toHaveText("150");
+      // A festa é daqui a 20 dias e ninguém entrou: o placar mostra a preparação, não "quem falta".
+      const preEvent = admin.getByTestId("pre-event-hero");
+      await expect(preEvent).toContainText("Antes da festa");
+      await expect(preEvent).toContainText("Começa em");
+      await expect(admin.getByTestId("stat-ready")).toHaveText("0");
+      await expect(admin.getByText("ver quem falta")).toHaveCount(0);
     });
 
     await test.step("administrador cria usuários de atendimento e segurança", async () => {

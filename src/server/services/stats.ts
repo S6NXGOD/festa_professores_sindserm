@@ -16,6 +16,12 @@ export interface DashboardStats {
   otherMembers: number;
   guests: number;
   expected: number;
+  /**
+   * Esperados que já podem entrar: filiação confirmada (e os convidados deles),
+   * colaboradores na lista e os convidados deles. O resto depende de conferência
+   * (inscrição) ou de assinatura (ficha) — e trava na portaria se ficar para a hora.
+   */
+  ready: number;
   present: number;
   absent: number;
   kitsDeliveredMember: number;
@@ -59,6 +65,23 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
         JOIN employee e ON e.id = gl.employee_id
        WHERE gl.status = 'ACTIVE' AND e.removed_at IS NULL
     ),
+    ready_people AS (
+      SELECT r.member_person_id AS person_id
+        FROM registration r
+       WHERE r.status IN ${ACTIVE_STATUSES}
+      UNION
+      SELECT gl.guest_person_id
+        FROM guest_link gl
+        JOIN registration r ON r.id = gl.registration_id
+       WHERE gl.status = 'ACTIVE' AND r.status IN ${ACTIVE_STATUSES}
+      UNION
+      SELECT e.person_id FROM employee e WHERE e.removed_at IS NULL
+      UNION
+      SELECT gl.guest_person_id
+        FROM guest_link gl
+        JOIN employee e ON e.id = gl.employee_id
+       WHERE gl.status = 'ACTIVE' AND e.removed_at IS NULL
+    ),
     active_checkins AS (
       SELECT person_id FROM check_in WHERE cancelled_at IS NULL
     )
@@ -75,6 +98,7 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
       (SELECT count(*) FROM guest_link gl JOIN registration r ON r.id = gl.registration_id
         WHERE gl.status = 'ACTIVE' AND r.status IN ${EXPECTED_STATUSES})::int AS guests,
       (SELECT count(*) FROM expected_people)::int AS expected,
+      (SELECT count(*) FROM ready_people)::int AS ready,
       (SELECT count(*) FROM active_checkins)::int AS present,
       (SELECT count(*) FROM expected_people e JOIN active_checkins c ON c.person_id = e.person_id)::int AS present_expected,
       (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'MEMBER')::int AS delivered_member,
@@ -115,6 +139,7 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
     otherMembers: n("other_members"),
     guests: n("guests"),
     expected: n("expected"),
+    ready: n("ready"),
     present: n("present"),
     absent: Math.max(0, n("expected") - n("present_expected")),
     kitsDeliveredMember: n("delivered_member"),

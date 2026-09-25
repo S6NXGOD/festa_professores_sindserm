@@ -27,6 +27,7 @@ import { StockCard, stockAlertText } from "@/components/staff/stock-card";
 import { Button } from "@/components/ui/button";
 import { formatDateTime, formatShortDateTime, formatTime } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
+import { cn } from "@/lib/utils";
 import { db } from "@/server/db";
 import { getConfig, getEventInfo, getRegistrationWindow } from "@/server/queries/config";
 import { defaultShareMessage, shareSummary } from "@/server/queries/share";
@@ -55,6 +56,17 @@ export default async function DashboardPage() {
   const shareUrl = `${publicBaseUrl() ?? ""}/`;
   const employeePool = stock?.pools.find((pool) => pool.pool === "EMPLOYEE") ?? null;
   const presence = stats.expected > 0 ? Math.round((stats.present / stats.expected) * 100) : 0;
+  // Antes da festa (e enquanto ninguém entrou), "quem falta" não faz sentido: o placar mostra
+  // quantos já estão prontos para entrar e o que ainda depende do Atendimento.
+  const preEvent = Boolean(event && !event.started && stats.present === 0);
+  const readiness = stats.expected > 0 ? Math.round((stats.ready / stats.expected) * 100) : 0;
+  const notReady = Math.max(0, stats.expected - stats.ready);
+  const toResolve = [
+    stats.pending > 0 ? plural(stats.pending, "inscrição para conferir", "inscrições para conferir") : null,
+    stats.awaitingSignature > 0 ? plural(stats.awaitingSignature, "ficha para assinar", "fichas para assinar") : null,
+  ].filter(Boolean);
+  const resolveHref = stats.pending > 0 ? "/painel/inscricoes?filtro=conferir" : "/painel/filiacoes?filtro=assinar";
+  const canSettings = can(actor.access, "manageSettings");
   // As duas filas do Atendimento, na ordem em que a recepção costuma resolver.
   const queue = [
     ...drafts.rows.map((row) => ({
@@ -90,7 +102,7 @@ export default async function DashboardPage() {
             : window.state === "NOT_OPEN"
               ? `Inscrições abrem em ${formatDateTime(window.opensAt)}.`
               : window.state === "CLOSED"
-                ? "Inscrições públicas encerradas."
+                ? `Inscrições pelo site encerradas em ${formatDateTime(window.closesAt)}. O Atendimento continua cadastrando na hora.`
                 : undefined
         }
         actions={
@@ -137,28 +149,81 @@ export default async function DashboardPage() {
       ) : null}
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <div className="relative overflow-clip rounded-2xl border border-red/40 bg-[linear-gradient(135deg,rgb(227_0_15/0.2),rgb(8_8_8/0.9)_55%)] p-5 shadow-[0_0_40px_-24px_var(--glow)]">
-          <div className="halftone pointer-events-none absolute -top-10 -right-10 size-48 rounded-full opacity-30 [mask-image:radial-gradient(circle,#000_25%,transparent_70%)]" />
-          <div className="relative flex items-center gap-2">
-            <Led tone={stats.present > 0 ? "success" : "neutral"} blink={stats.present > 0} />
-            <p className="pixel text-[0.55rem] text-fg-muted">Na pista agora</p>
-            <LiveRefresh score={stats.present} className="ml-auto" />
+        {preEvent && event?.startsAt ? (
+          <div
+            className="relative overflow-clip rounded-2xl border border-red/40 bg-[linear-gradient(135deg,rgb(227_0_15/0.2),rgb(8_8_8/0.9)_55%)] p-5 shadow-[0_0_40px_-24px_var(--glow)]"
+            data-testid="pre-event-hero"
+          >
+            <div className="halftone pointer-events-none absolute -top-10 -right-10 size-48 rounded-full opacity-30 [mask-image:radial-gradient(circle,#000_25%,transparent_70%)]" />
+            <div className="relative flex flex-wrap items-center gap-2">
+              <Led tone="neutral" />
+              <p className="pixel text-[0.55rem] text-fg-muted">Antes da festa</p>
+              <span
+                className="ml-auto flex items-center gap-2 rounded-md border border-line-strong bg-ink/70 px-2.5 py-1.5"
+                title={`A festa começa em ${event.startLabel}`}
+              >
+                <Clock className="size-4 text-red" />
+                <span className="pixel text-[0.5rem] text-fg-muted">Começa em</span>
+                <DeadlineTimer deadline={event.startsAt} />
+              </span>
+              {/* No celular o selo não cabe na linha; a atualização automática continua. */}
+              <LiveRefresh score={stats.present} className="hidden sm:inline-flex" />
+            </div>
+            <p className="relative mt-3 flex items-end gap-3">
+              <span className="display text-7xl leading-none text-fg neon tabular" data-testid="stat-ready">
+                {stats.ready}
+              </span>
+              <span className="display mb-1.5 text-2xl text-fg-muted tabular">/ {stats.expected}</span>
+              <span className="pixel mb-2 ml-auto text-sm text-red tabular">{readiness}%</span>
+            </p>
+            <p className="relative mt-1 text-sm font-semibold text-fg">prontos para entrar</p>
+            <SegmentMeter
+              className="relative mt-3"
+              value={stats.ready}
+              max={stats.expected}
+              segments={24}
+              label={`${stats.ready} de ${stats.expected} prontos para entrar`}
+            />
+            <p className="relative mt-3 text-xs text-fg-muted" data-testid="pre-event-note">
+              {notReady > 0 ? (
+                <>
+                  {plural(notReady, "pessoa ainda não pode entrar", "pessoas ainda não podem entrar")}
+                  {toResolve.length ? `: ${toResolve.join(" e ")} (com os convidados). ` : ". "}
+                  <Link href={resolveHref} className="font-semibold text-red hover:underline">
+                    Resolver antes da festa
+                  </Link>
+                </>
+              ) : stats.expected > 0 ? (
+                "Todo mundo já está liberado: agora é só a pista abrir."
+              ) : (
+                "Ainda sem inscritos."
+              )}
+            </p>
           </div>
-          <p className="relative mt-3 flex items-end gap-3">
-            <span className="display text-7xl leading-none text-fg neon tabular" data-testid="stat-present">
-              {stats.present}
-            </span>
-            <span className="display mb-1.5 text-2xl text-fg-muted tabular">/ {stats.expected}</span>
-            <span className="pixel mb-2 ml-auto text-sm text-red tabular">{presence}%</span>
-          </p>
-          <SegmentMeter className="relative mt-4" value={stats.present} max={stats.expected} segments={24} label={`${stats.present} de ${stats.expected} presentes`} />
-          <p className="relative mt-3 text-xs text-fg-muted">
-            {stats.absent === 1 ? "1 esperado ainda não entrou" : `${plural(stats.absent, "esperado", "esperados")} ainda não entraram`} ·{" "}
-            <Link href="/painel/participantes?filtro=absent" className="font-semibold text-red hover:underline">
-              ver quem falta
-            </Link>
-          </p>
-        </div>
+        ) : (
+          <div className="relative overflow-clip rounded-2xl border border-red/40 bg-[linear-gradient(135deg,rgb(227_0_15/0.2),rgb(8_8_8/0.9)_55%)] p-5 shadow-[0_0_40px_-24px_var(--glow)]">
+            <div className="halftone pointer-events-none absolute -top-10 -right-10 size-48 rounded-full opacity-30 [mask-image:radial-gradient(circle,#000_25%,transparent_70%)]" />
+            <div className="relative flex items-center gap-2">
+              <Led tone={stats.present > 0 ? "success" : "neutral"} blink={stats.present > 0} />
+              <p className="pixel text-[0.55rem] text-fg-muted">{event && !event.started ? "Na pista (antes do horário)" : "Na pista agora"}</p>
+              <LiveRefresh score={stats.present} className="ml-auto" />
+            </div>
+            <p className="relative mt-3 flex items-end gap-3">
+              <span className="display text-7xl leading-none text-fg neon tabular" data-testid="stat-present">
+                {stats.present}
+              </span>
+              <span className="display mb-1.5 text-2xl text-fg-muted tabular">/ {stats.expected}</span>
+              <span className="pixel mb-2 ml-auto text-sm text-red tabular">{presence}%</span>
+            </p>
+            <SegmentMeter className="relative mt-4" value={stats.present} max={stats.expected} segments={24} label={`${stats.present} de ${stats.expected} presentes`} />
+            <p className="relative mt-3 text-xs text-fg-muted">
+              {stats.absent === 1 ? "1 esperado ainda não entrou" : `${plural(stats.absent, "esperado", "esperados")} ainda não entraram`} ·{" "}
+              <Link href="/painel/participantes?filtro=absent" className="font-semibold text-red hover:underline">
+                ver quem falta
+              </Link>
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <StatTile
@@ -178,23 +243,38 @@ export default async function DashboardPage() {
             hint={`${stats.kitsDeliveredMember} prof. · ${stats.kitsDeliveredGuest} conv.${stats.kitsDeliveredEmployee ? ` · ${stats.kitsDeliveredEmployee} func.` : ""}`}
             testId="stat-kits-delivered"
           />
-          <div className="col-span-2 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4">
-            <div>
+          <div
+            className={cn(
+              "col-span-2 flex items-center justify-between gap-3 rounded-xl border bg-surface p-4",
+              event?.kitDeadline?.passed ? "border-danger/50" : "border-line",
+            )}
+            data-testid="kit-deadline-card"
+          >
+            <div className="min-w-0">
               <p className="text-[0.7rem] font-bold tracking-[0.1em] text-fg-muted uppercase">Entrega de kits</p>
               <p className="mt-1 text-sm text-fg">
-                {event?.kitDeadline ? `Até ${event.kitDeadline.label}` : "Sem horário limite"}
+                {event?.kitDeadline
+                  ? event.kitDeadline.passed
+                    ? `Encerrada às ${event.kitDeadline.label}`
+                    : `Até ${event.kitDeadline.label}`
+                  : "Sem horário limite"}
               </p>
+              {event?.kitDeadline?.passed ? (
+                <p className="mt-0.5 text-xs text-fg-muted">
+                  Quem entra agora fica sem kit.{canSettings ? " Mudando o horário, os kits voltam a sair na hora." : ""}
+                </p>
+              ) : null}
             </div>
-            {event?.kitDeadline ? (
-              <span className="flex items-center gap-2 rounded-md border border-line-strong bg-ink px-3 py-2">
+            {event?.kitDeadline && !(event.kitDeadline.passed && canSettings) ? (
+              <span className="flex shrink-0 items-center gap-2 rounded-md border border-line-strong bg-ink px-3 py-2">
                 <Clock className="size-4 text-red" />
                 <DeadlineTimer deadline={event.kitDeadline.at} />
               </span>
-            ) : (
-              <Link href="/painel/configuracoes" className="text-xs font-semibold text-red hover:underline">
-                Definir horário
+            ) : canSettings ? (
+              <Link href="/painel/configuracoes#kit-deadline" className="shrink-0 text-xs font-semibold text-red hover:underline">
+                {event?.kitDeadline ? "Mudar horário" : "Definir horário"}
               </Link>
-            )}
+            ) : null}
           </div>
         </div>
       </section>

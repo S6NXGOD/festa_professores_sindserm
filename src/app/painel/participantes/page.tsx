@@ -21,7 +21,8 @@ const FILTERS: { value: ParticipantFilter; label: string }[] = [
   { value: "employees", label: "Colaboradores" },
   { value: "pending", label: "Pendentes" },
   { value: "present", label: "Presentes" },
-  { value: "absent", label: "Ausentes" },
+  // "Ausentes" confundia antes da festa (todo mundo "falta" quando ninguém entrou ainda).
+  { value: "absent", label: "Ainda não entraram" },
 ];
 
 export default async function ParticipantsPage({ searchParams }: PageProps<"/painel/participantes">) {
