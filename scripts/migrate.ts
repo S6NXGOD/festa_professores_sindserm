@@ -1,18 +1,8 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { Pool } from "pg";
 import { pathToFileURL } from "node:url";
+import { runMigrations } from "../src/server/db/migrations";
 import { databaseNameOf, loadLocalEnv } from "./load-env";
 
-/** Aplica as migrations SQL da pasta ./drizzle no banco informado. */
-export async function runMigrations(databaseUrl: string) {
-  const pool = new Pool({ connectionString: databaseUrl, max: 1 });
-  try {
-    await migrate(drizzle({ client: pool }), { migrationsFolder: "drizzle" });
-  } finally {
-    await pool.end();
-  }
-}
+export { runMigrations };
 
 async function main() {
   loadLocalEnv();

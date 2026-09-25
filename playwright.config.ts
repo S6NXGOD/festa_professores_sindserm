@@ -33,6 +33,9 @@ export default defineConfig({
       SETUP_TOKEN: E2E.setupToken,
       RATE_LIMIT_DISABLED: "true",
       NEXT_TELEMETRY_DISABLED: "1",
+      // O servidor cria o primeiro administrador ao ligar se isso existir; o teste cria pelo /setup.
+      ADMIN_EMAIL: "",
+      ADMIN_PASSWORD: "",
     },
   },
 });

@@ -8,43 +8,27 @@
  *    cria o primeiro administrador (ADMIN_NAME é opcional). Se já existe
  *    usuário, não mexe em nada — a senha trocada em /conta continua valendo.
  *
+ * O servidor repete esse preparo ao ligar (src/instrumentation.ts): o sistema
+ * fica certo mesmo que este passo não rode. Falha nas migrations interrompe o
+ * deploy; problema só na criação do administrador vira aviso no log.
  * A senha nunca aparece no log e é gravada só como hash (scrypt).
  */
-import { databaseNameOf, loadLocalEnv } from "./load-env";
-import { runMigrations } from "./migrate";
+import { loadLocalEnv } from "./load-env";
 
 async function main() {
   loadLocalEnv();
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL não configurada.");
-  await runMigrations(url);
-  console.log(`Banco "${databaseNameOf(url)}" atualizado (migrations aplicadas).`);
-
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL não configurada.");
   // Depois de carregar o ambiente: o pool do banco lê DATABASE_URL ao ser criado.
-  const { countUsers, createAdminFromCli } = await import("../src/server/services/users");
-  const { db, pool } = await import("../src/server/db");
+  const { prepareDatabase } = await import("../src/server/db/prepare");
   try {
-    if ((await countUsers(db)) > 0) {
-      console.log("Já existem usuários: nenhum administrador foi criado.");
-      return;
-    }
-    const email = process.env.ADMIN_EMAIL?.trim();
-    const password = process.env.ADMIN_PASSWORD ?? "";
-    if (!email || !password) {
-      console.log(
-        "Nenhum usuário ainda. Defina ADMIN_EMAIL e ADMIN_PASSWORD para criar o primeiro administrador no próximo deploy, ou crie pelo navegador em /setup (com o SETUP_TOKEN).",
-      );
-      return;
-    }
-    const created = await createAdminFromCli({ name: process.env.ADMIN_NAME?.trim() || "Administrador SINDSERM", email, password });
-    console.log(`Primeiro administrador criado: ${created.email}. Entre, troque a senha em /conta e apague ADMIN_PASSWORD das variáveis.`);
+    await prepareDatabase();
   } finally {
+    const { pool } = await import("../src/server/db");
     await pool.end();
   }
 }
 
 main().catch((error) => {
-  const fieldErrors = (error as { fieldErrors?: Record<string, string> }).fieldErrors;
-  console.error(error instanceof Error ? error.message : error, fieldErrors ?? "");
+  console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 });
