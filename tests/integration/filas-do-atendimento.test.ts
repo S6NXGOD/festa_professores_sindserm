@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import {
+  hasAnyEntry,
   listAffiliationForms,
   listOrder,
   listRegistrations,
@@ -112,11 +113,14 @@ describe("filas do Atendimento", () => {
     // "Ainda não entraram": só inscrições válidas (a recusada fica de fora).
     const absent = async () => (await listRegistrations({ page: 1, absent: true })).rows.map((row) => row.fullName).sort();
     expect(await absent()).toEqual(["Joana Sozinha Reis", "Maria Grupo Souza"]);
+    // Ninguém entrou ainda: é o que decide mostrar (ou não) o filtro antes da festa.
+    expect(await hasAnyEntry()).toBe(false);
 
     // O convidado entrou antes: o grupo continua na lista, porque falta a professora.
     await registerCheckIn(attendant, { personId: group.state.guest!.personId, method: "SEARCH" });
     await registerCheckIn(attendant, { personId: solo.state.member.id, method: "QR" });
     expect(await absent()).toEqual(["Maria Grupo Souza"]);
+    expect(await hasAnyEntry()).toBe(true);
     const row = (await listRegistrations({ page: 1, q: "maria grupo" })).rows[0]!;
     expect(row.checkedInAt).toBeNull();
     expect(row.guestCheckedInAt).toBeTruthy();

@@ -448,6 +448,12 @@ export async function recentCheckIns(limit = 8) {
 }
 
 /** Tamanho das filas (badges do menu): inscrições para conferir e fichas para assinar. */
+/** Alguém já entrou (entrada não estornada)? */
+export async function hasAnyEntry(): Promise<boolean> {
+  const [row] = await db.select({ id: checkIn.id }).from(checkIn).where(isNull(checkIn.cancelledAt)).limit(1);
+  return Boolean(row);
+}
+
 export async function queueCounts() {
   const [[pending], [signature]] = await Promise.all([
     db.select({ total: count() }).from(registration).where(eq(registration.status, "PENDING")),

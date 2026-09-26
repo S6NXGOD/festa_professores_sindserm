@@ -9,6 +9,7 @@ import { VerificationCard } from "@/components/staff/queue-cards";
 import { WhatsAppButton } from "@/components/staff/whatsapp-button";
 import { AffiliationBadge, TeacherBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
+import { hasEventStarted } from "@/domain/kit-deadline";
 import { REGISTRATION_ORIGIN_LABEL } from "@/domain/labels";
 import { can } from "@/domain/rules";
 import { AFFILIATION_STATUSES, type AffiliationStatus } from "@/domain/types";
@@ -18,6 +19,7 @@ import { plural } from "@/lib/plural";
 import { cn } from "@/lib/utils";
 import { APP_NAME, getConfig } from "@/server/queries/config";
 import {
+  hasAnyEntry,
   listOrder,
   listRegistrations,
   listVerificationQueue,
@@ -60,7 +62,7 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
   const order = listOrder(query.ordem);
   const ordem = order === "antigas" ? "antigas" : undefined;
   const page = pageNumber(query.page);
-  const [counts, statusCounts, config] = await Promise.all([queueCounts(), registrationStatusCounts(), getConfig()]);
+  const [counts, statusCounts, config, anyEntry] = await Promise.all([queueCounts(), registrationStatusCounts(), getConfig(), hasAnyEntry()]);
   const eventName = config?.name ?? APP_NAME;
   // Sem filtro escolhido, abre direto na fila quando há inscrição esperando conferência. O filtro vai
   // para o endereço: ao conferir a última, a tela fica em "Fila zerada" em vez de pular para a lista.
@@ -72,6 +74,8 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
   }
   const inQueue = filtro === "conferir" || filtro === "PENDING";
   const absent = filtro === "ausentes";
+  // Como no Placar: antes da festa (e sem ninguém lá dentro), "Ainda não entraram" seria a lista inteira.
+  const showAbsent = absent || anyEntry || hasEventStarted(config);
   const status = !inQueue && (STATUS_FILTERS as readonly string[]).includes(filtro) ? (filtro as AffiliationStatus) : null;
   const current = inQueue ? "conferir" : absent ? "ausentes" : (status ?? "todas");
   const [queue, list] = await Promise.all([
@@ -111,7 +115,7 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
         options={[
           { value: "conferir", label: "Para conferir", count: counts.pending, attention: counts.pending > 0 },
           { value: "todas", label: "Todas", count: statusCounts.total },
-          { value: "ausentes", label: "Ainda não entraram" },
+          ...(showAbsent ? [{ value: "ausentes", label: "Ainda não entraram" }] : []),
           ...STATUS_FILTERS.filter((s) => (statusCounts.byStatus[s] ?? 0) > 0 || status === s).map((s) => ({
             value: s,
             label: FILTER_LABEL[s as Exclude<AffiliationStatus, "PENDING">],
