@@ -526,11 +526,17 @@ export function GateResult({
               ) : null}
             </div>
           ) : null}
-          <p className="display text-[2.15rem] leading-[0.95] break-words text-fg sm:text-5xl" data-testid="gate-person-name">
-            {view.fullName}
-          </p>
+          {/* No painel, o nome já está no cabeçalho do cadastro. */}
+          {mode === "gate" ? (
+            <p className="display text-[2.15rem] leading-[0.95] break-words text-fg sm:text-5xl" data-testid="gate-person-name">
+              {view.fullName}
+            </p>
+          ) : null}
           {role ? (
-            <p className="mt-2 flex items-start gap-2 text-[0.95rem] leading-snug font-semibold text-fg" data-testid="gate-person-role">
+            <p
+              className={cn("flex items-start gap-2 text-[0.95rem] leading-snug font-semibold text-fg", mode === "gate" && "mt-2")}
+              data-testid="gate-person-role"
+            >
               <role.icon className={cn("mt-0.5 size-4 shrink-0", role.iconClass)} />
               <span className="min-w-0">{role.text}</span>
             </p>

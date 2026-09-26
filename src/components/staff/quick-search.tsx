@@ -9,8 +9,11 @@ import { Input } from "@/components/ui/input";
 import { searchPeopleAction } from "@/server/actions/gate";
 import type { PersonSearchResult } from "@/server/services/people";
 
-/** Busca rápida (nome, CPF, matrícula ou código) disponível em todo o painel. */
-export function QuickSearch() {
+/**
+ * Busca rápida (nome, CPF, matrícula ou código) disponível em todo o painel.
+ * O resultado abre o cadastro (quem vê Inscrições) ou a tela da portaria.
+ */
+export function QuickSearch({ personPath = "/painel/participantes" }: { personPath?: "/painel/participantes" | "/portaria/pessoa" }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,7 +60,7 @@ export function QuickSearch() {
               {visible.map((person) => (
                 <li key={person.personId}>
                   <Link
-                    href={`/painel/participantes/${person.personId}`}
+                    href={`${personPath}/${person.personId}`}
                     onClick={() => setOpen(false)}
                     className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-white/5"
                   >

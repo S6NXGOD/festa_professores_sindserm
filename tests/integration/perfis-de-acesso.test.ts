@@ -106,7 +106,7 @@ describe("perfis-modelo = regras de antes", () => {
 
   it("Administrador não tem ajuste por área: nada é gravado e um ajuste antigo não reduz o acesso", () => {
     const reduced: AccessMap = {
-      modules: { ...ROLE_PRESETS.ADMIN.modules, usuarios: "none", configuracoes: "none", participantes: "view" },
+      modules: { ...ROLE_PRESETS.ADMIN.modules, usuarios: "none", configuracoes: "none", correcoes: "none" },
       fullCpf: false,
     };
     expect(isAccessFixed("ADMIN")).toBe(true);
@@ -292,7 +292,7 @@ describe("usuários: permissões, trava do último administrador e senha provis�
 
   it("Administrador é sempre acesso total: criar ou promover ignora ajustes; ajuste antigo gravado não vale", async () => {
     const reduced: AccessMap = {
-      modules: { ...ROLE_PRESETS.ADMIN.modules, usuarios: "none", configuracoes: "none", participantes: "view" },
+      modules: { ...ROLE_PRESETS.ADMIN.modules, usuarios: "none", configuracoes: "none", correcoes: "none" },
       fullCpf: false,
     };
     const novo = await createStaffUser(admin, {

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Check, Phone, Users, Warning } from "@/components/icons/pixel";
+import { WhatsAppButton } from "@/components/staff/whatsapp-button";
 import { PixelTag } from "@/components/retro/bits";
 import { AffiliationDecisionButtons, SignatureButtons } from "@/components/staff/affiliation-decision-buttons";
 import { TeacherBadge, ToneBadge } from "@/components/status/status-badge";
 import { formatCpf } from "@/lib/cpf";
 import { formatShortDateTime } from "@/lib/datetime";
+import { registrationWhatsappMessage } from "@/domain/whatsapp-messages";
 import { formatPhone } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 import type { AffiliationFormRow, VerificationRow } from "@/server/queries/panel";
@@ -24,7 +26,7 @@ function Field({ label, children, mono = false, wide = false }: { label: string;
 }
 
 /** Inscrição para conferir: os dados para bater com o cadastro do sindicato e a decisão. */
-export function VerificationCard({ row, canDecide }: { row: VerificationRow; canDecide: boolean }) {
+export function VerificationCard({ row, canDecide, eventName }: { row: VerificationRow; canDecide: boolean; eventName: string }) {
   return (
     <div className="rounded-xl border border-line bg-surface p-4 sm:p-5" data-testid="queue-item">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -44,10 +46,21 @@ export function VerificationCard({ row, canDecide }: { row: VerificationRow; can
               {row.workplace ?? "—"}
             </Field>
           </dl>
-          <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted">
-            <span className="inline-flex items-center gap-1">
-              <Phone className="size-3.5" /> {formatPhone(row.whatsapp) || "—"}
-            </span>
+          <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-fg-muted">
+            {row.whatsapp ? (
+              <WhatsAppButton
+                phone={row.whatsapp}
+                name={row.fullName}
+                label={formatPhone(row.whatsapp)}
+                message={registrationWhatsappMessage({ fullName: row.fullName, status: "PENDING", eventName })}
+                className="h-8 px-2.5 text-xs"
+                testId="queue-whatsapp"
+              />
+            ) : (
+              <span className="inline-flex items-center gap-1">
+                <Phone className="size-3.5" /> Sem WhatsApp
+              </span>
+            )}
             <span className="inline-flex items-center gap-1">
               <Users className="size-3.5" /> {row.guestName ? `Convidado: ${row.guestName}` : "Sem convidado"}
             </span>
@@ -70,7 +83,7 @@ function DocumentBadge({ ok, label, missing }: { ok: boolean; label: string; mis
 }
 
 /** Ficha esperando a assinatura na recepção: conferir, imprimir e confirmar. */
-export function SignatureCard({ row }: { row: AffiliationFormRow }) {
+export function SignatureCard({ row, eventName }: { row: AffiliationFormRow; eventName: string }) {
   const missingDocuments = !row.hasRg || !row.hasPayslip;
   return (
     <div className="rounded-xl border border-line bg-surface p-4 sm:p-5" data-testid="signature-item">
@@ -93,9 +106,20 @@ export function SignatureCard({ row }: { row: AffiliationFormRow }) {
             </Field>
           </dl>
           <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted">
-            <span className="inline-flex items-center gap-1">
-              <Phone className="size-3.5" /> {formatPhone(row.whatsapp) || "—"}
-            </span>
+            {row.whatsapp ? (
+              <WhatsAppButton
+                phone={row.whatsapp}
+                name={row.fullName}
+                label={formatPhone(row.whatsapp)}
+                message={registrationWhatsappMessage({ fullName: row.fullName, status: "AWAITING_SIGNATURE", eventName })}
+                className="h-8 px-2.5 text-xs"
+                testId="signature-whatsapp"
+              />
+            ) : (
+              <span className="inline-flex items-center gap-1">
+                <Phone className="size-3.5" /> Sem WhatsApp
+              </span>
+            )}
             {row.registrationId ? (
               <span className="inline-flex items-center gap-1">
                 <Users className="size-3.5" /> {row.guestName ? `Convidado: ${row.guestName}` : "Sem convidado"}

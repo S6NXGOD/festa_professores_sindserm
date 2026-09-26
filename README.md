@@ -14,16 +14,18 @@ Stack: Next.js (App Router) · TypeScript · PostgreSQL + Drizzle · Better Auth
 - **Fim das inscrições**: o site fecha (inscrição e ficha de filiação); o Atendimento continua cadastrando na hora e vouchers, portaria e placar seguem normais.
 - **Placar antes da festa**: em vez de "quem falta", mostra quantas pessoas já estão **prontas para entrar** (filiação confirmada, convidados delas e colaboradores) e quantas ainda dependem de conferência ou assinatura, com a contagem até a festa. Na primeira entrada, vira o placar "Na pista".
 - **Controle de entrada** (Painel → Entradas): cada entrada com horário, quem registrou, como (QR, busca ou código), kits que saíram junto, entradas antes do horário e estornos (quem estornou e o motivo); ranking de quem registrou e **planilha** para o Excel. Área própria nas permissões (Administrador e Atendimento já veem).
+- **Inscrições** (lista única das pessoas; o antigo menu "Participantes" foi incorporado): cada linha é o grupo — professor(a) ou filiado(a) e o convidado —, com quem já entrou, kits e o botão de **WhatsApp**. A busca acha também o convidado; o filtro **Ainda não entraram** mostra os grupos em que falta alguém. A linha abre o **cadastro** da pessoa (portaria, dados, vouchers, ex-convidados e histórico, tudo numa tela). Endereços antigos levam ao lugar equivalente.
 - **Inscrições e fichas**: as mais recentes primeiro, agrupadas por dia; o botão "Mais antigas" mostra primeiro quem espera há mais tempo.
+- **WhatsApp de quem se inscreveu**: na fila de conferência, na lista de Inscrições, nas fichas para assinar e no cadastro, o botão verde abre a conversa com uma mensagem pronta conforme a situação (filiação em conferência, ficha para assinar, não confirmada, confirmada). A equipe revisa antes de enviar.
 - **Entrada só a partir do horário da festa**: antes disso, a portaria vê o aviso "a festa ainda não começou" e só registra se confirmar (fica anotado na auditoria).
 - **Portaria rápida**: lido o QR, a tela mostra o status, o nome, quem a pessoa é e quantos kits saem; o botão **Confirmar entrada** fica fixo no pé da tela (ou **Pular**, para ler outro). Detalhes e ações do Atendimento ficam a um toque. Depois de confirmar, o leitor volta sozinho à câmera em 6 s — um toque na tela segura o resultado; o botão **Auto** do leitor liga/desliga isso no aparelho.
 - **Divulgação** (Placar → Divulgar): prévia do link como aparece no WhatsApp, mensagem pronta com os dados da festa (editável; o administrador pode salvar o texto da equipe), WhatsApp, link e QR Code para cartaz. A prévia do link (imagem com arte, data, local e prazo) é gerada com os dados do painel.
-- **Permissões** (Painel → Acesso ao sistema): **Administrador tem acesso total** — não há área para marcar (e ajuste antigo gravado não reduz nada). Atendimento e Segurança/Recepção já vêm com o modelo marcado e podem ser ajustados área por área (sem acesso / só ver / editar) para cada pessoa. O servidor confere tudo. Sempre sobra pelo menos uma pessoa que administra usuários.
+- **Permissões** (Painel → Acesso ao sistema): **Administrador tem acesso total** — não há área para marcar (e ajuste antigo gravado não reduz nada). Atendimento e Segurança/Recepção já vêm com o modelo marcado e podem ser ajustados área por área (sem acesso / só ver / editar) para cada pessoa. "Inscrições: só ver" inclui o cadastro de cada pessoa; **Correções** (estornar entradas e kits, reabrir conferências, apagar documentos de fichas assinadas) é uma área à parte, só do Administrador por padrão. O menu mostra só o que a pessoa consegue abrir, e o servidor confere tudo. Sempre sobra pelo menos uma pessoa que administra usuários.
 - **Senha provisória**: quem é criado ou tem a senha redefinida pelo administrador cria a própria senha no primeiro acesso. Para pedir isso a quem já usa o sistema: Acesso ao sistema → Editar → "Pedir nova senha no próximo acesso" (vale no próximo clique da pessoa).
 - **WhatsApp de ajuda** (Painel → Configurações): aparece como botão flutuante na inscrição e como link nos vouchers, na ficha, no login e nas telas de erro, já com a mensagem pronta. Sem número, nada aparece.
 - Filiação marcada como **não confirmada**? Se a pessoa comprovar na hora (ex.: contracheque com o desconto do SINDSERM), o Atendimento confirma na tela dela, escrevendo como foi comprovado (fica na auditoria).
 - Na portaria, confirmou a filiação, o comprovante ou a assinatura da ficha? Abre na hora o aviso **"já pode entrar!"** com o botão de registrar a entrada (+ kit), para ninguém esquecer.
-- **CPF** e **matrícula da prefeitura** são únicos (a matrícula é comparada sem pontuação). O CPF do **convidado é opcional** (ex.: crianças); se informado, também é único. Para virar filiado(a), o CPF passa a ser exigido.
+- **CPF** e **matrícula da prefeitura** são únicos (a matrícula é comparada sem pontuação), garantido pelo banco e avisado no campo em todas as portas de entrada: inscrição no site e na hora, ficha de filiação, correção de dados, filiação declarada na portaria, colaboradores e convidados. O CPF do **convidado é opcional** (ex.: crianças); se informado, também é único. Para virar filiado(a), o CPF passa a ser exigido.
 
 ## 1. Requisitos
 
@@ -94,7 +96,7 @@ O `railway.json` já configura tudo: build `npm run build`, antes de cada deploy
 ## 5. Rotas
 
 - Público: `/` · `/inscricao` (`?ficha=1` abre a ficha de filiação) · `/vouchers/[link]` · `/v/[token]` (voucher individual e `/imagem`) · `/local/foto`
-- Equipe: `/entrar` · `/conta` · `/portaria` (leitor em `/portaria/scanner`) · `/painel` (placar, inscrições — abre na fila de conferência quando há o que conferir —, fichas de filiação — abre na fila de assinatura —, participantes, kits, colaboradores do SINDSERM, acesso ao sistema, auditoria, configurações) · `/painel/inscricoes/[id]/vouchers` (imprime os vouchers do(a) professor(a) e do convidado numa folha) · `/painel/colaboradores/vouchers` (vouchers dos colaboradores e dos convidados deles, para imprimir)
+- Equipe: `/entrar` · `/conta` · `/portaria` (leitor em `/portaria/scanner`) · `/painel` (placar, inscrições — abre na fila de conferência quando há o que conferir —, fichas de filiação — abre na fila de assinatura —, kits, colaboradores do SINDSERM, acesso ao sistema, auditoria, configurações) · `/painel/participantes/[id]` (cadastro da pessoa) · `/painel/inscricoes/[id]/vouchers` (imprime os vouchers do(a) professor(a) e do convidado numa folha) · `/painel/colaboradores/vouchers` (vouchers dos colaboradores e dos convidados deles, para imprimir)
 - Controle de entrada: `/painel/entradas` (planilha em `/painel/entradas/planilha`)
 - Divulgação: `/opengraph-image` (prévia do link) · `/divulgacao/qr` (QR Code do link de inscrição) · `/icone?s=32` (ícone do site; `/favicon.ico` aponta para ele)
 - Arquivos: `POST /api/documentos` (envio de RG/contracheque) · `POST /api/icone` (ícone do site) · `GET /api/documentos/[id]` (só equipe; `?miniatura=1`) · `GET /api/health` (verificação do Railway)
@@ -105,7 +107,7 @@ O `railway.json` já configura tudo: build `npm run build`, antes de cada deploy
 npm run lint
 npm run typecheck
 npm test             # Vitest: regras críticas contra o banco <nome>_test (recriado a cada execução)
-npm run test:e2e     # Playwright: build + fluxos completos no banco <nome>_e2e, porta 3210
+npm run test:e2e     # Playwright: build + fluxos completos no banco <nome>_e2e, porta 3210 (outra: E2E_PORT=3215)
 ```
 
 Antes do primeiro `test:e2e`: `npx playwright install chromium`. O E2E simula a câmera com um vídeo do QR Code do voucher e exercita o leitor ZXing de verdade. `npm run check` executa lint, typecheck, testes e build em sequência.

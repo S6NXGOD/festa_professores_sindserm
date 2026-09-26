@@ -22,6 +22,7 @@ import { eventStartAt } from "@/domain/kit-deadline";
 import type { CheckInMethod } from "@/domain/types";
 import { formatDayHeading, formatShortDateTime, formatTime, todayInZone, zonedDayKey, zonedHour } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
+import { can } from "@/domain/rules";
 import { cn } from "@/lib/utils";
 import { db } from "@/server/db";
 import { getConfig } from "@/server/queries/config";
@@ -53,16 +54,11 @@ function roleText(row: EntryRow) {
   return row.isTeacher ? "Professor(a)" : "Filiado(a)";
 }
 
-function EntryItem({ row, early }: { row: EntryRow; early: boolean }) {
+function EntryItem({ row, early, canOpen }: { row: EntryRow; early: boolean; canOpen: boolean }) {
   const cancelled = Boolean(row.cancelledAt);
   const method = METHOD[row.method];
-  return (
-    <li>
-      <Link
-        href={`/painel/participantes/${row.personId}`}
-        className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-white/[0.04] sm:px-5"
-        data-testid="entry-row"
-      >
+  const body = (
+    <>
         <span className={cn("pixel w-12 shrink-0 pt-1 text-[0.7rem] tabular", cancelled ? "text-fg-dim line-through" : "text-red")}>
           {formatTime(row.checkedInAt)}
         </span>
@@ -96,14 +92,30 @@ function EntryItem({ row, early }: { row: EntryRow; early: boolean }) {
             </p>
           ) : null}
         </div>
-        <ChevronRight className="mt-1 size-5 shrink-0 text-fg-dim" />
-      </Link>
+      {canOpen ? <ChevronRight className="mt-1 size-5 shrink-0 text-fg-dim" /> : null}
+    </>
+  );
+  const rowClass = "flex items-start gap-3 px-4 py-3 sm:px-5";
+  return (
+    <li>
+      {/* Só vira link para quem pode abrir o cadastro da pessoa. */}
+      {canOpen ? (
+        <Link href={`/painel/participantes/${row.personId}`} className={cn(rowClass, "transition-colors hover:bg-white/[0.04]")} data-testid="entry-row">
+          {body}
+        </Link>
+      ) : (
+        <div className={rowClass} data-testid="entry-row">
+          {body}
+        </div>
+      )}
     </li>
   );
 }
 
 export default async function EntriesPage({ searchParams }: PageProps<"/painel/entradas">) {
-  await requirePageActor("viewEntries");
+  const actor = await requirePageActor("viewEntries");
+  const canPeople = can(actor.access, "viewPeople");
+  const canEmployees = can(actor.access, "viewEmployees");
   const query = await searchParams;
   const q = typeof query.q === "string" && query.q.trim() ? query.q : undefined;
   const filter = (ENTRY_FILTERS as readonly string[]).includes(String(query.filtro)) ? (query.filtro as EntryFilter) : "todas";
@@ -265,7 +277,12 @@ export default async function EntriesPage({ searchParams }: PageProps<"/painel/e
                 </header>
                 <ul className="divide-y divide-line">
                   {group.rows.map((row) => (
-                    <EntryItem key={row.id} row={row} early={Boolean(eventStart && row.checkedInAt < eventStart)} />
+                    <EntryItem
+                      key={row.id}
+                      row={row}
+                      early={Boolean(eventStart && row.checkedInAt < eventStart)}
+                      canOpen={canPeople || (canEmployees && (row.role === "EMPLOYEE" || row.hostIsEmployee))}
+                    />
                   ))}
                 </ul>
               </section>

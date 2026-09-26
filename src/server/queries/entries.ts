@@ -24,6 +24,8 @@ export interface EntryRow {
   role: ParticipantRole;
   isTeacher: boolean | null;
   hostName: string | null;
+  /** Convidado(a) de colaborador(a) do SINDSERM. */
+  hostIsEmployee: boolean;
   employeeCategory: EmployeeCategory | null;
   employeeJobTitle: string | null;
   method: CheckInMethod;
@@ -71,6 +73,7 @@ function entriesQuery() {
       role: checkIn.role,
       isTeacher: sql<boolean | null>`CASE WHEN ${checkIn.role} = 'MEMBER' THEN ${registration.isTeacher} END`,
       hostName: sql<string | null>`CASE WHEN ${checkIn.role} = 'GUEST' THEN coalesce(${hostPerson.fullName}, ${hostEmployeePerson.fullName}) END`,
+      hostIsEmployee: sql<boolean>`${hostEmployee.id} IS NOT NULL`,
       employeeCategory: employee.category,
       employeeJobTitle: employee.jobTitle,
       method: checkIn.method,

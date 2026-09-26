@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, not, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, exists, ilike, inArray, isNotNull, isNull, not, or, type SQL, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/server/db";
 import {
@@ -44,6 +44,26 @@ function paged<T>(rows: T[], total: number, page: number): Page<T> {
   return { rows, total, page, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
+/**
+ * Busca de inscrições: acha o grupo pelo nome, CPF, matrícula ou código do
+ * voucher de quem se inscreveu ou do convidado.
+ */
+function groupSearchCondition(q: string | undefined): SQL | null {
+  const search = q ? personSearchCondition(q, { allowPartialCpf: true }) : null;
+  if (!search) return null;
+  const matching = db.select({ id: person.id }).from(person).where(search);
+  const guest = alias(guestLink, "search_guest_link");
+  return or(
+    inArray(registration.memberPersonId, matching),
+    exists(
+      db
+        .select({ one: sql`1` })
+        .from(guest)
+        .where(and(eq(guest.registrationId, registration.id), eq(guest.status, "ACTIVE"), inArray(guest.guestPersonId, matching))),
+    ),
+  )!;
+}
+
 /** Nome do convidado ativo (no máximo um por professor(a)). */
 const guestNameSql = sql<string | null>`(SELECT gp.full_name FROM ${guestLink} gl JOIN ${person} gp ON gp.id = gl.guest_person_id WHERE gl.registration_id = ${registration.id} AND gl.status = 'ACTIVE' LIMIT 1)`;
 
@@ -54,7 +74,7 @@ const guestNameSql = sql<string | null>`(SELECT gp.full_name FROM ${guestLink} g
 export type QueueKind = "PENDING" | "AWAITING_SIGNATURE";
 
 export async function listVerificationQueue(options: { kind: QueueKind; q?: string; page: number; order?: ListOrder }) {
-  const search = options.q ? personSearchCondition(options.q, { allowPartialCpf: true }) : null;
+  const search = groupSearchCondition(options.q);
   const where = and(eq(registration.status, options.kind), search ?? undefined);
   const openForm = alias(affiliationForm, "open_form");
   const [rows, [totalRow]] = await Promise.all([
@@ -168,11 +188,30 @@ export async function listParticipants(options: { q?: string; filter: Participan
 // Inscrições (grupos)
 // ---------------------------------------------------------------------------
 
-export async function listRegistrations(options: { q?: string; status?: AffiliationStatus | null; page: number; order?: ListOrder }) {
+const memberCheckedInSql = sql<Date | null>`(SELECT ci.checked_in_at FROM ${checkIn} ci WHERE ci.person_id = ${registration.memberPersonId} AND ci.cancelled_at IS NULL LIMIT 1)`;
+const guestPersonIdSql = sql<string | null>`(SELECT gl.guest_person_id FROM ${guestLink} gl WHERE gl.registration_id = ${registration.id} AND gl.status = 'ACTIVE' LIMIT 1)`;
+const guestCheckedInSql = sql<Date | null>`(SELECT ci.checked_in_at FROM ${guestLink} gl JOIN ${checkIn} ci ON ci.person_id = gl.guest_person_id AND ci.cancelled_at IS NULL
+  WHERE gl.registration_id = ${registration.id} AND gl.status = 'ACTIVE' LIMIT 1)`;
+
+/**
+ * Inscrições (grupos: quem se inscreveu e o convidado), com quem já entrou.
+ * `ausentes`: grupos esperados na festa em que alguém ainda não entrou.
+ */
+export async function listRegistrations(options: {
+  q?: string;
+  status?: AffiliationStatus | null;
+  absent?: boolean;
+  page: number;
+  order?: ListOrder;
+}) {
   const conditions: SQL[] = [];
-  const search = options.q ? personSearchCondition(options.q, { allowPartialCpf: true }) : null;
+  const search = groupSearchCondition(options.q);
   if (search) conditions.push(search);
   if (options.status) conditions.push(eq(registration.status, options.status));
+  if (options.absent) {
+    conditions.push(inArray(registration.status, ["PENDING", "AWAITING_SIGNATURE", "CONFIRMED", "JOINED_AT_EVENT"]));
+    conditions.push(sql`(${memberCheckedInSql} IS NULL OR (${guestPersonIdSql} IS NOT NULL AND ${guestCheckedInSql} IS NULL))`);
+  }
   const where = conditions.length ? and(...conditions) : undefined;
   const [rows, [totalRow]] = await Promise.all([
     db
@@ -184,9 +223,12 @@ export async function listRegistrations(options: { q?: string; status?: Affiliat
         isTeacher: registration.isTeacher,
         origin: registration.origin,
         createdAt: registration.createdAt,
+        whatsapp: person.whatsapp,
         guestName: guestNameSql,
+        guestPersonId: guestPersonIdSql,
         kitsDelivered: sql<number>`(SELECT count(*)::int FROM ${kitDelivery} kd WHERE kd.registration_id = ${registration.id} AND kd.cancelled_at IS NULL)`,
-        checkedIn: sql<boolean>`EXISTS (SELECT 1 FROM ${checkIn} ci WHERE ci.person_id = ${person.id} AND ci.cancelled_at IS NULL)`,
+        checkedInAt: memberCheckedInSql,
+        guestCheckedInAt: guestCheckedInSql,
       })
       .from(registration)
       .innerJoin(person, eq(person.id, registration.memberPersonId))

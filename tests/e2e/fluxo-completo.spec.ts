@@ -17,6 +17,8 @@ const ADMIN = { name: "Ana Administradora Lima", email: "admin@e2e.test", passwo
 const ATTENDANT = { name: "Paulo Atendente Rocha", email: "atendimento@e2e.test", password: "senha-atend-123" };
 const SECURITY = { name: "Sergio Seguranca Alves", email: "seguranca@e2e.test", password: "senha-segur-123" };
 const EXTRA_ADMIN = { name: "Rodrigo Carneiro Admin", email: "rodrigo@e2e.test", password: "senha-rodri-123" };
+/** Pessoa da equipe que só consulta: Portaria e Inscrições em "só ver". */
+const VIEWER = { name: "Vera Consulta Moura", email: "consulta@e2e.test", password: "senha-consu-123" };
 
 const MEMBER = {
   name: "Maria Aparecida Souza",
@@ -327,6 +329,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(page.getByTestId("chip-conferir")).toHaveAttribute("aria-current", "page");
       const item = page.getByTestId("queue-item").filter({ hasText: MEMBER.name });
       await expect(item).toContainText("529.982.247-25");
+      await expect(item.getByTestId("queue-whatsapp")).toHaveAttribute("href", /^https:\/\/wa\.me\/5586999998888\?text=Ol%C3%A1%2C%20Maria!/);
       await item.getByTestId("queue-confirm").click();
       await page.getByTestId("confirm-dialog-action").click();
       await expect(page.getByText(`Filiação de ${MEMBER.name} confirmada.`)).toBeVisible();
@@ -450,7 +453,12 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.getByTestId("stock-forecast-all")).toContainText("Previsão com os inscritos: 2 kits");
       // Vouchers do grupo (professora + convidada) numa folha só, para imprimir.
       await admin.goto("/painel/inscricoes");
-      await admin.getByTestId("registration-row").filter({ hasText: MEMBER.name }).first().click();
+      const memberRow = admin.getByTestId("registration-row").filter({ hasText: MEMBER.name });
+      // Presença de cada um na própria linha: a professora e a convidada já entraram.
+      await expect(memberRow.getByTestId("registration-guest")).toContainText(GUEST.name);
+      await memberRow.getByTestId("registration-open").click();
+      await expect(admin).toHaveURL(/\/painel\/participantes\/[0-9a-f-]{36}$/);
+      await expect(admin.getByTestId("person-header")).toContainText(MEMBER.name);
       await admin.getByTestId("print-group-vouchers").click();
       await expect(admin.getByTestId("registration-vouchers").getByTestId("voucher-card")).toHaveCount(2);
       await admin.goto("/painel/auditoria");
@@ -788,6 +796,10 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(nav).toContainText("Entradas");
       await expect(nav).not.toContainText("Administração");
       await expect(nav).not.toContainText("Colaboradores SINDSERM");
+      // Participantes virou parte de Inscrições: some do menu e o endereço antigo leva para lá.
+      await expect(nav).not.toContainText("Participantes");
+      await page.goto("/painel/participantes");
+      await expect(page).toHaveURL(/\/painel\/inscricoes\?filtro=todas$/);
       for (const path of ["/painel/usuarios", "/painel/configuracoes", "/painel/auditoria", "/painel/colaboradores"]) {
         await page.goto(path);
         await expect(page, `Atendimento não entra em ${path}`).toHaveURL(/\/painel$/);
@@ -866,7 +878,6 @@ test.describe.serial("festa das professoras e professores", () => {
         "Kits e estoque",
         "Inscrições",
         "Fichas de filiação",
-        "Participantes",
         "Colaboradores SINDSERM",
         "Acesso ao sistema",
         "Auditoria",
@@ -904,6 +915,60 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(nav).not.toContainText("Inscrições");
       await page.goto("/painel/inscricoes");
       await expect(page).toHaveURL(/\/painel$/);
+      await context.close();
+    });
+
+    await test.step("só ver (Portaria e Inscrições): busca, abre o cadastro e chama no WhatsApp, sem confirmar entrada nem cadastrar", async () => {
+      const adminContext = await browser.newContext();
+      const admin = await adminContext.newPage();
+      await login(admin, ADMIN);
+      await admin.goto("/painel/usuarios");
+      await admin.getByRole("button", { name: "Novo usuário" }).click();
+      const editor = admin.getByTestId("access-editor");
+      await editor.getByTestId("role-ATTENDANT").click();
+      for (const choice of ["placar-none", "entradas-none", "kits-none", "fichas-none", "portaria-view", "inscricoes-view"]) {
+        await editor.getByTestId(`access-${choice}`).click();
+      }
+      await expect(editor).toContainText("Personalizado");
+      await admin.fill("#user-name", VIEWER.name);
+      await admin.fill("#user-email", VIEWER.email);
+      await admin.fill("#user-password", VIEWER.password);
+      await admin.getByTestId("create-user-submit").click();
+      await expect(admin.getByTestId("user-row").filter({ hasText: VIEWER.email })).toContainText("Permissões ajustadas");
+      await adminContext.close();
+
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await login(page, VIEWER);
+      // Sem Placar: cai na primeira área que pode ver, a portaria.
+      await expect(page).toHaveURL(/\/portaria$/);
+      // Busca e vê a situação de quem ainda não entrou, mas não tem o botão de confirmar.
+      await openPersonAtGate(page, "Clara Juridico", "Clara Juridico Dias");
+      await expect(page.getByTestId("gate-status-title")).toHaveText("LIBERADO PARA ENTRADA");
+      await expect(page.getByTestId("confirm-entry")).toHaveCount(0);
+
+      // Inscrições: lista, WhatsApp e cadastro, sem "Cadastrar na hora" nem vouchers.
+      await page.goto("/painel/inscricoes?filtro=todas");
+      await expect(page.getByRole("link", { name: "Cadastrar na hora" })).toHaveCount(0);
+      const row = page.getByTestId("registration-row").filter({ hasText: MEMBER.name });
+      await expect(row.getByTestId("registration-whatsapp")).toHaveAttribute("href", /^https:\/\/wa\.me\/5586999998888\?text=Ol%C3%A1%2C%20Maria!/);
+      await row.getByTestId("registration-open").click();
+      await expect(page.getByTestId("person-header")).toContainText(MEMBER.name);
+      await expect(page.getByTestId("person-whatsapp")).toBeVisible();
+      await expect(page.getByTestId("print-group-vouchers")).toHaveCount(0);
+
+      // A busca rápida do painel abre o cadastro (e não uma tela bloqueada).
+      await page.getByRole("textbox", { name: "Busca rápida por nome, CPF ou matrícula" }).fill("Clara Juridico");
+      await page.getByRole("link", { name: /Clara Juridico Dias/ }).click();
+      await expect(page).toHaveURL(/\/painel\/participantes\/[0-9a-f-]{36}$/);
+      await expect(page.getByTestId("person-header")).toContainText("Clara Juridico Dias");
+      await expect(page.getByTestId("confirm-entry")).toHaveCount(0);
+
+      // O que ficou de fora do ajuste leva de volta à portaria.
+      for (const path of ["/painel", "/painel/kits", "/painel/entradas", "/painel/filiacoes", "/painel/inscricoes/nova"]) {
+        await page.goto(path);
+        await expect(page, `só ver não entra em ${path}`).toHaveURL(/\/portaria$/);
+      }
       await context.close();
     });
   });

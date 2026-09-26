@@ -15,6 +15,7 @@ import {
 } from "@/server/queries/panel";
 import type { StaffActor } from "@/server/services/actor";
 import { decideAffiliation } from "@/server/services/affiliation";
+import { registerCheckIn } from "@/server/services/checkin";
 import { cancelAffiliationForm, formalizeAffiliation, saveAffiliationForm } from "@/server/services/membership";
 import { getDashboardStats } from "@/server/services/stats";
 import {
@@ -92,5 +93,37 @@ describe("filas do Atendimento", () => {
     expect(listOrder("antigas")).toBe("antigas");
     expect(listOrder("qualquer coisa")).toBe("recentes");
     expect(await registrationStatusCounts()).toMatchObject({ total: 3, today: 3, byStatus: { PENDING: 2, CONFIRMED: 1 } });
+  });
+
+  it("lista unificada: acha o grupo pelo convidado, mostra quem já entrou e filtra quem ainda não entrou", async () => {
+    const group = await registerMember({ guest: true, memberName: "Maria Grupo Souza", guestName: "Luiza Convidada Lima" });
+    const solo = await registerMember({ memberName: "Joana Sozinha Reis" });
+    const rejected = await registerMember({ memberName: "Rita Recusada Alves" });
+    await decideAffiliation(attendant, { registrationId: group.registrationId, decision: "CONFIRM" });
+    await decideAffiliation(attendant, { registrationId: solo.registrationId, decision: "CONFIRM" });
+    await decideAffiliation(attendant, { registrationId: rejected.registrationId, decision: "REJECT" });
+
+    // Buscar pelo convidado encontra a linha do grupo (com o WhatsApp de quem se inscreveu).
+    const byGuest = await listRegistrations({ page: 1, q: "luiza" });
+    expect(byGuest.rows).toHaveLength(1);
+    expect(byGuest.rows[0]).toMatchObject({ fullName: "Maria Grupo Souza", guestName: "Luiza Convidada Lima", guestPersonId: group.state.guest!.personId });
+    expect(byGuest.rows[0]!.whatsapp).toBeTruthy();
+
+    // "Ainda não entraram": só inscrições válidas (a recusada fica de fora).
+    const absent = async () => (await listRegistrations({ page: 1, absent: true })).rows.map((row) => row.fullName).sort();
+    expect(await absent()).toEqual(["Joana Sozinha Reis", "Maria Grupo Souza"]);
+
+    // O convidado entrou antes: o grupo continua na lista, porque falta a professora.
+    await registerCheckIn(attendant, { personId: group.state.guest!.personId, method: "SEARCH" });
+    await registerCheckIn(attendant, { personId: solo.state.member.id, method: "QR" });
+    expect(await absent()).toEqual(["Maria Grupo Souza"]);
+    const row = (await listRegistrations({ page: 1, q: "maria grupo" })).rows[0]!;
+    expect(row.checkedInAt).toBeNull();
+    expect(row.guestCheckedInAt).toBeTruthy();
+
+    // Os dois dentro: sai da lista.
+    await registerCheckIn(attendant, { personId: group.state.member.id, method: "QR" });
+    expect(await absent()).toEqual([]);
+    expect((await listRegistrations({ page: 1, q: "maria grupo" })).rows[0]!.checkedInAt).toBeTruthy();
   });
 });

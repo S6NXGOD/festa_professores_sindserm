@@ -16,8 +16,8 @@ export const ACCESS_MODULES = [
   "kits",
   "inscricoes",
   "fichas",
-  "participantes",
   "colaboradores",
+  "correcoes",
   "usuarios",
   "auditoria",
   "configuracoes",
@@ -32,8 +32,8 @@ export interface AccessMap {
 
 export const ACCESS_GROUPS = [
   { title: "Na festa", modules: ["placar", "portaria", "entradas", "kits"] },
-  { title: "Pessoas", modules: ["inscricoes", "fichas", "participantes", "colaboradores"] },
-  { title: "Administração", modules: ["usuarios", "auditoria", "configuracoes"] },
+  { title: "Pessoas", modules: ["inscricoes", "fichas", "colaboradores"] },
+  { title: "Administração", modules: ["correcoes", "usuarios", "auditoria", "configuracoes"] },
 ] as const satisfies readonly { title: string; modules: readonly AccessModule[] }[];
 
 /** O que cada nível libera em cada área (e quais níveis existem ali). */
@@ -54,7 +54,7 @@ export const MODULE_INFO: Record<AccessModule, { label: string; levels: readonly
   inscricoes: {
     label: "Inscrições",
     levels: ["none", "view", "edit"],
-    view: "Ver as inscrições",
+    view: "Ver as inscrições e o cadastro de cada pessoa",
     edit: "Conferir filiação, cadastrar na hora, convidados, corrigir dados e vouchers",
   },
   fichas: {
@@ -63,17 +63,16 @@ export const MODULE_INFO: Record<AccessModule, { label: string; levels: readonly
     view: "Ver fichas e documentos",
     edit: "Fazer fichas, anexar documentos e confirmar assinatura",
   },
-  participantes: {
-    label: "Participantes",
-    levels: ["none", "view", "edit"],
-    view: "Ver cada pessoa",
-    edit: "Correções de administrador: estornar entradas e entregas",
-  },
   colaboradores: {
     label: "Colaboradores SINDSERM",
     levels: ["none", "view", "edit"],
     view: "Ver a lista e os vouchers",
     edit: "Liberar, editar e tirar da lista",
+  },
+  correcoes: {
+    label: "Correções",
+    levels: ["none", "edit"],
+    edit: "Estornar entradas e entregas de kit, reabrir conferências e apagar documentos de fichas assinadas (tudo fica na auditoria)",
   },
   usuarios: { label: "Acesso ao sistema", levels: ["none", "edit"], edit: "Criar usuários, permissões e senhas" },
   auditoria: { label: "Auditoria", levels: ["none", "view"], view: "Histórico de tudo o que foi feito" },
@@ -108,8 +107,8 @@ export const ROLE_PRESETS: Record<StaffRole, AccessMap> = {
       kits: "edit",
       inscricoes: "edit",
       fichas: "edit",
-      participantes: "view",
       colaboradores: "none",
+      correcoes: "none",
       usuarios: "none",
       auditoria: "none",
       configuracoes: "none",
@@ -136,7 +135,7 @@ export const PERMISSION_RULES = {
   viewEntries: (a: AccessMap) => atLeast(a.modules.entradas, "view"),
   checkIn: (a: AccessMap) => atLeast(a.modules.portaria, "edit"),
   search: (a: AccessMap) =>
-    atLeast(a.modules.portaria, "view") || atLeast(a.modules.inscricoes, "view") || atLeast(a.modules.participantes, "view"),
+    atLeast(a.modules.portaria, "view") || atLeast(a.modules.inscricoes, "view"),
   // Painel
   viewPanel: (a: AccessMap) => PANEL_MODULES.some((module) => atLeast(a.modules[module], "view")),
   viewDashboard: (a: AccessMap) => atLeast(a.modules.placar, "view"),
@@ -153,8 +152,10 @@ export const PERMISSION_RULES = {
   viewForms: (a: AccessMap) => atLeast(a.modules.fichas, "view"),
   newAffiliation: (a: AccessMap) => atLeast(a.modules.fichas, "edit"),
   // Participantes
-  viewParticipants: (a: AccessMap) => atLeast(a.modules.participantes, "view"),
-  adminCorrections: (a: AccessMap) => atLeast(a.modules.participantes, "edit"),
+  // Cadastro de cada pessoa (dados, grupo, vouchers e histórico): faz parte de Inscrições.
+  viewPeople: (a: AccessMap) => atLeast(a.modules.inscricoes, "view"),
+  // Correções de administrador (estornos e reaberturas)
+  adminCorrections: (a: AccessMap) => atLeast(a.modules.correcoes, "edit"),
   // Colaboradores do SINDSERM
   viewEmployees: (a: AccessMap) => atLeast(a.modules.colaboradores, "view"),
   manageEmployees: (a: AccessMap) => atLeast(a.modules.colaboradores, "edit"),
@@ -202,8 +203,15 @@ export function resolveAccess(role: StaffRole, stored: string | null | undefined
   if (stored) {
     try {
       const parsed = JSON.parse(stored) as { modules?: Record<string, unknown>; fullCpf?: unknown };
+      const saved = parsed.modules ?? {};
       // Área criada depois do ajuste (ex.: Entradas): vale o padrão do perfil até alguém mexer nela.
-      return sanitizeAccess({ ...parsed, modules: { ...ROLE_PRESETS[role].modules, ...(parsed.modules ?? {}) } });
+      const modules: Record<string, unknown> = { ...ROLE_PRESETS[role].modules, ...saved };
+      // "Participantes" deixou de ser área própria: o "ver" foi para Inscrições e o "editar" (estornos) para Correções.
+      if (saved.participantes === "view" || saved.participantes === "edit") {
+        if (!atLeast(modules.inscricoes as AccessLevel, "view")) modules.inscricoes = "view";
+        if (saved.participantes === "edit" && !("correcoes" in saved)) modules.correcoes = "edit";
+      }
+      return sanitizeAccess({ ...parsed, modules });
     } catch {
       // JSON corrompido: cai no perfil (nunca em acesso total).
     }
@@ -231,7 +239,6 @@ export function homePathFor(access: AccessMap): string {
     ["entradas", "/painel/entradas"],
     ["inscricoes", "/painel/inscricoes"],
     ["fichas", "/painel/filiacoes"],
-    ["participantes", "/painel/participantes"],
     ["kits", "/painel/kits"],
     ["colaboradores", "/painel/colaboradores"],
     ["usuarios", "/painel/usuarios"],

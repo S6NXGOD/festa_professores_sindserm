@@ -19,6 +19,7 @@ export const metadata: Metadata = { title: "Kits e estoque" };
 
 export default async function KitsPage({ searchParams }: PageProps<"/painel/kits">) {
   const actor = await requirePageActor("viewKits");
+  const canPeople = can(actor.access, "viewPeople");
   const query = await searchParams;
   const page = pageNumber(query.page);
   const [stats, deliveries, event] = await Promise.all([getDashboardStats(db), listDeliveries({ page }), getEventInfo()]);
@@ -94,17 +95,25 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
                   </p>
                   <p className="text-xs text-fg-muted">
                     Para{" "}
-                    <Link href={`/painel/participantes/${row.beneficiaryPersonId}`} className="font-semibold text-fg hover:text-red">
-                      {row.beneficiaryName}
-                    </Link>
+                    {canPeople ? (
+                      <Link href={`/painel/participantes/${row.beneficiaryPersonId}`} className="font-semibold text-fg hover:text-red">
+                        {row.beneficiaryName}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold text-fg">{row.beneficiaryName}</span>
+                    )}
                     {row.kitType === "EMPLOYEE" ? " · colaborador(a) do SINDSERM" : null}
                     {row.kitType === "GUEST" ? (
                       <>
                         {" "}
                         · convidado(a) de{" "}
-                        <Link href={`/painel/participantes/${row.memberPersonId}`} className="font-semibold text-fg hover:text-red">
-                          {row.memberName}
-                        </Link>
+                        {canPeople ? (
+                          <Link href={`/painel/participantes/${row.memberPersonId}`} className="font-semibold text-fg hover:text-red">
+                            {row.memberName}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold text-fg">{row.memberName}</span>
+                        )}
                         {row.employeeGroup ? " (colaborador(a), estoque dos colaboradores)" : null}
                       </>
                     ) : null}

@@ -1,12 +1,14 @@
 import { eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Cancel } from "@/components/icons/pixel";
 import { EmptyState } from "@/components/staff/panel-ui";
 import { Button } from "@/components/ui/button";
 import { SendGroupVouchersButton, VoucherActions } from "@/components/voucher/voucher-actions";
 import { VoucherCard, voucherEventFrom } from "@/components/voucher/voucher-card";
+import { homePathFor } from "@/domain/access";
+import { can } from "@/domain/rules";
 import { db } from "@/server/db";
 import { person } from "@/server/db/schema";
 import { getEventInfo } from "@/server/queries/config";
@@ -18,7 +20,7 @@ export const metadata: Metadata = { title: "Voucher", referrer: "no-referrer" };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function StaffVoucherPage({ params }: PageProps<"/painel/participantes/[id]/voucher">) {
-  await requirePageActor("reissueVoucher");
+  const actor = await requirePageActor();
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const [card, event, contact, employeeGroup] = await Promise.all([
@@ -27,6 +29,8 @@ export default async function StaffVoucherPage({ params }: PageProps<"/painel/pa
     db.select({ whatsapp: person.whatsapp }).from(person).where(eq(person.id, id)).limit(1),
     loadEmployeeGroupVouchers(id),
   ]);
+  // Vouchers: quem cuida das inscrições; os dos colaboradores, também quem vê a lista de colaboradores.
+  if (!can(actor.access, "reissueVoucher") && !(employeeGroup && can(actor.access, "viewEmployees"))) redirect(homePathFor(actor.access));
   const phone = contact[0]?.whatsapp ?? null;
   // Funcionário(a) com convidado: os dois vouchers na mesma tela, para mandar numa mensagem só.
   const guestCard = employeeGroup?.guest ?? null;

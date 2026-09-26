@@ -13,6 +13,7 @@ import { todayInZone } from "@/lib/datetime";
 import { maskPhoneInput } from "@/lib/phone";
 import { db } from "@/server/db";
 import { loadPersonState } from "@/server/services/state";
+import { can } from "@/domain/rules";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Nova ficha de filiação" };
@@ -20,7 +21,7 @@ export const metadata: Metadata = { title: "Nova ficha de filiação" };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function NewAffiliationPage({ searchParams }: PageProps<"/painel/filiacoes/nova">) {
-  await requirePageActor("newAffiliation");
+  const actor = await requirePageActor("newAffiliation");
   const query = await searchParams;
   const personId = typeof query.pessoa === "string" && UUID.test(query.pessoa) ? query.pessoa : null;
   const state = personId ? await loadPersonState(db, personId) : null;
@@ -55,7 +56,7 @@ export default async function NewAffiliationPage({ searchParams }: PageProps<"/p
   return (
     <div className="mx-auto max-w-3xl">
       <Button asChild variant="ghost" className="-ml-2 mb-2">
-        <Link href={state ? `/painel/participantes/${state.person.id}` : "/painel/filiacoes"}>
+        <Link href={state && can(actor.access, "viewPeople") ? `/painel/participantes/${state.person.id}` : "/painel/filiacoes"}>
           <ArrowLeft /> Voltar
         </Link>
       </Button>

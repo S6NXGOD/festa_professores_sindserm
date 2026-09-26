@@ -22,9 +22,14 @@ export type LookupResult =
   | { kind: "NOT_FOUND" }
   | { kind: "INVALID" };
 
-async function gateActor(): Promise<StaffActor> {
+/**
+ * Quem usa a portaria. Ler o QR, digitar o código e ver a situação pedem
+ * "Portaria: ver"; buscar pessoas vale também para quem vê Inscrições. Registrar
+ * a entrada ("Portaria: editar") é conferido no próprio registro.
+ */
+async function gateActor(permission: "viewGate" | "search" = "viewGate"): Promise<StaffActor> {
   const actor = await requireActionActor();
-  assertPermission(actor, "checkIn");
+  assertPermission(actor, permission);
   await enforceRateLimit(RATE_LIMITS.gateLookup, actor.userId);
   return actor;
 }
@@ -60,7 +65,7 @@ export async function searchPeopleAction(
   mode: "auto" | "name" | "cpf" = "auto",
 ): Promise<ActionResult<PersonSearchResult[]>> {
   return runAction(async () => {
-    const actor = await gateActor();
+    const actor = await gateActor("search");
     return searchPeople(db, String(query ?? ""), { mode, fullCpf: can(actor.access, "viewFullCpf"), limit: 20 });
   });
 }

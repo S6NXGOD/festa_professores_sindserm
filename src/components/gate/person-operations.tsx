@@ -935,7 +935,7 @@ function AdminSection({ view, onChanged }: { view: GateView; onChanged?: () => v
   if (view.entry.kind !== "ALREADY_IN" && delivered.length === 0 && !canReopen) return null;
 
   return (
-    <Panel title="Correções do administrador" icon={Undo}>
+    <Panel title="Correções" icon={Undo}>
       <p className="mb-3 text-sm text-fg-muted">Use só para corrigir registros feitos por engano. Tudo fica na auditoria.</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {view.entry.kind === "ALREADY_IN" ? (

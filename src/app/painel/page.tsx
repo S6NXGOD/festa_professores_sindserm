@@ -42,6 +42,12 @@ export const metadata: Metadata = { title: "Placar" };
 export default async function DashboardPage() {
   const actor = await requirePageActor("viewDashboard");
   const isAdmin = can(actor.access, "manageEmployees");
+  // Atalhos só para o que a pessoa pode abrir (sem cair numa tela bloqueada).
+  const canRegistrations = can(actor.access, "viewRegistrations");
+  const canPeople = can(actor.access, "viewPeople");
+  const canForms = can(actor.access, "viewForms");
+  const canKits = can(actor.access, "viewKits");
+  const canEmployees = can(actor.access, "viewEmployees");
   const [config, event, window, stats, pending, drafts, checkIns, timeline] = await Promise.all([
     getConfig(),
     getEventInfo(),
@@ -71,7 +77,7 @@ export default async function DashboardPage() {
   const queue = [
     ...drafts.rows.map((row) => ({
       key: `ficha-${row.id}`,
-      href: `/painel/filiacoes/${row.id}`,
+      href: canForms ? `/painel/filiacoes/${row.id}` : null,
       queueHref: "/painel/filiacoes?filtro=assinar",
       fullName: row.fullName,
       isTeacher: row.isTeacher,
@@ -81,7 +87,7 @@ export default async function DashboardPage() {
     })),
     ...pending.rows.map((row) => ({
       key: `inscricao-${row.registrationId}`,
-      href: `/painel/participantes/${row.personId}`,
+      href: canPeople ? `/painel/participantes/${row.personId}` : null,
       queueHref: "/painel/inscricoes?filtro=conferir",
       fullName: row.fullName,
       isTeacher: row.isTeacher,
@@ -189,9 +195,11 @@ export default async function DashboardPage() {
                 <>
                   {plural(notReady, "pessoa ainda não pode entrar", "pessoas ainda não podem entrar")}
                   {toResolve.length ? `: ${toResolve.join(" e ")} (com os convidados). ` : ". "}
-                  <Link href={resolveHref} className="font-semibold text-red hover:underline">
-                    Resolver antes da festa
-                  </Link>
+                  {canRegistrations || canForms ? (
+                    <Link href={resolveHref} className="font-semibold text-red hover:underline">
+                      Resolver antes da festa
+                    </Link>
+                  ) : null}
                 </>
               ) : stats.expected > 0 ? (
                 "Todo mundo já está liberado: agora é só a pista abrir."
@@ -218,9 +226,11 @@ export default async function DashboardPage() {
             <SegmentMeter className="relative mt-4" value={stats.present} max={stats.expected} segments={24} label={`${stats.present} de ${stats.expected} presentes`} />
             <p className="relative mt-3 text-xs text-fg-muted">
               {stats.absent === 1 ? "1 esperado ainda não entrou" : `${plural(stats.absent, "esperado", "esperados")} ainda não entraram`} ·{" "}
-              <Link href="/painel/participantes?filtro=absent" className="font-semibold text-red hover:underline">
-                ver quem falta
-              </Link>
+              {canRegistrations ? (
+                <Link href="/painel/inscricoes?filtro=ausentes" className="font-semibold text-red hover:underline">
+                  ver quem falta
+                </Link>
+              ) : null}
             </p>
           </div>
         )}
@@ -231,7 +241,7 @@ export default async function DashboardPage() {
             value={stock?.totalAvailable ?? 0}
             icon={Gift}
             tone={stock?.anyLow ? "danger" : "brand"}
-            href="/painel/kits"
+            href={canKits ? "/painel/kits" : undefined}
             hint={employeePool ? `${(stock?.totalAvailable ?? 0) - employeePool.available} gerais · ${employeePool.available} colaboradores` : undefined}
             testId="stat-kits-available"
           />
@@ -280,8 +290,8 @@ export default async function DashboardPage() {
       </section>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatTile label="Inscrições" value={stats.registrations} icon={List} href="/painel/inscricoes" testId="stat-registrations" />
-        <StatTile label="Professoras e professores" value={stats.teachers} icon={Teach} href="/painel/participantes?filtro=teachers" testId="stat-teachers" hint={stats.otherMembers ? `+ ${plural(stats.otherMembers, "filiado", "filiados")} sem kit` : undefined} />
+        <StatTile label="Inscrições" value={stats.registrations} icon={List} href={canRegistrations ? "/painel/inscricoes?filtro=todas" : undefined} testId="stat-registrations" />
+        <StatTile label="Professoras e professores" value={stats.teachers} icon={Teach} href={canRegistrations ? "/painel/inscricoes?filtro=todas" : undefined} testId="stat-teachers" hint={stats.otherMembers ? `+ ${plural(stats.otherMembers, "filiado", "filiados")} sem kit` : undefined} />
         <StatTile
           label="Convidados"
           value={stats.guests + stats.employeeGuests}
@@ -290,9 +300,9 @@ export default async function DashboardPage() {
           testId="stat-guests"
         />
         <StatTile label="Filiados confirmados" value={stats.confirmed} icon={Check} tone="success" testId="stat-confirmed" />
-        <StatTile label="Aguardando conferência" value={stats.pending} icon={Clock} tone="warning" href="/painel/inscricoes?filtro=conferir" testId="stat-pending" />
-        <StatTile label="Fichas para assinar" value={stats.draftForms} icon={ClipboardNote} tone="warning" href="/painel/filiacoes?filtro=assinar" testId="stat-signature" />
-        <StatTile label="Filiaram-se na festa" value={stats.joinedAtEvent} icon={Sparkles} href="/painel/filiacoes" testId="stat-joined" />
+        <StatTile label="Aguardando conferência" value={stats.pending} icon={Clock} tone="warning" href={canRegistrations ? "/painel/inscricoes?filtro=conferir" : undefined} testId="stat-pending" />
+        <StatTile label="Fichas para assinar" value={stats.draftForms} icon={ClipboardNote} tone="warning" href={canForms ? "/painel/filiacoes?filtro=assinar" : undefined} testId="stat-signature" />
+        <StatTile label="Filiaram-se na festa" value={stats.joinedAtEvent} icon={Sparkles} href={canForms ? "/painel/filiacoes?filtro=FORMALIZED" : undefined} testId="stat-joined" />
         <StatTile
           label="Kits a entregar"
           value={stats.kitsOwedMember + stats.kitsOwedGuest + stats.kitsOwedEmployee}
@@ -307,7 +317,7 @@ export default async function DashboardPage() {
             value={stats.employeesPresent}
             icon={Building}
             tone="warning"
-            href={isAdmin ? "/painel/colaboradores" : undefined}
+            href={canEmployees ? "/painel/colaboradores" : undefined}
             hint={stats.employees ? `de ${plural(stats.employees, "liberado", "liberados")} já entraram` : "Libere os colaboradores do SINDSERM"}
             testId="stat-employees-present"
           />
@@ -322,9 +332,11 @@ export default async function DashboardPage() {
           title="Estoque de kits"
           icon={Gift}
           action={
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/painel/kits">Detalhes</Link>
-            </Button>
+            canKits ? (
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/painel/kits">Detalhes</Link>
+              </Button>
+            ) : null
           }
         >
           {stock ? <StockCard stock={stock} demand={stats.kitDemand} /> : null}
@@ -337,12 +349,12 @@ export default async function DashboardPage() {
           icon={Check}
           action={
             <div className="flex gap-1">
-              {stats.pending > 0 ? (
+              {stats.pending > 0 && canRegistrations ? (
                 <Button asChild variant="ghost" size="sm">
                   <Link href="/painel/inscricoes?filtro=conferir">Conferir</Link>
                 </Button>
               ) : null}
-              {stats.draftForms > 0 ? (
+              {stats.draftForms > 0 && canForms ? (
                 <Button asChild variant="ghost" size="sm">
                   <Link href="/painel/filiacoes?filtro=assinar">Assinar</Link>
                 </Button>
@@ -359,17 +371,23 @@ export default async function DashboardPage() {
               {queue.map((row) => (
                 <li key={row.key} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
-                    <Link href={row.href} className="block truncate font-semibold text-fg hover:text-red">
-                      {row.fullName}
-                    </Link>
+                    {row.href ? (
+                      <Link href={row.href} className="block truncate font-semibold text-fg hover:text-red">
+                        {row.fullName}
+                      </Link>
+                    ) : (
+                      <p className="truncate font-semibold text-fg">{row.fullName}</p>
+                    )}
                     <p className="truncate text-xs text-fg-muted">
                       {row.isTeacher ? "Professor(a)" : "Não professor(a)"} · Matrícula {row.registrationNumber || "—"} ·{" "}
                       {formatShortDateTime(row.createdAt)}
                     </p>
                   </div>
-                  <Link href={row.queueHref} className="shrink-0">
-                    {row.kind === "SIGNATURE" ? <PixelTag tone="warning">Assinar</PixelTag> : <PixelTag tone="neutral">Conferir</PixelTag>}
-                  </Link>
+                  {(row.kind === "SIGNATURE" ? canForms : canRegistrations) ? (
+                    <Link href={row.queueHref} className="shrink-0">
+                      {row.kind === "SIGNATURE" ? <PixelTag tone="warning">Assinar</PixelTag> : <PixelTag tone="neutral">Conferir</PixelTag>}
+                    </Link>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -401,9 +419,13 @@ export default async function DashboardPage() {
                   className="flex items-center gap-3 rounded-md px-2 py-1.5 text-sm odd:bg-white/[0.03]"
                 >
                   <span className="pixel w-6 text-[0.55rem] text-red tabular">{String(index + 1).padStart(2, "0")}</span>
-                  <Link href={`/painel/participantes/${entry.personId}`} className="min-w-0 flex-1 truncate font-semibold text-fg hover:text-red">
-                    {entry.fullName}
-                  </Link>
+                  {canPeople ? (
+                    <Link href={`/painel/participantes/${entry.personId}`} className="min-w-0 flex-1 truncate font-semibold text-fg hover:text-red">
+                      {entry.fullName}
+                    </Link>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate font-semibold text-fg">{entry.fullName}</span>
+                  )}
                   <span className="shrink-0 text-xs text-fg-muted tabular">
                     {entry.role === "EMPLOYEE" ? "Func. · " : entry.role === "GUEST" ? "P2 · " : "P1 · "}
                     {formatTime(entry.checkedInAt)}

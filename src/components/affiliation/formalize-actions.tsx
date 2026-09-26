@@ -29,18 +29,25 @@ export function FormalizeController({
   name,
   status,
   missingDocuments = [],
+  canOpenPerson = true,
+  canCheckIn = true,
 }: {
   formId: string;
   name: string;
   status: "DRAFT" | "FORMALIZED" | "CANCELLED";
   /** A assinatura só é confirmada com RG e contracheque anexados. */
   missingDocuments?: DocumentKind[];
+  /** Pode abrir o cadastro da pessoa (Inscrições: ver). */
+  canOpenPerson?: boolean;
+  /** Pode registrar a entrada na portaria. */
+  canCheckIn?: boolean;
 }) {
   const router = useRouter();
   const [done, setDone] = useState<FormalizeResult | null>(null);
 
   function goToPerson() {
-    if (done) router.push(`/painel/participantes/${done.personId}`);
+    if (done && canOpenPerson) router.push(`/painel/participantes/${done.personId}`);
+    else router.refresh();
     setDone(null);
   }
 
@@ -113,11 +120,13 @@ export function FormalizeController({
           {done?.accessToken ? <CopyLinkBox path={`/vouchers/${done.accessToken}`} label="Link dos vouchers do(a) novo(a) filiado(a)" /> : null}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={goToPerson} data-testid="go-to-new-member">
-              Ir para o cadastro
+              {canOpenPerson ? "Ir para o cadastro" : "Fechar"}
             </Button>
-            <Button variant="success" onClick={goToEntry} autoFocus data-testid="go-to-entry">
-              <Login /> Registrar a entrada agora
-            </Button>
+            {canCheckIn ? (
+              <Button variant="success" onClick={goToEntry} autoFocus data-testid="go-to-entry">
+                <Login /> Registrar a entrada agora
+              </Button>
+            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>

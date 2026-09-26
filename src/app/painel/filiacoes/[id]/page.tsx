@@ -81,7 +81,14 @@ export default async function AffiliationFormPage({ params }: PageProps<"/painel
       />
 
       {/* Mesma posição em todos os status: preserva o diálogo de resultado após a assinatura. */}
-      <FormalizeController formId={form.id} name={form.fullName} status={form.status} missingDocuments={missing} />
+      <FormalizeController
+        formId={form.id}
+        name={form.fullName}
+        status={form.status}
+        missingDocuments={missing}
+        canOpenPerson={can(actor.access, "viewPeople")}
+        canCheckIn={can(actor.access, "checkIn")}
+      />
 
       {form.status === "DRAFT" ? (
         <div className="space-y-5">
@@ -131,7 +138,7 @@ export default async function AffiliationFormPage({ params }: PageProps<"/painel
               </span>
             }
             action={
-              form.status === "FORMALIZED" ? (
+              form.status === "FORMALIZED" && can(actor.access, "viewPeople") ? (
                 <Button asChild variant="secondary" size="sm">
                   <Link href={`/painel/participantes/${form.personId}`}>
                     <User /> Cadastro

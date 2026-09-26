@@ -22,7 +22,11 @@ export default async function PanelLayout({ children }: LayoutProps<"/painel">) 
         <header className="no-print sticky top-0 z-30 border-b border-line bg-ink/88 backdrop-blur">
           <div className="flex h-16 items-center gap-2 px-3 sm:px-6">
             <PanelMobileNav access={actor.access} badges={badges} eventName={eventName} />
-            {can(actor.access, "search") ? <QuickSearch /> : <div className="flex-1" />}
+            {can(actor.access, "search") ? (
+              <QuickSearch personPath={can(actor.access, "viewPeople") ? "/painel/participantes" : "/portaria/pessoa"} />
+            ) : (
+              <div className="flex-1" />
+            )}
             <div className="ml-auto">
               <UserMenu name={actor.name} role={actor.role} showGate={can(actor.access, "viewGate")} />
             </div>

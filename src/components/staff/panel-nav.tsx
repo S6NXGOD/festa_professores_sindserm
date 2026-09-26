@@ -17,11 +17,11 @@ import {
   type PixelIcon,
   QrCode,
   Settings,
-  Users,
 } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { type AccessMap, type AccessModule, atLeast } from "@/domain/access";
+import { type AccessMap, can } from "@/domain/access";
+import { PANEL_NAV } from "@/domain/nav";
 import { cn } from "@/lib/utils";
 
 /** Tamanho das filas de trabalho, mostrado no item do menu onde o trabalho é feito. */
@@ -30,53 +30,31 @@ export interface NavBadges {
   signature: number;
 }
 
-interface NavItem {
-  href: string;
-  label: string;
-  icon: PixelIcon;
-  exact?: boolean;
-  /** Área do sistema: o item só aparece para quem pode ver essa área. */
-  module: AccessModule;
-  badge?: keyof NavBadges;
-}
+/** Ícone de cada item do menu (a lista e as permissões ficam em domain/nav). */
+const ICON: Record<string, PixelIcon> = {
+  "/painel": Chart,
+  "/portaria": QrCode,
+  "/painel/entradas": Login,
+  "/painel/kits": Gift,
+  "/painel/inscricoes": List,
+  "/painel/filiacoes": ClipboardNote,
+  "/painel/colaboradores": Building,
+  "/painel/usuarios": Key,
+  "/painel/auditoria": Database,
+  "/painel/configuracoes": Settings,
+};
 
-/** Menu em blocos: o que se usa durante a festa, as pessoas e a administração. */
-const GROUPS: { title: string; items: NavItem[] }[] = [
-  {
-    title: "Na festa",
-    items: [
-      { href: "/painel", label: "Placar", icon: Chart, exact: true, module: "placar" },
-      { href: "/portaria", label: "Portaria", icon: QrCode, module: "portaria" },
-      { href: "/painel/entradas", label: "Entradas", icon: Login, module: "entradas" },
-      { href: "/painel/kits", label: "Kits e estoque", icon: Gift, module: "kits" },
-    ],
-  },
-  {
-    title: "Pessoas",
-    // As filas de trabalho moram nas próprias listas: conferir em Inscrições, assinar em Fichas.
-    items: [
-      { href: "/painel/inscricoes", label: "Inscrições", icon: List, badge: "pending", module: "inscricoes" },
-      { href: "/painel/filiacoes", label: "Fichas de filiação", icon: ClipboardNote, badge: "signature", module: "fichas" },
-      { href: "/painel/participantes", label: "Participantes", icon: Users, module: "participantes" },
-      { href: "/painel/colaboradores", label: "Colaboradores SINDSERM", icon: Building, module: "colaboradores" },
-    ],
-  },
-  {
-    title: "Administração",
-    items: [
-      { href: "/painel/usuarios", label: "Acesso ao sistema", icon: Key, module: "usuarios" },
-      { href: "/painel/auditoria", label: "Auditoria", icon: Database, module: "auditoria" },
-      { href: "/painel/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes" },
-    ],
-  },
-];
+function NavIcon({ href, className }: { href: string; className?: string }) {
+  const Icon = ICON[href] ?? List;
+  return <Icon className={className} />;
+}
 
 function NavLinks({ access, badges, onNavigate }: { access: AccessMap; badges: NavBadges; onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <nav className="grid gap-4" aria-label="Navegação do painel" data-testid="panel-nav">
-      {GROUPS.map((group) => {
-        const items = group.items.filter((item) => atLeast(access.modules[item.module], "view"));
+      {PANEL_NAV.map((group) => {
+        const items = group.items.filter((item) => can(access, item.permission));
         if (items.length === 0) return null;
         return (
           <div key={group.title} className="grid gap-1">
@@ -87,7 +65,7 @@ function NavLinks({ access, badges, onNavigate }: { access: AccessMap; badges: N
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={badge > 0 && item.queueHref ? item.queueHref : item.href}
                   onClick={onNavigate}
                   className={cn(
                     "group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-bold transition-colors",
@@ -102,7 +80,7 @@ function NavLinks({ access, badges, onNavigate }: { access: AccessMap; badges: N
                     )}
                     aria-hidden
                   />
-                  <item.icon className={cn("size-5", active ? "text-red" : "text-fg-dim group-hover:text-fg-muted")} />
+                  <NavIcon href={item.href} className={cn("size-5", active ? "text-red" : "text-fg-dim group-hover:text-fg-muted")} />
                   <span className="flex-1">{item.label}</span>
                   {badge > 0 ? (
                     <span

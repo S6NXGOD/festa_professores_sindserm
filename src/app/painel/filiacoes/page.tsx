@@ -9,7 +9,9 @@ import { SignatureCard } from "@/components/staff/queue-cards";
 import { TeacherBadge, ToneBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatShortDateTime } from "@/lib/datetime";
+import { APP_NAME, getConfig } from "@/server/queries/config";
 import { listAffiliationForms, listOrder, pageNumber, queueCounts } from "@/server/queries/panel";
+import { can } from "@/domain/rules";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Fichas de filiação" };
@@ -21,7 +23,7 @@ const STATUS = {
 } as const;
 
 export default async function AffiliationFormsPage({ searchParams }: PageProps<"/painel/filiacoes">) {
-  await requirePageActor("viewForms");
+  const actor = await requirePageActor("viewForms");
   const query = await searchParams;
   const filtro = typeof query.filtro === "string" ? query.filtro : "";
   const q = typeof query.q === "string" ? query.q : undefined;
@@ -40,7 +42,8 @@ export default async function AffiliationFormsPage({ searchParams }: PageProps<"
   const inQueue = filtro === "assinar" || filtro === "DRAFT";
   const status = inQueue ? "DRAFT" : filtro === "FORMALIZED" || filtro === "CANCELLED" ? filtro : null;
   const current = inQueue ? "assinar" : (status ?? "todas");
-  const data = await listAffiliationForms({ status, q, page, order });
+  const [data, config] = await Promise.all([listAffiliationForms({ status, q, page, order }), getConfig()]);
+  const eventName = config?.name ?? APP_NAME;
 
   return (
     <div>
@@ -53,11 +56,14 @@ export default async function AffiliationFormsPage({ searchParams }: PageProps<"
             : "Fichas preenchidas no site (antes da festa) ou no Atendimento. Assinada = filiado(a) na festa."
         }
         actions={
-          <Button asChild>
-            <Link href="/painel/filiacoes/nova">
-              <Plus /> Nova ficha
-            </Link>
-          </Button>
+          // Só quem faz fichas vê o botão (quem só vê as fichas cairia numa tela bloqueada).
+          can(actor.access, "newAffiliation") ? (
+            <Button asChild>
+              <Link href="/painel/filiacoes/nova">
+                <Plus /> Nova ficha
+              </Link>
+            </Button>
+          ) : null
         }
       />
       <ChipFilters
@@ -92,7 +98,7 @@ export default async function AffiliationFormsPage({ searchParams }: PageProps<"
           ) : null}
         </EmptyState>
       ) : inQueue ? (
-        <AnimatedList items={data.rows.map((row) => ({ key: row.id, content: <SignatureCard row={row} /> }))} />
+        <AnimatedList items={data.rows.map((row) => ({ key: row.id, content: <SignatureCard row={row} eventName={eventName} /> }))} />
       ) : (
         <div className="overflow-hidden rounded-xl border border-line bg-surface">
           <ul className="divide-y divide-line">

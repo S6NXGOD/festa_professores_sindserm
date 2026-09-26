@@ -205,7 +205,8 @@ export async function missingDocuments(ex: Executor, formId: string): Promise<Do
  * auditoria; a miniatura da tela da ficha não.
  */
 export async function readDocument(actor: Actor, id: string, options: { thumbnail?: boolean } = {}) {
-  assertPermission(actor, "newAffiliation");
+  // "Fichas: só ver" inclui ver os documentos (cada abertura fica na auditoria).
+  assertPermission(actor, "viewForms");
   const [row] = await db
     .select({
       id: affiliationDocument.id,
