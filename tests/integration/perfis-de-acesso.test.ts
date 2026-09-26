@@ -117,6 +117,26 @@ describe("perfis-modelo = regras de antes", () => {
     expect(isCustomAccess("ADMIN", JSON.stringify(reduced))).toBe(false);
   });
 
+  it("Entradas (controle de entrada): Administrador e Atendimento veem, Segurança não; ajuste antigo recebe o padrão do perfil", () => {
+    expect(can(ROLE_PRESETS.ADMIN, "viewEntries")).toBe(true);
+    expect(can(ROLE_PRESETS.ATTENDANT, "viewEntries")).toBe(true);
+    expect(can(ROLE_PRESETS.SECURITY, "viewEntries")).toBe(false);
+    // Ajuste gravado antes de existir a área "Entradas": ela vem com o padrão do perfil.
+    const oldModules = Object.fromEntries(
+      Object.entries({ ...ROLE_PRESETS.ATTENDANT.modules, colaboradores: "view" }).filter(([module]) => module !== "entradas"),
+    );
+    expect(resolveAccess("ATTENDANT", JSON.stringify({ modules: oldModules, fullCpf: true })).modules).toMatchObject({
+      entradas: "view",
+      colaboradores: "view",
+    });
+    expect(resolveAccess("SECURITY", JSON.stringify({ modules: { portaria: "edit", placar: "view" }, fullCpf: false })).modules.entradas).toBe("none");
+    // Quem só tem Entradas cai direto nela.
+    const onlyEntries = sanitizeAccess({ modules: { entradas: "view" }, fullCpf: false });
+    expect(homePathFor(onlyEntries)).toBe("/painel/entradas");
+    expect(can(onlyEntries, "viewPanel")).toBe(true);
+    expect(can(onlyEntries, "viewDashboard")).toBe(false);
+  });
+
   it("Atendimento e Segurança: o modelo vem marcado e dá para ajustar (a mais ou a menos)", () => {
     for (const role of ["ATTENDANT", "SECURITY"] as const) {
       expect(isAccessFixed(role)).toBe(false);

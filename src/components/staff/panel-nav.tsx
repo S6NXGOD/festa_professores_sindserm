@@ -12,6 +12,7 @@ import {
   Gift,
   Key,
   List,
+  Login,
   Menu,
   type PixelIcon,
   QrCode,
@@ -46,6 +47,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/painel", label: "Placar", icon: Chart, exact: true, module: "placar" },
       { href: "/portaria", label: "Portaria", icon: QrCode, module: "portaria" },
+      { href: "/painel/entradas", label: "Entradas", icon: Login, module: "entradas" },
       { href: "/painel/kits", label: "Kits e estoque", icon: Gift, module: "kits" },
     ],
   },

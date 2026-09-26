@@ -463,6 +463,39 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(auditEntries("Entrada registrada").filter({ hasText: `Kit do convidado ${GUEST.name} entregue junto` })).toHaveCount(1);
     });
 
+    await test.step("controle de entrada: quem entrou, a que horas, quem registrou e como (e a planilha)", async () => {
+      await admin.goto("/painel");
+      await admin.getByTestId("dashboard-all-entries").click();
+      await expect(admin).toHaveURL(/\/painel\/entradas$/);
+      await expect(admin.getByTestId("entries-total")).toContainText("2");
+      // A professora entrou pelo QR com a Segurança e levou os 2 kits (o dela e o da convidada que já estava lá).
+      // Filtra pelo nome da pessoa (a linha da convidada também cita a professora: "convidado(a) de...").
+      const entryOf = (name: string) => admin.getByTestId("entry-row").filter({ has: admin.getByTestId("entry-name").filter({ hasText: name }) });
+      const member = entryOf(MEMBER.name);
+      await expect(member).toContainText(`registrada por ${SECURITY.name}`);
+      await expect(member).toContainText("QR Code");
+      await expect(member).toContainText("2 kits na entrada");
+      // A festa do teste é daqui a 20 dias: a entrada ficou marcada como antecipada.
+      await expect(member).toContainText("Antes do horário");
+      const guest = entryOf(GUEST.name);
+      await expect(guest).toContainText(`registrada por ${ATTENDANT.name}`);
+      await expect(guest).toContainText(`Convidado(a) de ${MEMBER.name}`);
+      await expect(admin.getByTestId("entries-operators")).toContainText(SECURITY.name);
+      await expect(admin.getByTestId("entries-operators")).toContainText(ATTENDANT.name);
+      // Filtro por quem registrou.
+      await admin.getByTestId("entries-operators").getByRole("link", { name: new RegExp(SECURITY.name) }).click();
+      await expect(admin.getByTestId("entries-operator-filter")).toContainText(SECURITY.name);
+      await expect(admin.getByTestId("entry-row")).toHaveCount(1);
+      // Planilha para o Excel.
+      const csv = await admin.request.get("/painel/entradas/planilha");
+      expect(csv.status()).toBe(200);
+      expect(csv.headers()["content-type"]).toContain("text/csv");
+      const body = await csv.text();
+      expect(body).toContain("Registrada por");
+      expect(body).toContain(MEMBER.name);
+      expect(body).toContain(SECURITY.name);
+    });
+
     await adminContext.close();
   });
 
@@ -736,7 +769,7 @@ test.describe.serial("festa das professoras e professores", () => {
       const page = await context.newPage();
       await login(page, SECURITY);
       await expect(page).toHaveURL(/\/portaria$/);
-      for (const path of ["/painel", "/painel/usuarios", "/painel/kits", "/painel/colaboradores", "/painel/funcionarios"]) {
+      for (const path of ["/painel", "/painel/usuarios", "/painel/kits", "/painel/colaboradores", "/painel/funcionarios", "/painel/entradas"]) {
         await page.goto(path);
         await expect(page, `Segurança não entra em ${path}`).toHaveURL(/\/portaria$/);
       }
@@ -751,6 +784,8 @@ test.describe.serial("festa das professoras e professores", () => {
       const nav = page.getByTestId("panel-nav").first();
       await expect(nav).toContainText("Na festa");
       await expect(nav).toContainText("Pessoas");
+      // O controle de entrada vem liberado para o Atendimento (só ver).
+      await expect(nav).toContainText("Entradas");
       await expect(nav).not.toContainText("Administração");
       await expect(nav).not.toContainText("Colaboradores SINDSERM");
       for (const path of ["/painel/usuarios", "/painel/configuracoes", "/painel/auditoria", "/painel/colaboradores"]) {
@@ -790,6 +825,7 @@ test.describe.serial("festa das professoras e professores", () => {
       // Atendimento: o modelo dele vem marcado; dá para ajustar e voltar ao perfil.
       await editor.getByTestId("role-ATTENDANT").click();
       await expect(editor.getByTestId("access-inscricoes-edit")).toHaveAttribute("aria-checked", "true");
+      await expect(editor.getByTestId("access-entradas-view")).toHaveAttribute("aria-checked", "true");
       await expect(editor.getByTestId("access-fichas-edit")).toHaveAttribute("aria-checked", "true");
       await expect(editor.getByTestId("access-colaboradores-none")).toHaveAttribute("aria-checked", "true");
       await expect(editor.getByTestId("access-usuarios-none")).toHaveAttribute("aria-checked", "true");
@@ -826,6 +862,7 @@ test.describe.serial("festa das professoras e professores", () => {
       for (const label of [
         "Placar",
         "Portaria",
+        "Entradas",
         "Kits e estoque",
         "Inscrições",
         "Fichas de filiação",
@@ -837,7 +874,7 @@ test.describe.serial("festa das professoras e professores", () => {
       ]) {
         await expect(nav, label).toContainText(label);
       }
-      for (const path of ["/painel/usuarios", "/painel/configuracoes", "/painel/auditoria", "/painel/colaboradores", "/painel/kits"]) {
+      for (const path of ["/painel/usuarios", "/painel/configuracoes", "/painel/auditoria", "/painel/colaboradores", "/painel/kits", "/painel/entradas"]) {
         await page.goto(path);
         await expect(page, `Administrador entra em ${path}`).toHaveURL(new RegExp(`${path}$`));
       }

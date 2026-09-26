@@ -5,7 +5,14 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
-import { listAffiliationForms, listVerificationQueue, queueCounts } from "@/server/queries/panel";
+import {
+  listAffiliationForms,
+  listOrder,
+  listRegistrations,
+  listVerificationQueue,
+  queueCounts,
+  registrationStatusCounts,
+} from "@/server/queries/panel";
 import type { StaffActor } from "@/server/services/actor";
 import { decideAffiliation } from "@/server/services/affiliation";
 import { cancelAffiliationForm, formalizeAffiliation, saveAffiliationForm } from "@/server/services/membership";
@@ -42,13 +49,17 @@ describe("filas do Atendimento", () => {
     expect(stats.pending).toBe(1);
     expect(stats.draftForms).toBe(2);
 
-    // Fila de assinatura: quem espera há mais tempo primeiro, com a situação dos documentos.
-    const drafts = await listAffiliationForms({ status: "DRAFT", page: 1 });
+    // Por padrão, as mais recentes primeiro; "mais antigas" mostra quem espera há mais tempo.
+    expect((await listAffiliationForms({ status: "DRAFT", page: 1 })).rows.map((row) => row.fullName)).toEqual([
+      "Elisa Ficha Balcao",
+      "Daniel Ficha Site",
+    ]);
+    const drafts = await listAffiliationForms({ status: "DRAFT", page: 1, order: "antigas" });
     expect(drafts.rows.map((row) => row.fullName)).toEqual(["Daniel Ficha Site", "Elisa Ficha Balcao"]);
     expect(drafts.rows[0]).toMatchObject({ origin: "PUBLIC", hasRg: true, hasPayslip: true });
     expect(drafts.rows[1]).toMatchObject({ origin: "STAFF", hasRg: false, hasPayslip: false });
     await attachTestDocuments(attendant, staff.formId);
-    expect((await listAffiliationForms({ status: "DRAFT", page: 1 })).rows[1]).toMatchObject({ hasRg: true, hasPayslip: true });
+    expect((await listAffiliationForms({ status: "DRAFT", page: 1, order: "antigas" })).rows[1]).toMatchObject({ hasRg: true, hasPayslip: true });
 
     // Resolver cada item tira ele da fila e do contador.
     await decideAffiliation(attendant, { registrationId: member.registrationId, decision: "CONFIRM" });
@@ -57,5 +68,29 @@ describe("filas do Atendimento", () => {
     expect(await queueCounts()).toEqual({ pending: 0, signature: 0 });
     expect((await listVerificationQueue({ kind: "PENDING", page: 1 })).rows).toHaveLength(0);
     expect((await getDashboardStats(db)).draftForms).toBe(0);
+  });
+
+  it("inscrições: mais recentes primeiro por padrão (fila e lista), mais antigas quando pedido; conta as de hoje", async () => {
+    const primeira = await registerMember({ memberName: "Alice Primeira Rocha" });
+    await registerMember({ memberName: "Bruna Segunda Rocha" });
+    await registerMember({ memberName: "Carla Terceira Rocha" });
+    const names = (rows: { fullName: string }[]) => rows.map((row) => row.fullName);
+
+    expect(names((await listVerificationQueue({ kind: "PENDING", page: 1 })).rows)).toEqual([
+      "Carla Terceira Rocha",
+      "Bruna Segunda Rocha",
+      "Alice Primeira Rocha",
+    ]);
+    expect(names((await listVerificationQueue({ kind: "PENDING", page: 1, order: "antigas" })).rows)).toEqual([
+      "Alice Primeira Rocha",
+      "Bruna Segunda Rocha",
+      "Carla Terceira Rocha",
+    ]);
+    await decideAffiliation(attendant, { registrationId: primeira.registrationId, decision: "CONFIRM" });
+    expect(names((await listRegistrations({ page: 1 })).rows)).toEqual(["Carla Terceira Rocha", "Bruna Segunda Rocha", "Alice Primeira Rocha"]);
+    expect(names((await listRegistrations({ page: 1, order: "antigas" })).rows)[0]).toBe("Alice Primeira Rocha");
+    expect(listOrder("antigas")).toBe("antigas");
+    expect(listOrder("qualquer coisa")).toBe("recentes");
+    expect(await registrationStatusCounts()).toMatchObject({ total: 3, today: 3, byStatus: { PENDING: 2, CONFIRMED: 1 } });
   });
 });

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CountUp } from "@/components/count-up";
-import { ChevronLeft, ChevronRight, type PixelIcon, Search } from "@/components/icons/pixel";
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, type PixelIcon, Search } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
@@ -289,5 +289,58 @@ export function ChipFilters({
         );
       })}
     </div>
+  );
+}
+
+/** Ordem da lista: mais recentes (padrão) ou mais antigas. Links: funciona sem JavaScript. */
+export function OrderToggle({
+  basePath,
+  order,
+  params,
+}: {
+  basePath: string;
+  order: "recentes" | "antigas";
+  params?: Record<string, string | undefined>;
+}) {
+  const href = (value: "recentes" | "antigas") => {
+    const search = new URLSearchParams();
+    for (const [key, v] of Object.entries(params ?? {})) if (v) search.set(key, v);
+    if (value === "antigas") search.set("ordem", "antigas");
+    const qs = search.toString();
+    return qs ? `${basePath}?${qs}` : basePath;
+  };
+  return (
+    <div className="inline-flex shrink-0 self-start rounded-lg border-2 border-line-strong bg-surface-2 p-0.5" role="group" aria-label="Ordem da lista">
+      {(["recentes", "antigas"] as const).map((value) => {
+        const active = order === value;
+        const Icon = value === "recentes" ? ArrowDown : ArrowUp;
+        return (
+          <Link
+            key={value}
+            href={href(value)}
+            aria-current={active ? "true" : undefined}
+            data-testid={`order-${value}`}
+            className={cn(
+              "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold transition-colors",
+              active ? "bg-surface-3 text-fg shadow-[inset_0_-2px_0_var(--red)]" : "text-fg-muted hover:text-fg",
+            )}
+          >
+            <Icon className="size-3.5" />
+            {value === "recentes" ? "Mais recentes" : "Mais antigas"}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Divisória de dia numa lista ("Hoje · 3"). */
+export function DayHeading({ title, count, noun = ["inscrição", "inscrições"] }: { title: string; count: number; noun?: [string, string] }) {
+  return (
+    <p className="flex items-center gap-2 px-1 pt-1 text-fg-muted" data-testid="day-heading">
+      <span className="pixel text-[0.55rem] text-fg">{title}</span>
+      <span className="pixel text-[0.5rem] text-fg-dim tabular">· {count} {count === 1 ? noun[0] : noun[1]}</span>
+      <span aria-hidden className="h-px flex-1 bg-line" />
+    </p>
   );
 }

@@ -128,3 +128,44 @@ export function formatMonthYear(value: string | null | undefined): string {
 export function todayInZone(timeZone = APP_TIME_ZONE): string {
   return utcToZonedLocalInput(new Date(), timeZone).slice(0, 10);
 }
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Dia (YYYY-MM-DD) de um instante, no fuso do evento (para agrupar listas por dia). */
+export function zonedDayKey(date: Date | string, timeZone = APP_TIME_ZONE): string {
+  return utcToZonedLocalInput(new Date(date), timeZone).slice(0, 10);
+}
+
+/** Hora cheia (0–23) de um instante, no fuso do evento. */
+export function zonedHour(date: Date | string, timeZone = APP_TIME_ZONE): number {
+  return partsInZone(new Date(date), timeZone).hour;
+}
+
+/** "Hoje", "Ontem" ou "Qua. 23/09": cabeçalho de listas agrupadas por dia. */
+export function formatDayHeading(dayKey: string, todayKey = todayInZone()): string {
+  if (dayKey === todayKey) return "Hoje";
+  const [ty, tm, td] = todayKey.split("-").map(Number);
+  const yesterday = new Date(Date.UTC(ty!, tm! - 1, td! - 1, 12)).toISOString().slice(0, 10);
+  if (dayKey === yesterday) return "Ontem";
+  const [y, m, d] = dayKey.split("-").map(Number);
+  const weekday = new Intl.DateTimeFormat(LOCALE, { timeZone: "UTC", weekday: "short" }).format(new Date(Date.UTC(y!, m! - 1, d!, 12)));
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${pad2(d!)}/${pad2(m!)}`;
+}
+
+/** "16/10/2026 19:42:05" (planilhas: com segundos, no fuso do evento). */
+export function formatDateTimeSeconds(date: Date | string, timeZone = APP_TIME_ZONE): string {
+  const p = partsInZone(new Date(date), timeZone);
+  return `${pad2(p.day)}/${pad2(p.month)}/${p.year} ${pad2(p.hour)}:${pad2(p.minute)}:${pad2(p.second)}`;
+}
+
+/** Agrupa uma lista (já ordenada) por dia no fuso do evento: "Hoje", "Ontem", "Qua. 23/09". */
+export function groupByDay<T>(rows: T[], dateOf: (row: T) => Date | string, todayKey = todayInZone()) {
+  const groups: { key: string; title: string; rows: T[] }[] = [];
+  for (const row of rows) {
+    const key = zonedDayKey(dateOf(row));
+    const last = groups[groups.length - 1];
+    if (last?.key === key) last.rows.push(row);
+    else groups.push({ key, title: formatDayHeading(key, todayKey), rows: [row] });
+  }
+  return groups;
+}

@@ -18,6 +18,8 @@ export type StockMode = "SINGLE" | "SPLIT";
 export type StockPool = "ALL" | "MEMBER" | "GUEST" | "EMPLOYEE";
 export type ParticipantRole = "MEMBER" | "GUEST" | "EMPLOYEE";
 export type CheckInMethod = "QR" | "SEARCH" | "CODE";
+/** De onde veio a inscrição (mesmos valores do banco). */
+export type RegistrationOrigin = "PUBLIC_FORM" | "PRE_AFFILIATION" | "STAFF" | "GUEST_CONVERSION" | "NEW_AFFILIATION";
 
 export const DOCUMENT_KINDS = ["RG", "PAYSLIP"] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];

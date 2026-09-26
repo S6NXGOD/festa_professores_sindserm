@@ -376,7 +376,19 @@ export default async function DashboardPage() {
           )}
         </Panel>
 
-        <Panel title="Últimas entradas" icon={Trophy}>
+        <Panel
+          title="Últimas entradas"
+          icon={Trophy}
+          action={
+            can(actor.access, "viewEntries") ? (
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/painel/entradas" data-testid="dashboard-all-entries">
+                  Ver todas
+                </Link>
+              </Button>
+            ) : null
+          }
+        >
           {checkIns.length === 0 ? (
             <EmptyState icon={Login} title="Pista vazia">
               As entradas aparecem aqui assim que a portaria começar.

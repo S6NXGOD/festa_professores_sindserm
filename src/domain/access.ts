@@ -12,6 +12,7 @@ export type AccessLevel = (typeof ACCESS_LEVELS)[number];
 export const ACCESS_MODULES = [
   "placar",
   "portaria",
+  "entradas",
   "kits",
   "inscricoes",
   "fichas",
@@ -30,7 +31,7 @@ export interface AccessMap {
 }
 
 export const ACCESS_GROUPS = [
-  { title: "Na festa", modules: ["placar", "portaria", "kits"] },
+  { title: "Na festa", modules: ["placar", "portaria", "entradas", "kits"] },
   { title: "Pessoas", modules: ["inscricoes", "fichas", "participantes", "colaboradores"] },
   { title: "Administração", modules: ["usuarios", "auditoria", "configuracoes"] },
 ] as const satisfies readonly { title: string; modules: readonly AccessModule[] }[];
@@ -38,6 +39,11 @@ export const ACCESS_GROUPS = [
 /** O que cada nível libera em cada área (e quais níveis existem ali). */
 export const MODULE_INFO: Record<AccessModule, { label: string; levels: readonly AccessLevel[]; view?: string; edit?: string }> = {
   placar: { label: "Placar", levels: ["none", "view"], view: "Números da festa, filas e últimas entradas" },
+  entradas: {
+    label: "Entradas",
+    levels: ["none", "view"],
+    view: "Quem entrou, a que horas, quem registrou e como; estornos e planilha",
+  },
   portaria: {
     label: "Portaria",
     levels: ["none", "view", "edit"],
@@ -98,6 +104,7 @@ export const ROLE_PRESETS: Record<StaffRole, AccessMap> = {
     modules: {
       placar: "view",
       portaria: "edit",
+      entradas: "view",
       kits: "edit",
       inscricoes: "edit",
       fichas: "edit",
@@ -125,6 +132,8 @@ const PANEL_MODULES = ACCESS_MODULES.filter((module) => module !== "portaria");
 export const PERMISSION_RULES = {
   // Portaria
   viewGate: (a: AccessMap) => atLeast(a.modules.portaria, "view"),
+  // Controle de entrada (lista de quem entrou, por quem e quando)
+  viewEntries: (a: AccessMap) => atLeast(a.modules.entradas, "view"),
   checkIn: (a: AccessMap) => atLeast(a.modules.portaria, "edit"),
   search: (a: AccessMap) =>
     atLeast(a.modules.portaria, "view") || atLeast(a.modules.inscricoes, "view") || atLeast(a.modules.participantes, "view"),
@@ -192,7 +201,9 @@ export function resolveAccess(role: StaffRole, stored: string | null | undefined
   if (isAccessFixed(role)) return ROLE_PRESETS[role];
   if (stored) {
     try {
-      return sanitizeAccess(JSON.parse(stored) as { modules?: Record<string, unknown>; fullCpf?: unknown });
+      const parsed = JSON.parse(stored) as { modules?: Record<string, unknown>; fullCpf?: unknown };
+      // Área criada depois do ajuste (ex.: Entradas): vale o padrão do perfil até alguém mexer nela.
+      return sanitizeAccess({ ...parsed, modules: { ...ROLE_PRESETS[role].modules, ...(parsed.modules ?? {}) } });
     } catch {
       // JSON corrompido: cai no perfil (nunca em acesso total).
     }
@@ -217,6 +228,7 @@ export function homePathFor(access: AccessMap): string {
   const order: [AccessModule, string][] = [
     ["placar", "/painel"],
     ["portaria", "/portaria"],
+    ["entradas", "/painel/entradas"],
     ["inscricoes", "/painel/inscricoes"],
     ["fichas", "/painel/filiacoes"],
     ["participantes", "/painel/participantes"],

@@ -1,5 +1,5 @@
 import type { EntryBlockCode, KitBlockCode } from "./rules";
-import type { AffiliationStatus, CheckInMethod, DocumentKind, KitType, StaffRole, StockMode, StockPool, EmployeeCategory } from "./types";
+import type { AffiliationStatus, CheckInMethod, DocumentKind, EmployeeCategory, KitType, RegistrationOrigin, StaffRole, StockMode, StockPool } from "./types";
 
 /** Nome da entidade organizadora (sistema de uso exclusivo do sindicato). */
 export const ORG_NAME = "SINDSERM";
@@ -100,6 +100,15 @@ export const EMPLOYEE_CATEGORY_INLINE: Record<EmployeeCategory, string> = {
   BOARD: "diretoria do SINDSERM",
   STAFF: "funcionário(a) do SINDSERM",
   CONTRACTOR: "prestador(a) de serviço do SINDSERM",
+};
+
+/** De onde veio a inscrição (lista de Inscrições). */
+export const REGISTRATION_ORIGIN_LABEL: Record<RegistrationOrigin, string> = {
+  PUBLIC_FORM: "Pelo site",
+  PRE_AFFILIATION: "Ficha pelo site",
+  STAFF: "Na hora",
+  GUEST_CONVERSION: "Era convidado(a)",
+  NEW_AFFILIATION: "Ficha na festa",
 };
 
 export const CHECK_IN_METHOD_LABEL: Record<CheckInMethod, string> = {

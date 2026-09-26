@@ -15,6 +15,7 @@ import {
   user,
 } from "@/server/db/schema";
 import type { AffiliationStatus } from "@/domain/types";
+import { todayInZone, zonedLocalToUtc } from "@/lib/datetime";
 import { escapeLike } from "@/lib/text";
 import { personSearchCondition } from "@/server/services/people";
 
@@ -32,6 +33,13 @@ export function pageNumber(value: unknown): number {
   return Number.isInteger(n) && n > 0 ? Math.min(n, 10_000) : 1;
 }
 
+/** Ordem das listas de inscrições e fichas: por padrão, as mais recentes primeiro. */
+export type ListOrder = "recentes" | "antigas";
+
+export function listOrder(value: unknown): ListOrder {
+  return value === "antigas" ? "antigas" : "recentes";
+}
+
 function paged<T>(rows: T[], total: number, page: number): Page<T> {
   return { rows, total, page, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
@@ -45,7 +53,7 @@ const guestNameSql = sql<string | null>`(SELECT gp.full_name FROM ${guestLink} g
 
 export type QueueKind = "PENDING" | "AWAITING_SIGNATURE";
 
-export async function listVerificationQueue(options: { kind: QueueKind; q?: string; page: number }) {
+export async function listVerificationQueue(options: { kind: QueueKind; q?: string; page: number; order?: ListOrder }) {
   const search = options.q ? personSearchCondition(options.q, { allowPartialCpf: true }) : null;
   const where = and(eq(registration.status, options.kind), search ?? undefined);
   const openForm = alias(affiliationForm, "open_form");
@@ -70,7 +78,7 @@ export async function listVerificationQueue(options: { kind: QueueKind; q?: stri
       .innerJoin(person, eq(person.id, registration.memberPersonId))
       .leftJoin(openForm, and(eq(openForm.registrationId, registration.id), eq(openForm.status, "DRAFT")))
       .where(where)
-      .orderBy(asc(registration.createdAt))
+      .orderBy(options.order === "antigas" ? asc(registration.createdAt) : desc(registration.createdAt))
       .limit(PAGE_SIZE)
       .offset((options.page - 1) * PAGE_SIZE),
     db
@@ -160,7 +168,7 @@ export async function listParticipants(options: { q?: string; filter: Participan
 // Inscrições (grupos)
 // ---------------------------------------------------------------------------
 
-export async function listRegistrations(options: { q?: string; status?: AffiliationStatus | null; page: number }) {
+export async function listRegistrations(options: { q?: string; status?: AffiliationStatus | null; page: number; order?: ListOrder }) {
   const conditions: SQL[] = [];
   const search = options.q ? personSearchCondition(options.q, { allowPartialCpf: true }) : null;
   if (search) conditions.push(search);
@@ -183,7 +191,7 @@ export async function listRegistrations(options: { q?: string; status?: Affiliat
       .from(registration)
       .innerJoin(person, eq(person.id, registration.memberPersonId))
       .where(where)
-      .orderBy(desc(registration.createdAt))
+      .orderBy(options.order === "antigas" ? asc(registration.createdAt) : desc(registration.createdAt))
       .limit(PAGE_SIZE)
       .offset((options.page - 1) * PAGE_SIZE),
     db
@@ -263,6 +271,7 @@ export async function listAffiliationForms(options: {
   status?: "DRAFT" | "FORMALIZED" | "CANCELLED" | null;
   q?: string;
   page: number;
+  order?: ListOrder;
 }) {
   const conditions: SQL[] = [];
   if (options.status) conditions.push(eq(affiliationForm.status, options.status));
@@ -296,8 +305,7 @@ export async function listAffiliationForms(options: {
       .leftJoin(user, eq(user.id, affiliationForm.createdByUserId))
       .innerJoin(person, eq(person.id, affiliationForm.personId))
       .where(where)
-      // Fila de assinatura: quem espera há mais tempo primeiro.
-      .orderBy(options.status === "DRAFT" ? asc(affiliationForm.createdAt) : desc(affiliationForm.createdAt))
+      .orderBy(options.order === "antigas" ? asc(affiliationForm.createdAt) : desc(affiliationForm.createdAt))
       .limit(PAGE_SIZE)
       .offset((options.page - 1) * PAGE_SIZE),
     db
@@ -406,11 +414,15 @@ export async function queueCounts() {
   return { pending: Number(pending?.total ?? 0), signature: Number(signature?.total ?? 0) };
 }
 
-/** Quantas inscrições há em cada situação (para os filtros). */
+/** Quantas inscrições há em cada situação (para os filtros) e quantas chegaram hoje. */
 export async function registrationStatusCounts() {
-  const rows = await db.select({ status: registration.status, total: count() }).from(registration).groupBy(registration.status);
+  const todayStart = zonedLocalToUtc(`${todayInZone()}T00:00`) ?? new Date(0);
+  const [rows, [todayRow]] = await Promise.all([
+    db.select({ status: registration.status, total: count() }).from(registration).groupBy(registration.status),
+    db.select({ total: count() }).from(registration).where(sql`${registration.createdAt} >= ${todayStart.toISOString()}::timestamptz`),
+  ]);
   const byStatus = Object.fromEntries(rows.map((row) => [row.status, Number(row.total)])) as Partial<Record<AffiliationStatus, number>>;
-  return { total: rows.reduce((sum, row) => sum + Number(row.total), 0), byStatus };
+  return { total: rows.reduce((sum, row) => sum + Number(row.total), 0), byStatus, today: Number(todayRow?.total ?? 0) };
 }
 
 export type QueueCounts = Awaited<ReturnType<typeof queueCounts>>;
