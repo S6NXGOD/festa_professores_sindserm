@@ -40,6 +40,7 @@ import type { EmployeeCategory } from "@/domain/types";
 import { cn } from "@/lib/utils";
 import { createEmployeeAction, createEmployeesFromListAction, updateEmployeeAction } from "@/server/actions/employees";
 import { CategoryPicker } from "./employee-category";
+import { firstName } from "@/lib/text";
 
 /** Setores e cargos comuns no sindicato (sugestões; dá para escrever qualquer outro). */
 const SECTOR_SUGGESTIONS = [
@@ -117,7 +118,7 @@ export function EmployeeDialog() {
       }
       playSound("powerup");
       toast.success(
-        `${values.fullName.split(" ")[0]} liberado(a) para a festa!` +
+        `${firstName(values.fullName)} liberado(a) para a festa!` +
           (result.data.guestName ? ` Convidado: ${result.data.guestName}.` : "") +
           " Os vouchers já estão prontos.",
       );

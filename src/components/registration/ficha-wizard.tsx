@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { CpfTakenRecovery } from "@/components/voucher/recover-vouchers-form";
 import { Controller, type FieldPath, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { cachedPreview, DocumentSlot } from "@/components/documents/document-slot";
@@ -120,6 +121,8 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
   const fe = errors.ficha;
   const values = useWatch({ control });
   const [uploading, setUploading] = useState<Record<DocumentKind, boolean>>({ RG: false, PAYSLIP: false });
+  // CPF recusado por já estar inscrito: oferece abrir os vouchers da inscrição que já existe.
+  const [takenCpf, setTakenCpf] = useState<string | null>(null);
   const isTeacher = values.isTeacher === true;
   const flow: Step[] = isTeacher
     ? ["personal", "work", "authorization", "guest", "documents", "review"]
@@ -191,7 +194,8 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
     return "review";
   }
 
-  function showServerErrors(error: string, fieldErrors: Record<string, string> = {}) {
+  function showServerErrors(error: string, fieldErrors: Record<string, string> = {}, code?: string) {
+    if (code === "CPF_TAKEN" && fieldErrors["ficha.cpf"]) setTakenCpf(form.getValues("ficha.cpf"));
     toast.error(error);
     const entries = Object.entries(fieldErrors);
     for (const [path, message] of entries) setError(path as FieldPath<PreAffiliationInput>, { type: "server", message });
@@ -203,7 +207,7 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
       // O servidor revalida e normaliza: envia os valores no formato de entrada.
       const result = await callAction(submitPublicPreAffiliation(form.getValues()));
       if (result.ok) router.push(`/vouchers/${result.data.accessToken}?nova=1`);
-      else showServerErrors(result.error, result.fieldErrors);
+      else showServerErrors(result.error, result.fieldErrors, result.code);
     });
   };
 
@@ -270,6 +274,9 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
                   <Input id="f-email" type="email" autoComplete="email" aria-invalid={Boolean(fe?.email)} {...register("ficha.email")} />
                 </FormField>
               </div>
+              {takenCpf && values.ficha?.cpf === takenCpf ? (
+                <CpfTakenRecovery cpf={takenCpf} whatsapp={values.ficha?.whatsapp ?? ""} />
+              ) : null}
             </>
           ) : null}
 

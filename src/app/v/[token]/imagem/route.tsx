@@ -4,6 +4,8 @@ import { ImageResponse } from "next/og";
 import { EMPLOYEE_CATEGORY_TITLE } from "@/domain/labels";
 import type { EmployeeCategory } from "@/domain/types";
 import { formatPhone } from "@/lib/phone";
+import { firstName, properName } from "@/lib/text";
+import { KIT_BOX, LINE_HEIGHT, NAME_LINE_HEIGHT, VOUCHER_IMAGE, voucherImageLayout } from "@/lib/voucher-image-layout";
 import { getEventInfo } from "@/server/queries/config";
 import { loadVoucherByToken, qrPngDataUrl } from "@/server/queries/vouchers";
 import { consumeRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
@@ -19,8 +21,7 @@ const assetsPromise = Promise.all([
   readFile(join(process.cwd(), "public/brand/sindserm-branca.png")),
 ]);
 
-const WIDTH = 1080;
-const HEIGHT = 1920; // 9:16, formato de story/status
+const { width: WIDTH, height: HEIGHT } = VOUCHER_IMAGE;
 const RED = "#ff2626";
 const AMBER = "#f8c000";
 
@@ -31,6 +32,8 @@ const METAL: Record<EmployeeCategory, { accent: string; rgb: string; tagText: st
   CONTRACTOR: { accent: "#22d3ee", rgb: "34,211,238", tagText: "#0e0e0f", tag: "PRESTADOR(A)" },
 };
 const INK = "#080808";
+/** Nenhum bloco encolhe: a altura de cada um é garantida pela conta do layout. */
+const KEEP = { flexShrink: 0 } as const;
 
 /** Imagem PNG do voucher (para salvar na galeria ou compartilhar). */
 export async function GET(_request: Request, context: RouteContext<"/v/[token]/imagem">) {
@@ -43,7 +46,6 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
   const card = result.card;
 
   const [regular, bold, condensed, pixel, emblem, unionLogo] = await assetsPromise;
-  const qr = await qrPngDataUrl(token, 600);
   const emblemSrc = `data:image/jpeg;base64,${emblem.toString("base64")}`;
   const unionLogoSrc = `data:image/png;base64,${unionLogo.toString("base64")}`;
   const isMember = card.kind === "MEMBER";
@@ -53,17 +55,19 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
   const metal = METAL[category];
   const accent = isEmployee ? metal.accent : RED;
   const glowRgb = isEmployee ? metal.rgb : "255,38,38";
+  // Na faixa do kit, só o primeiro nome: o nome completo já está no voucher de cada pessoa.
+  const guestFirst = card.guestName ? firstName(card.guestName) : null;
   const kitLine = isEmployee
-    ? card.guestName
-      ? `2 kits de consumação: o seu e o de ${card.guestName}`
+    ? guestFirst
+      ? `2 kits de consumação: o seu e o de ${guestFirst}`
       : "1 kit de consumação"
     : isMember
       ? card.isTeacher
-        ? card.guestName
-          ? `2 kits de consumação: o seu e o de ${card.guestName}`
+        ? guestFirst
+          ? `2 kits de consumação: o seu e o de ${guestFirst}`
           : "1 kit de consumação"
         : "Participação sem kit de consumação"
-      : `1 kit de consumação, depois que ${card.hostName ?? "quem te convidou"} chegar`;
+      : `1 kit de consumação, depois que ${card.hostName ? firstName(card.hostName) : "quem te convidou"} chegar`;
   const tag = isEmployee ? metal.tag : isMember ? "PLAYER 1" : "PLAYER 2";
   const subtitle = isEmployee
     ? `${EMPLOYEE_CATEGORY_TITLE[category]}${card.jobTitle ? ` · ${card.jobTitle}` : ""}`
@@ -71,37 +75,44 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
       ? card.isTeacher
         ? "Professor(a) filiado(a)"
         : "Filiado(a) ao SINDSERM"
-      : `Convidado(a) de ${card.hostName ?? ""}`;
-  // Nomes longos em fonte menor para caber em até duas linhas.
-  const nameSize = card.fullName.length > 34 ? 66 : card.fullName.length > 22 ? 80 : 96;
+      : `Convidado(a) de ${card.hostName ? properName(card.hostName) : ""}`;
   const statusLine =
     card.affiliationStatus === "PENDING"
       ? "Aguardando o SINDSERM confirmar a filiação"
       : card.affiliationStatus === "AWAITING_SIGNATURE"
         ? "Sua ficha estará na recepção para assinar"
         : null;
+  const layout = voucherImageLayout({
+    fullName: card.fullName,
+    subtitle,
+    kitLine,
+    statusLine,
+    venue: event.venue?.name ?? null,
+    hasHelp: Boolean(event.helpWhatsapp),
+  });
+  const qr = await qrPngDataUrl(token, 600);
 
   return new ImageResponse(
     (
-      <div style={{ width: WIDTH, height: HEIGHT, display: "flex", background: INK, padding: 44, fontFamily: "Saira" }}>
+      <div style={{ width: WIDTH, height: HEIGHT, display: "flex", background: INK, padding: VOUCHER_IMAGE.pagePadding, fontFamily: "Saira" }}>
         <div
           style={{
             display: "flex",
             flexDirection: "column",
             flex: 1,
             background: "#0e0e0f",
-            border: `6px solid ${accent}`,
+            border: `${VOUCHER_IMAGE.border}px solid ${accent}`,
             borderRadius: 48,
             overflow: "hidden",
             boxShadow: `0 0 80px rgba(${glowRgb},${isEmployee ? 0.4 : 0.45})`,
           }}
         >
-          <div style={{ display: "flex", justifyContent: "center", background: INK, paddingTop: 16 }}>
+          <div style={{ ...KEEP, display: "flex", justifyContent: "center", background: INK, paddingTop: 16 }}>
             {/* eslint-disable-next-line @next/next/no-img-element -- renderizado pelo Satori */}
-            <img src={emblemSrc} width={560} height={481} alt="" />
+            <img src={emblemSrc} width={layout.emblemWidth} height={layout.emblemHeight} alt="" />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", padding: "8px 64px 0" }}>
+          <div style={{ ...KEEP, display: "flex", flexDirection: "column", padding: `8px ${VOUCHER_IMAGE.sidePadding}px 0` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div
                 style={{
@@ -125,25 +136,44 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                 display: "flex",
                 marginTop: 28,
                 fontFamily: "SairaCondensed",
-                fontSize: nameSize,
+                fontSize: layout.nameSize,
                 fontWeight: 900,
-                lineHeight: 0.95,
+                lineHeight: NAME_LINE_HEIGHT,
                 color: "#f5f4f1",
                 textTransform: "uppercase",
               }}
             >
               {card.fullName}
             </div>
-            <div style={{ display: "flex", marginTop: 14, fontSize: 36, fontWeight: 500, color: isEmployee ? metal.accent : "#a8a49e" }}>
+            <div
+              style={{
+                display: "flex",
+                marginTop: 14,
+                fontSize: 36,
+                lineHeight: LINE_HEIGHT,
+                fontWeight: 500,
+                color: isEmployee ? metal.accent : "#a8a49e",
+              }}
+            >
               {subtitle}
             </div>
           </div>
 
-          <div style={{ display: "flex", margin: "32px 48px 0", borderTop: "5px dashed #3b3b41" }} />
+          <div style={{ ...KEEP, display: "flex", margin: "32px 48px 0", borderTop: "5px dashed #3b3b41" }} />
 
-          <div style={{ display: "flex", flexDirection: "column", flex: 1, alignItems: "center", justifyContent: "center", padding: "20px 64px 12px" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              padding: `20px ${VOUCHER_IMAGE.sidePadding}px 12px`,
+            }}
+          >
             <div
               style={{
+                ...KEEP,
                 display: "flex",
                 padding: 18,
                 background: "#ffffff",
@@ -152,28 +182,43 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- renderizado pelo Satori */}
-              <img src={qr} width={400} height={400} alt="" />
+              <img src={qr} width={layout.qrSize} height={layout.qrSize} alt="" />
             </div>
-            <div style={{ display: "flex", marginTop: 34, fontSize: 60, fontWeight: 700, letterSpacing: 12, color: "#f5f4f1" }}>
+            <div style={{ ...KEEP, display: "flex", marginTop: 34, fontSize: 60, lineHeight: 1.1, fontWeight: 700, letterSpacing: 12, color: "#f5f4f1" }}>
               {card.code}
             </div>
-            <div style={{ display: "flex", marginTop: 18, fontSize: 32, fontWeight: 700, color: "#a8a49e" }}>
+            <div style={{ ...KEEP, display: "flex", marginTop: 18, fontSize: 32, lineHeight: LINE_HEIGHT, fontWeight: 700, color: "#a8a49e" }}>
               {`${event.dateLabel} · ${event.timeLabel}`}
             </div>
             {event.venue?.name ? (
-              <div style={{ display: "flex", marginTop: 6, fontSize: 28, fontWeight: 500, color: "#a8a49e", textAlign: "center" }}>
+              <div
+                style={{
+                  ...KEEP,
+                  display: "flex",
+                  marginTop: 6,
+                  fontSize: 28,
+                  lineHeight: LINE_HEIGHT,
+                  fontWeight: 500,
+                  color: "#a8a49e",
+                  textAlign: "center",
+                }}
+              >
                 {event.venue.name}
               </div>
             ) : null}
             <div
               style={{
+                ...KEEP,
                 display: "flex",
-                marginTop: 30,
-                padding: "20px 28px",
+                justifyContent: "center",
+                maxWidth: "100%",
+                marginTop: KIT_BOX.marginTop,
+                padding: `${KIT_BOX.paddingY}px ${KIT_BOX.paddingX}px`,
                 borderRadius: 20,
-                border: `3px solid rgba(${glowRgb},${isEmployee ? 0.6 : 0.55})`,
+                border: `${KIT_BOX.border}px solid rgba(${glowRgb},${isEmployee ? 0.6 : 0.55})`,
                 background: `rgba(${glowRgb},0.12)`,
-                fontSize: 30,
+                fontSize: KIT_BOX.fontSize,
+                lineHeight: LINE_HEIGHT,
                 fontWeight: 700,
                 color: "#f5f4f1",
                 textAlign: "center",
@@ -182,13 +227,16 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
               {kitLine}
             </div>
             {statusLine ? (
-              <div style={{ display: "flex", marginTop: 16, fontSize: 28, fontWeight: 700, color: "#f8c000" }}>{statusLine}</div>
+              <div style={{ ...KEEP, display: "flex", marginTop: 16, fontSize: 28, lineHeight: LINE_HEIGHT, fontWeight: 700, color: AMBER, textAlign: "center" }}>
+                {statusLine}
+              </div>
             ) : null}
           </div>
 
           {/* Rodapé do ingresso: a assinatura do organizador, centralizada. */}
           <div
             style={{
+              ...KEEP,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -200,7 +248,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
             {/* eslint-disable-next-line @next/next/no-img-element -- renderizado pelo Satori */}
             <img src={unionLogoSrc} width={308} height={88} alt="" />
             {event.helpWhatsapp ? (
-              <div style={{ display: "flex", marginTop: 12, fontSize: 26, fontWeight: 700, color: "#a8a49e" }}>
+              <div style={{ display: "flex", marginTop: 12, fontSize: 26, lineHeight: LINE_HEIGHT, fontWeight: 700, color: "#a8a49e" }}>
                 {`Dúvidas? WhatsApp ${formatPhone(event.helpWhatsapp)}`}
               </div>
             ) : null}

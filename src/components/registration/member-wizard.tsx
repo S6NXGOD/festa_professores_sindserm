@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { CpfTakenRecovery } from "@/components/voucher/recover-vouchers-form";
 import { Controller, type FieldPath, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { FormField } from "@/components/forms/form-field";
@@ -42,6 +43,7 @@ import {
   validateGuestStep,
   WizardNav,
 } from "./wizard-parts";
+import { firstName } from "@/lib/text";
 
 type Step = "member" | "guest" | "review";
 
@@ -74,6 +76,8 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
   const flow: Step[] = isTeacher ? ["member", "guest", "review"] : ["member", "review"];
   const index = Math.max(0, flow.indexOf(step));
   const staff = mode === "staff";
+  // CPF recusado por já estar inscrito: no site, oferece abrir os vouchers (quase sempre é a própria pessoa).
+  const [takenCpf, setTakenCpf] = useState<string | null>(null);
 
   function go(next: Step) {
     setDirection(flow.indexOf(next) >= index ? 1 : -1);
@@ -114,7 +118,8 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
     return "review";
   }
 
-  function showServerErrors(error: string, fieldErrors: Record<string, string> = {}) {
+  function showServerErrors(error: string, fieldErrors: Record<string, string> = {}, code?: string) {
+    if (!staff && code === "CPF_TAKEN" && fieldErrors["member.cpf"]) setTakenCpf(form.getValues("member.cpf"));
     toast.error(error);
     const entries = Object.entries(fieldErrors);
     for (const [path, message] of entries) setError(path as FieldPath<RegistrationInput>, { type: "server", message });
@@ -136,7 +141,7 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
       }
       const result = await callAction(submitPublicRegistration(data));
       if (result.ok) router.push(`/vouchers/${result.data.accessToken}?nova=1`);
-      else showServerErrors(result.error, result.fieldErrors);
+      else showServerErrors(result.error, result.fieldErrors, result.code);
     });
   };
 
@@ -185,6 +190,9 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
                   />
                 </FormField>
               </div>
+              {takenCpf && values.member?.cpf === takenCpf ? (
+                <CpfTakenRecovery cpf={takenCpf} whatsapp={values.member?.whatsapp ?? ""} />
+              ) : null}
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
                 <FormField id="member-registration" label="Matrícula da prefeitura" error={errors.member?.registrationNumber?.message}>
                   <Input
@@ -338,7 +346,7 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
             </PixelTag>
             <DialogTitle>Inscrição gravada!</DialogTitle>
             <DialogDescription>
-              Mande agora o link dos vouchers para {values.member?.fullName?.split(" ")[0] || "a pessoa"}. Ele só aparece desta vez
+              Mande agora o link dos vouchers para {(values.member?.fullName ? firstName(values.member.fullName) : "") || "a pessoa"}. Ele só aparece desta vez
               (depois dá para gerar outro na inscrição).
             </DialogDescription>
           </DialogHeader>

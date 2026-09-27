@@ -23,6 +23,8 @@ export const metadata: Metadata = { title: "Meus vouchers", referrer: "no-referr
 export default async function GroupVouchersPage({ params, searchParams }: PageProps<"/vouchers/[token]">) {
   const [{ token }, query, event] = await Promise.all([params, searchParams, getEventInfo()]);
   const isNew = query.nova === "1";
+  // Veio do "Recuperar meus vouchers": comemora, lembra de salvar e avisa do link novo.
+  const recovered = !isNew && query.recuperado === "1";
   const eventName = event?.name ?? APP_NAME;
 
   const limit = await consumeRateLimit(RATE_LIMITS.voucherView, await clientIp());
@@ -40,8 +42,14 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
   if (!group || !event || !group.member) {
     return (
       <PublicShell eventName={eventName} backdrop="calm" help={{ topic: "abrir os meus vouchers (o link não funcionou)" }}>
-        <MessageCard icon={Search} title="Link inválido" kicker="Fita não encontrada" tone="danger" action={{ href: "/", label: "Voltar ao início" }}>
-          Confira o link recebido ao concluir a inscrição.
+        <MessageCard
+          icon={Search}
+          title="Link inválido"
+          kicker="Fita não encontrada"
+          tone="danger"
+          action={{ href: "/vouchers", label: "Recuperar meus vouchers" }}
+        >
+          Confira o link recebido ao concluir a inscrição ou recupere os vouchers com o CPF e o WhatsApp da inscrição.
           <HelpLine lead="Não achou?" topic="abrir os meus vouchers (o link não funcionou)" className="mt-3 justify-center" />
         </MessageCard>
       </PublicShell>
@@ -54,7 +62,7 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
 
   return (
     <PublicShell eventName={event.name} wide backdrop="calm" help={{ topic: `resolver uma dúvida sobre o meu voucher (código ${group.member.code})` }}>
-      <Celebration enabled={isNew} />
+      <Celebration enabled={isNew || recovered} />
       <section className="mx-auto max-w-3xl">
         <Reveal className="text-center">
           {isNew ? (
@@ -63,10 +71,10 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
             <QrCode className="mx-auto size-12 text-red" />
           )}
           <p className="pixel mt-5 text-[0.62rem] text-red neon-red">
-            {isNew ? (cards.length > 1 ? "Player 1 + Player 2 prontos" : "Player 1 pronto") : "Seus vouchers"}
+            {isNew ? (cards.length > 1 ? "Player 1 + Player 2 prontos" : "Player 1 pronto") : recovered ? "Fita recuperada" : "Seus vouchers"}
           </p>
           <h1 className="display mt-3 text-5xl text-fg sm:text-6xl">
-            {isNew ? (awaitingSignature ? "Ficha gravada!" : "Você está na pista!") : "Vouchers da inscrição"}
+            {isNew ? (awaitingSignature ? "Ficha gravada!" : "Você está na pista!") : recovered ? "Achamos seus vouchers!" : "Vouchers da inscrição"}
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-fg-muted">
             {cards.length === 1 ? "Seu voucher está pronto. " : "Um voucher para você e outro para o seu convidado. "}
@@ -107,7 +115,7 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
             }))}
             missionId={token.slice(0, 16)}
             eventName={event.name}
-            remind={isNew}
+            remind={isNew || recovered}
           />
         </Reveal>
 
@@ -118,7 +126,10 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
         ) : null}
 
         <Reveal delay={0.1} className="mt-6">
-          <CopyLinkBox path={`/vouchers/${token}`} label="Guarde este link para abrir os vouchers depois" />
+          <CopyLinkBox
+            path={`/vouchers/${token}`}
+            label={recovered ? "Link novo (o anterior parou de funcionar): guarde este" : "Guarde este link para abrir os vouchers depois"}
+          />
         </Reveal>
 
 

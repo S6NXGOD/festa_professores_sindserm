@@ -23,6 +23,7 @@ import { entryDecisionFor } from "./checkin";
 import { employeeKitInput, kitInput } from "./kits";
 import { type EventConfig, getEventConfig, getStockOverview, type StockOverview } from "./settings";
 import { type ActiveGuest, type EmployeeGroupState, loadPersonState, type PersonState, type RegistrationState } from "./state";
+import { firstName } from "@/lib/text";
 
 export type KitView =
   | { kind: "DELIVERED"; deliveryId: string; at: Date; byName: string; beneficiaryName: string }
@@ -203,7 +204,7 @@ function employeeKitPreview(
   const waitingGuest = group.guest?.checkIn && !group.deliveries.GUEST ? group.guest : null;
   const guestOut = waitingGuest ? check("GUEST", input) === null : false;
   if (!ownReason && guestOut) {
-    const first = state.person.fullName.split(" ")[0];
+    const first = firstName(state.person.fullName);
     return {
       kind: "WILL_DELIVER",
       count: 2,
@@ -269,7 +270,7 @@ function kitOnEntryPreview(
   const waitingGuest = group.guest?.checkIn && !group.deliveries.GUEST ? group.guest : null;
   const guestOut = waitingGuest ? check("GUEST", input) === null : false;
   if (!ownReason && guestOut) {
-    const first = state.person.fullName.split(" ")[0];
+    const first = firstName(state.person.fullName);
     return {
       kind: "WILL_DELIVER",
       count: 2,

@@ -22,6 +22,7 @@ export const AUDIT_ACTIONS = {
   REGISTRATION_CREATED: "Inscrição criada",
   PRE_AFFILIATION_CREATED: "Ficha de filiação preenchida antes da festa",
   REGISTRATION_ACCESS_RENEWED: "Link de vouchers renovado",
+  REGISTRATION_ACCESS_RECOVERED: "Vouchers recuperados pelo site",
   AFFILIATION_CONFIRMED: "Filiação confirmada",
   AFFILIATION_REJECTED: "Filiação não confirmada",
   AFFILIATION_REOPENED: "Conferência de filiação reaberta",

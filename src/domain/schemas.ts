@@ -236,6 +236,14 @@ export const registrationSchema = z
   .superRefine((data, ctx) => refineGuest(data, data.member, ctx));
 
 export type RegistrationInput = z.input<typeof registrationSchema>;
+
+/** Recuperar os vouchers pelo site: o CPF e o WhatsApp usados na inscrição. */
+export const voucherRecoverySchema = z.object({
+  cpf: cpfField,
+  whatsapp: phoneField,
+});
+
+export type VoucherRecoveryInput = z.input<typeof voucherRecoverySchema>;
 export type RegistrationData = z.output<typeof registrationSchema>;
 export type MemberData = z.output<typeof memberDataSchema>;
 

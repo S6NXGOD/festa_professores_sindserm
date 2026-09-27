@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { PreAffiliationInput, RegistrationInput } from "@/domain/schemas";
+import type { PreAffiliationInput, RegistrationInput, VoucherRecoveryInput } from "@/domain/schemas";
+import { normalizeCpf } from "@/lib/cpf";
 import type { ActionResult } from "@/lib/action-result";
 import { PUBLIC_ACTOR } from "@/server/services/actor";
 import { enforceRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
-import { createPreAffiliation, createRegistration } from "@/server/services/registration";
+import { createPreAffiliation, createRegistration, recoverRegistrationAccess } from "@/server/services/registration";
 import { clientIp, requireActionActor } from "@/server/session";
 import { runAction } from "./result";
 
@@ -28,6 +29,17 @@ export async function submitPublicPreAffiliation(
     await enforceRateLimit(RATE_LIMITS.publicRegistration, await clientIp());
     const created = await createPreAffiliation(PUBLIC_ACTOR, input);
     return { accessToken: created.accessToken };
+  });
+}
+
+/** Perdeu o link dos vouchers? Recupera com o CPF e o WhatsApp da inscrição (link novo). */
+export async function recoverVouchers(input: VoucherRecoveryInput): Promise<ActionResult<{ accessToken: string }>> {
+  return runAction(async () => {
+    await enforceRateLimit(RATE_LIMITS.voucherRecovery, await clientIp());
+    // Também por CPF: ninguém fica chutando números de WhatsApp para o CPF de outra pessoa.
+    const cpf = normalizeCpf(typeof input?.cpf === "string" ? input.cpf : "");
+    if (cpf) await enforceRateLimit(RATE_LIMITS.voucherRecoveryCpf, `cpf:${cpf}`);
+    return recoverRegistrationAccess(input);
   });
 }
 

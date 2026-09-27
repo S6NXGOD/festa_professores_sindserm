@@ -25,6 +25,8 @@ Stack: Next.js (App Router) · TypeScript · PostgreSQL + Drizzle · Better Auth
 - **WhatsApp de ajuda** (Painel → Configurações): aparece como botão flutuante na inscrição e como link nos vouchers, na ficha, no login e nas telas de erro, já com a mensagem pronta. Sem número, nada aparece.
 - Filiação marcada como **não confirmada**? Se a pessoa comprovar na hora (ex.: contracheque com o desconto do SINDSERM), o Atendimento confirma na tela dela, escrevendo como foi comprovado (fica na auditoria).
 - Na portaria, confirmou a filiação, o comprovante ou a assinatura da ficha? Abre na hora o aviso **"já pode entrar!"** com o botão de registrar a entrada (+ kit), para ninguém esquecer.
+- **Perdeu o voucher?** Em `/vouchers` (link na página inicial e no rodapé do site) a pessoa digita o CPF e o WhatsApp da inscrição (com ou sem o 9) e os vouchers do grupo abrem na hora. A resposta é a mesma para CPF sem inscrição e WhatsApp diferente (o site não revela quem está inscrito), há limite de tentativas por rede e por CPF, sai um link novo (o anterior para de funcionar) e fica registrado na auditoria. Os QR Codes não mudam: imagem já salva continua valendo. Quem tenta se inscrever de novo com o mesmo CPF ganha o botão **Abrir meus vouchers** ali mesmo. Convidados recuperam pelo(a) professor(a); colaboradores, com a organização.
+- **Imagem do voucher**: nomes longos cabem sempre (a fonte do nome, o emblema e o QR se ajustam); nas frases entra só o primeiro nome, e nome digitado todo em MAIÚSCULAS aparece como "Nome Próprio".
 - **CPF** e **matrícula da prefeitura** são únicos (a matrícula é comparada sem pontuação), garantido pelo banco e avisado no campo em todas as portas de entrada: inscrição no site e na hora, ficha de filiação, correção de dados, filiação declarada na portaria, colaboradores e convidados. O CPF do **convidado é opcional** (ex.: crianças); se informado, também é único. Para virar filiado(a), o CPF passa a ser exigido.
 
 ## 1. Requisitos
@@ -95,7 +97,7 @@ O `railway.json` já configura tudo: build `npm run build`, antes de cada deploy
 
 ## 5. Rotas
 
-- Público: `/` · `/inscricao` (`?ficha=1` abre a ficha de filiação) · `/vouchers/[link]` · `/v/[token]` (voucher individual e `/imagem`) · `/local/foto`
+- Público: `/` · `/inscricao` (`?ficha=1` abre a ficha de filiação) · `/vouchers` (recuperar os vouchers) · `/vouchers/[link]` · `/v/[token]` (voucher individual e `/imagem`) · `/local/foto`
 - Equipe: `/entrar` · `/conta` · `/portaria` (leitor em `/portaria/scanner`) · `/painel` (placar, inscrições — abre na fila de conferência quando há o que conferir —, fichas de filiação — abre na fila de assinatura —, kits, colaboradores do SINDSERM, acesso ao sistema, auditoria, configurações) · `/painel/participantes/[id]` (cadastro da pessoa) · `/painel/inscricoes/[id]/vouchers` (imprime os vouchers do(a) professor(a) e do convidado numa folha) · `/painel/colaboradores/vouchers` (vouchers dos colaboradores e dos convidados deles, para imprimir)
 - Controle de entrada: `/painel/entradas` (planilha em `/painel/entradas/planilha`)
 - Divulgação: `/opengraph-image` (prévia do link) · `/divulgacao/qr` (QR Code do link de inscrição) · `/icone?s=32` (ícone do site; `/favicon.ico` aponta para ele)

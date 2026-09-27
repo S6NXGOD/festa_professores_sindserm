@@ -9,12 +9,15 @@ import {
   type RegistrationInput,
   registrationNumberKey,
   registrationSchema,
+  type VoucherRecoveryInput,
+  voucherRecoverySchema,
 } from "@/domain/schemas";
 import { maskCpf } from "@/lib/cpf";
+import { samePhone } from "@/lib/phone";
 import { todayInZone } from "@/lib/datetime";
 import { toSearchText } from "@/lib/text";
 import { generateToken, isWellFormedToken, sha256Hex } from "@/server/crypto";
-import { type Actor, actorUserId, assertPermission } from "./actor";
+import { type Actor, actorUserId, assertPermission, PUBLIC_ACTOR } from "./actor";
 import { writeAudit } from "./audit";
 import { linkDocumentsToForm } from "./documents";
 import { DomainError, isUniqueViolation } from "./errors";
@@ -311,6 +314,37 @@ export async function renewRegistrationAccess(actor: Actor, registrationId: stri
       entityType: "registration",
       entityId: reg.id,
       summary: "Novo link de vouchers gerado; o link anterior deixou de funcionar.",
+    });
+    return { accessToken };
+  });
+}
+
+/** Mesma resposta para CPF sem inscrição e WhatsApp diferente: o site não revela quem está inscrito. */
+export const RECOVERY_NOT_FOUND =
+  "Não encontramos uma inscrição com esse CPF e esse WhatsApp. Use os mesmos números da inscrição ou fale com a organização pelo WhatsApp.";
+
+/**
+ * Quem perdeu o link dos vouchers recupera pelo site com o CPF e o WhatsApp da
+ * inscrição (vale para a inscrição e para a ficha feita no site). Gera um link
+ * novo e o anterior deixa de funcionar; o QR Code de cada voucher continua o
+ * mesmo, então a imagem que a pessoa já salvou segue valendo na portaria.
+ */
+export async function recoverRegistrationAccess(input: VoucherRecoveryInput) {
+  const data = voucherRecoverySchema.parse(input);
+  return withTx(async (tx) => {
+    const [found] = await tx
+      .select({ id: registration.id, whatsapp: person.whatsapp })
+      .from(registration)
+      .innerJoin(person, eq(person.id, registration.memberPersonId))
+      .where(eq(person.cpf, data.cpf))
+      .limit(1);
+    if (!found || !samePhone(found.whatsapp, data.whatsapp)) throw new DomainError("NOT_FOUND", RECOVERY_NOT_FOUND);
+    const accessToken = await rotateAccessToken(tx, found.id);
+    await writeAudit(tx, PUBLIC_ACTOR, {
+      action: "REGISTRATION_ACCESS_RECOVERED",
+      entityType: "registration",
+      entityId: found.id,
+      summary: "Vouchers recuperados pelo site com o CPF e o WhatsApp da inscrição; o link anterior deixou de funcionar.",
     });
     return { accessToken };
   });

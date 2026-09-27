@@ -70,6 +70,7 @@ import {
 import type { GateView, GuestView, KitView } from "@/server/services/gate-view";
 import { AddGuestDialog } from "./add-guest-dialog";
 import { KitStatusText } from "./gate-result";
+import { firstName as firstNameOf } from "@/lib/text";
 
 export interface PersonOperationsProps {
   view: GateView;
@@ -323,7 +324,7 @@ function VerifySection({ view, onChanged, onConfirmed }: { view: GateView; onCha
 /** Filiação "não confirmada", mas a pessoa comprova na hora que é filiada. */
 function ProofSection({ view, onConfirmed }: { view: GateView; onConfirmed: () => void }) {
   const own = view.ownRegistration!;
-  const firstName = view.fullName.split(" ")[0];
+  const firstName = firstNameOf(view.fullName);
   return (
     <Panel title="Comprovou que é filiado(a)?" icon={Check} tone="red">
       <p className="mb-4 text-sm text-fg-muted">

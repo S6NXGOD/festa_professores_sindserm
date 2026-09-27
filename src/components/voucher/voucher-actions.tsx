@@ -7,6 +7,7 @@ import { copyText, slugify } from "@/lib/clipboard";
 import { whatsappLink } from "@/lib/phone";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { firstName } from "@/lib/text";
 
 /** Ações individuais do voucher: compartilhar, salvar imagem e imprimir. */
 export function VoucherActions({
@@ -109,7 +110,7 @@ export function SendGroupVouchersButton({
     playSound("coin");
     const origin = window.location.origin;
     const text = [
-      `Olá, ${hostName.split(" ")[0]}! Os vouchers para a ${eventName}:`,
+      `Olá, ${firstName(hostName)}! Os vouchers para a ${eventName}:`,
       `• O seu: ${origin}/v/${hostToken}`,
       `• O de ${guestName}: ${origin}/v/${guestToken}`,
       "Na entrada, é só mostrar o QR Code. O seu kit sai junto com a sua entrada; o do convidado, depois que você chegar.",

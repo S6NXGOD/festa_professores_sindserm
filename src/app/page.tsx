@@ -138,6 +138,15 @@ export default async function HomePage() {
               </Button>
             )}
           </Reveal>
+          <Reveal delay={0.22} className="mt-4">
+            <Link
+              href="/vouchers"
+              className="inline-flex items-center gap-2 rounded-lg text-sm font-semibold text-fg-muted underline-offset-4 outline-none hover:text-fg hover:underline focus-visible:ring-2 focus-visible:ring-red"
+              data-testid="recover-link"
+            >
+              <QrCode className="size-4 text-red" /> Já se inscreveu? Recuperar meus vouchers
+            </Link>
+          </Reveal>
           {event.startsAt ? (
             <Reveal delay={0.25} className="mt-8">
               <Countdown target={event.startsAt} label="A pista abre em" align="start" />

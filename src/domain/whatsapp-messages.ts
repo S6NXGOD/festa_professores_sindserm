@@ -1,3 +1,4 @@
+import { firstName as first } from "@/lib/text";
 import type { AffiliationStatus } from "./types";
 
 /*
@@ -5,10 +6,6 @@ import type { AffiliationStatus } from "./types";
  * (conferência, ficha, filiação não confirmada). A pessoa da equipe revisa no
  * WhatsApp antes de enviar.
  */
-
-function first(fullName: string) {
-  return fullName.trim().split(/\s+/)[0] ?? fullName;
-}
 
 export function registrationWhatsappMessage(input: { fullName: string; status: AffiliationStatus; eventName: string }): string {
   const hello = `Olá, ${first(input.fullName)}! Aqui é da organização da ${input.eventName}.`;

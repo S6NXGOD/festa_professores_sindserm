@@ -18,8 +18,40 @@ export function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
+/** Partículas que ficam minúsculas no meio do nome ("Maria das Dores"). */
+const NAME_PARTICLES = new Set(["da", "das", "de", "do", "dos", "e"]);
+
+/**
+ * Nome digitado todo em MAIÚSCULAS (ou todo em minúsculas) vira "Nome Próprio"
+ * para aparecer no meio de frases ("o seu e o de Gabriel"). Nome que já veio
+ * com maiúsculas e minúsculas é respeitado como está.
+ */
+export function properName(value: string): string {
+  const text = value.trim().replace(/\s+/g, " ");
+  const letters = text.replace(/[^\p{L}]/gu, "");
+  if (!letters) return text;
+  const shouting = letters === letters.toLocaleUpperCase("pt-BR");
+  const whispering = letters === letters.toLocaleLowerCase("pt-BR");
+  if (!shouting && !whispering) return text;
+  return text
+    .toLocaleLowerCase("pt-BR")
+    .split(" ")
+    .map((word, index) =>
+      index > 0 && NAME_PARTICLES.has(word)
+        ? word
+        : word
+            .split("-")
+            // Maiúscula no início e depois de apóstrofo ("d'ávila" → "D'Ávila").
+            .map((part) => part.replace(/(^|')(\p{L})/gu, (_, before: string, letter: string) => before + letter.toLocaleUpperCase("pt-BR")))
+            .join("-"),
+    )
+    .join(" ");
+}
+
+/** Primeiro nome, já em "Nome Próprio" ("  GABRIEL ARCANJO" → "Gabriel"). */
 export function firstName(fullName: string): string {
-  return fullName.split(" ")[0] ?? fullName;
+  const first = fullName.trim().split(/\s+/)[0] ?? "";
+  return properName(first || fullName);
 }
 
 export function initials(fullName: string): string {

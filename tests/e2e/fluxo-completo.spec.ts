@@ -972,4 +972,48 @@ test.describe.serial("festa das professoras e professores", () => {
       await context.close();
     });
   });
+
+  test("perdeu o voucher: recupera pelo site com CPF e WhatsApp; tentar se inscrever de novo abre os vouchers", async ({ browser }) => {
+    const context = await browser.newContext({ ...devices["Pixel 7"] });
+    const page = await context.newPage();
+
+    await test.step("pela página inicial: WhatsApp errado é recusado; o certo (mesmo sem o 9) abre os vouchers do grupo", async () => {
+      await page.goto("/");
+      await page.getByTestId("recover-link").click();
+      await expect(page).toHaveURL(/\/vouchers$/);
+      await page.getByTestId("recover-cpf").fill(MEMBER.cpf);
+      await page.getByTestId("recover-whatsapp").fill("86988887770");
+      await page.getByTestId("recover-submit").click();
+      await expect(page.getByTestId("recover-error")).toContainText("Não encontramos uma inscrição com esse CPF e esse WhatsApp");
+      await page.getByTestId("recover-whatsapp").fill("8699998888");
+      await page.getByTestId("recover-submit").click();
+      await page.waitForURL(/\/vouchers\/[0-9A-Za-z_-]+/);
+      await expect(page.getByRole("heading", { name: "Achamos seus vouchers!" })).toBeVisible();
+      await expect(page.getByTestId("voucher-card")).toHaveCount(2);
+      // Lembrete de salvar no celular, desta vez para não perder de novo.
+      await expect(page.getByTestId("voucher-reminder")).toBeVisible();
+      await page.getByTestId("reminder-later").click();
+    });
+
+    await test.step("inscrição de novo com o mesmo CPF: um toque abre os vouchers com o CPF e o WhatsApp digitados", async () => {
+      await page.goto("/inscricao");
+      await page.getByTestId("answer-member-yes").click();
+      await page.fill("#member-name", MEMBER.name);
+      await page.fill("#member-cpf", MEMBER.cpf);
+      await page.fill("#member-whatsapp", MEMBER.whatsapp);
+      await page.fill("#member-registration", "99999-1");
+      await page.fill("#member-workplace", MEMBER.workplace);
+      await page.getByTestId("teacher-no").click();
+      await page.getByTestId("wizard-next").click();
+      await page.locator("label[for=privacy-consent]").click();
+      await page.getByTestId("submit-registration").click();
+      const recovery = page.getByTestId("cpf-taken-recovery");
+      await expect(recovery).toContainText("Esse CPF já está inscrito na festa.");
+      await recovery.getByTestId("cpf-taken-open").click();
+      await page.waitForURL(/\/vouchers\/[0-9A-Za-z_-]+/);
+      await expect(page.getByRole("heading", { name: "Achamos seus vouchers!" })).toBeVisible();
+    });
+
+    await context.close();
+  });
 });

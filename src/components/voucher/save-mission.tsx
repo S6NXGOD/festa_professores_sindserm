@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { slugify } from "@/lib/clipboard";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { firstName } from "@/lib/text";
 
 export interface MissionVoucher {
   personId: string;
@@ -111,7 +112,7 @@ export function SaveVouchersMission({
   }
 
   function sendToGuest(voucher: MissionVoucher) {
-    const first = voucher.fullName.split(" ")[0];
+    const first = firstName(voucher.fullName);
     const url = `${window.location.origin}/v/${voucher.token}`;
     const text = `Oi, ${first}! Este é o seu voucher da ${eventName}. Mostre o QR Code na entrada: ${url}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
@@ -139,7 +140,7 @@ export function SaveVouchersMission({
         <ul className="grid gap-2">
           {vouchers.map((voucher) => {
             const checked = done.has(voucher.personId);
-            const first = voucher.fullName.split(" ")[0];
+            const first = firstName(voucher.fullName);
             const isGuest = voucher.kind === "GUEST";
             return (
               <li key={voucher.personId} className={cn("rounded-xl border p-3", checked ? "border-success/40 bg-success-soft" : "border-line-strong bg-ink/60")}>
@@ -199,7 +200,7 @@ export function SaveVouchersMission({
       <ul className="mt-4 space-y-2">
         {vouchers.map((voucher) => {
           const checked = done.has(voucher.personId);
-          const first = voucher.fullName.split(" ")[0];
+          const first = firstName(voucher.fullName);
           const isGuest = voucher.kind === "GUEST";
           return (
             <li

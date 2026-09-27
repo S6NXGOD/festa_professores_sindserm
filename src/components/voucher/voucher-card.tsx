@@ -5,6 +5,7 @@ import { EMPLOYEE_CATEGORY_LABEL, EMPLOYEE_CATEGORY_TITLE } from "@/domain/label
 import type { EmployeeCategory } from "@/domain/types";
 import { formatShortDateTime } from "@/lib/datetime";
 import { formatPhone, whatsappLink } from "@/lib/phone";
+import { properName } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import type { EventInfo } from "@/server/queries/config";
 import type { VoucherCardData } from "@/server/queries/vouchers";
@@ -85,7 +86,7 @@ export function VoucherCard({
             )
           ) : (
             <>
-              Convidado(a) de <span className="text-fg print:text-black">{card.hostName}</span>
+              Convidado(a) de <span className="text-fg print:text-black">{card.hostName ? properName(card.hostName) : null}</span>
             </>
           )}
           {card.isMinor ? " · menor de 18 anos" : ""}
@@ -106,7 +107,7 @@ export function VoucherCard({
           {!isMember ? (
             <Note tone="red" icon={Gift} testId="voucher-guest-kit">
               <strong className="font-bold">Você tem direito a um kit de consumação.</strong> Ele é entregue na recepção depois que{" "}
-              {card.hostName ?? "quem te convidou"} chegar.
+              {card.hostName ? properName(card.hostName) : "quem te convidou"} chegar.
               {event.kitDeadlineLabel ? ` Kits até ${event.kitDeadlineLabel}.` : ""}
             </Note>
           ) : null}
@@ -212,7 +213,7 @@ function EmployeePass({
             {card.guestName ? (
               <>
                 {" "}
-                — o seu e o de <span data-testid="voucher-guest-name">{card.guestName}</span>
+                — o seu e o de <span data-testid="voucher-guest-name">{properName(card.guestName)}</span>
               </>
             ) : null}
             .{" "}
@@ -314,7 +315,7 @@ function MemberNotes({ card, active, kitDeadline }: { card: VoucherCardData; act
           {card.guestName ? (
             <>
               {" "}
-              — o seu e o de <span data-testid="voucher-guest-name">{card.guestName}</span>
+              — o seu e o de <span data-testid="voucher-guest-name">{properName(card.guestName)}</span>
             </>
           ) : null}
           .{" "}

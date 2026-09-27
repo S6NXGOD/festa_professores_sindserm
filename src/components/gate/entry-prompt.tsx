@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { GateView } from "@/server/services/gate-view";
 import { confirmEntryLabel, KitOnEntryTile } from "./gate-result";
+import { firstName } from "@/lib/text";
 
 /**
  * Logo depois de confirmar a filiação (ou a assinatura da ficha) na portaria:
@@ -24,7 +25,7 @@ export function EntryPromptDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
-  const first = view.fullName.split(" ")[0];
+  const first = firstName(view.fullName);
   const kit = view.kitOnEntry;
   return (
     <Dialog open={open} onOpenChange={(value) => (!value ? onClose() : undefined)}>

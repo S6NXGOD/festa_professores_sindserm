@@ -55,9 +55,14 @@ export function PublicShell({
           <div className="text-xs text-fg-dim">
             <p>{eventName}</p>
             <HelpLine lead="Dúvidas?" className="mt-1 justify-center text-xs sm:justify-start" />
-            <Link href="/entrar" className="mt-1 inline-block font-semibold text-fg-muted underline-offset-4 hover:text-fg hover:underline">
-              Acesso da equipe
-            </Link>
+            <p className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1 sm:justify-start">
+              <Link href="/vouchers" className="font-semibold text-fg-muted underline-offset-4 hover:text-fg hover:underline">
+                Recuperar meus vouchers
+              </Link>
+              <Link href="/entrar" className="font-semibold text-fg-muted underline-offset-4 hover:text-fg hover:underline">
+                Acesso da equipe
+              </Link>
+            </p>
           </div>
         </div>
       </footer>

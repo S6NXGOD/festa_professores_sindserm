@@ -23,6 +23,7 @@ import { callAction } from "@/lib/call-action";
 import { playSound } from "@/lib/sound";
 import { createUserAction, resetPasswordAction, updateUserAction } from "@/server/actions/users";
 import { AccessEditor } from "./access-editor";
+import { firstName } from "@/lib/text";
 
 /** Diálogo alto (permissões por área): rola por dentro, também no celular. */
 const TALL_DIALOG = "max-h-[92dvh] overflow-y-auto";
@@ -188,7 +189,7 @@ export function ResetPasswordDialog({ userId, name }: { userId: string; name: st
         toast.error(result.fieldErrors?.password ?? result.error);
         return;
       }
-      toast.success(`Senha provisória de ${name} definida. No próximo acesso, ${name.split(" ")[0]} cria a própria.`);
+      toast.success(`Senha provisória de ${name} definida. No próximo acesso, ${firstName(name)} cria a própria.`);
       setPassword("");
       setOpen(false);
     });

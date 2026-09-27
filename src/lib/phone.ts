@@ -18,6 +18,18 @@ export function isValidPhone(value: string): boolean {
   return true;
 }
 
+/**
+ * Mesmo número? Aceita o celular com ou sem o 9 depois do DDD (muita gente
+ * cadastrou de um jeito e digita do outro).
+ */
+export function samePhone(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = normalizePhone(a ?? "");
+  const y = normalizePhone(b ?? "");
+  if (!x || !y) return false;
+  const core = (digits: string) => (digits.length === 11 && digits[2] === "9" ? digits.slice(0, 2) + digits.slice(3) : digits);
+  return core(x) === core(y);
+}
+
 export function formatPhone(value: string | null | undefined): string {
   if (!value) return "";
   const d = normalizePhone(value);
