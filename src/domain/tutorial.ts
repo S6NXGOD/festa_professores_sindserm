@@ -118,6 +118,9 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
           title: "Portaria: entrada em segundos",
           bullets: [
             "Leia o QR Code com a câmera ou busque pelo nome, CPF ou código do voucher.",
+            ...(can(access, "registerAtEvent")
+              ? ["Chegou sem inscrição? Na busca, toque em Cadastrar agora: o cadastro rápido já vem com o nome digitado."]
+              : []),
             "A tela diz na hora: LIBERADO, ou o motivo do bloqueio e o que fazer.",
             ...(can(access, "checkIn")
               ? [

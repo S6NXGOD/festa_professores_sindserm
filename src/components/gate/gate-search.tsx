@@ -4,13 +4,15 @@ import { EMPLOYEE_CATEGORY_LABEL, employeeDetail } from "@/domain/labels";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import { Building, ChevronRight, Login, MemberCard, Search, User, Users } from "@/components/icons/pixel";
+import { Building, ChevronRight, Login, MemberCard, Search, User, UserPlus, Users } from "@/components/icons/pixel";
 import { CategoryChip } from "@/components/staff/employee-category";
 import { AffiliationBadge, ToneBadge } from "@/components/status/status-badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { maskCpfInput } from "@/lib/cpf";
 import { formatTime } from "@/lib/datetime";
+import { quickRegisterHref } from "@/lib/quick-register";
 import { cn } from "@/lib/utils";
 import { searchPeopleAction } from "@/server/actions/gate";
 import type { PersonSearchResult } from "@/server/services/people";
@@ -41,10 +43,13 @@ export function GateSearch({
   basePath = "/portaria/pessoa",
   autoFocus = false,
   requireFullCpf = false,
+  registerHref = null,
 }: {
   basePath?: string;
   autoFocus?: boolean;
   requireFullCpf?: boolean;
+  /** Cadastro rápido (quem pode cadastrar): "Ninguém encontrado" vira "Cadastrar agora". */
+  registerHref?: string | null;
 }) {
   const [mode, setMode] = useState<Mode>("name");
   const [query, setQuery] = useState("");
@@ -124,6 +129,18 @@ export function GateSearch({
           <Search className="size-8 text-fg-dim" />
           <p className="display mt-2 text-xl text-fg">Ninguém encontrado</p>
           <p className="text-sm text-fg-muted">Confira a grafia ou tente pelo CPF.</p>
+          {registerHref ? (
+            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mt-4 grid w-full max-w-xs gap-1.5">
+              <Button asChild size="lg" data-testid="gate-quick-register">
+                <Link href={quickRegisterHref(registerHref, query)}>
+                  <UserPlus /> Cadastrar agora
+                </Link>
+              </Button>
+              <span className="text-xs text-fg-dim">Cadastro rápido de quem chegou sem inscrição</span>
+            </motion.div>
+          ) : (
+            <p className="mt-3 text-xs text-fg-dim">Chegou sem inscrição? Chame o Atendimento para o cadastro rápido.</p>
+          )}
         </div>
       ) : null}
 

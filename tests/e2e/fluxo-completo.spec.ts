@@ -849,6 +849,14 @@ test.describe.serial("festa das professoras e professores", () => {
         await page.goto(path);
         await expect(page, `Segurança não entra em ${path}`).toHaveURL(/\/portaria$/);
       }
+      // Cadastro rápido é do Atendimento: a Segurança vê o aviso para chamar, sem o botão.
+      await page.goto("/portaria");
+      await expect(page.getByTestId("open-quick-register")).toHaveCount(0);
+      await page.getByTestId("gate-search-input").fill("Ninguem Com Este Nome");
+      await expect(page.getByText("Chegou sem inscrição? Chame o Atendimento para o cadastro rápido.")).toBeVisible();
+      await expect(page.getByTestId("gate-quick-register")).toHaveCount(0);
+      await page.goto("/portaria/cadastro");
+      await expect(page).toHaveURL(/\/portaria$/);
       await context.close();
     });
 
@@ -1213,6 +1221,49 @@ test.describe.serial("festa das professoras e professores", () => {
     await expect(staff).toHaveURL(/\/painel\/participantes\/[0-9a-f-]{36}$/);
     await expect(staff.getByTestId("person-header")).toContainText("Rita Radar Souza");
     await staffContext.close();
+  });
+
+  test("portaria: cadastro rápido de quem chegou sem inscrição, conferência e entrada", async ({ browser }) => {
+    test.setTimeout(150_000);
+    const context = await browser.newContext({ ...devices["Pixel 7"] });
+    const page = await context.newPage();
+    await login(page, ATTENDANT);
+    await page.goto("/portaria");
+    // Não achou na busca: um toque abre o cadastro rápido já com o nome digitado.
+    await page.getByTestId("gate-search-input").fill("Joana Chegou Agora");
+    await expect(page.getByText("Ninguém encontrado")).toBeVisible();
+    await page.getByTestId("gate-quick-register").click();
+    await expect(page).toHaveURL(/\/portaria\/cadastro\?nome=Joana/);
+    await expect(page.getByTestId("quick-name")).toHaveValue("Joana Chegou Agora");
+    await page.getByTestId("quick-cpf").fill("39053344705");
+    await page.getByTestId("quick-whatsapp").fill("86988887777");
+    await page.getByTestId("quick-registration-number").fill("RAPIDA-2026");
+    await page.getByTestId("quick-workplace").fill("Escola Municipal Rapida");
+    await page.getByTestId("teacher-yes").click();
+    await page.getByTestId("guest-yes").click();
+    await expect(page.getByTestId("guest-yes")).toContainText("Veio com convidado(a)");
+    await page.getByTestId("guest-name").fill("Juca Convidado Rapido");
+    await page.locator("label[for=quick-consent]").click();
+    await page.getByTestId("quick-submit").click();
+
+    // A pessoa abre na conferência: confirma a filiação e a tela já pergunta pela entrada.
+    await expect(page).toHaveURL(/\/portaria\/pessoa\/[0-9a-f-]{36}#person-operations$/);
+    await expect(page.getByTestId("gate-person-name")).toHaveText("Joana Chegou Agora");
+    await page.getByTestId("confirm-affiliation").click();
+    await page.getByTestId("confirm-dialog-action").click();
+    const prompt = page.getByTestId("entry-prompt");
+    await expect(prompt).toBeVisible();
+    await expect(prompt.getByTestId("prompt-kit")).toContainText("Entregue 1 kit");
+    await prompt.getByTestId("prompt-confirm-entry").click();
+    await confirmEarlyEntry(page);
+    await expect(page.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
+    // O convidado dela já está na lista (entra quando chegar; o kit dele sai depois dela).
+    await page.goto("/portaria");
+    await page.getByTestId("gate-search-input").fill("Juca Convidado");
+    await expect(page.getByTestId("gate-search-result").filter({ hasText: "Juca Convidado Rapido" })).toContainText(
+      "Convidado de Joana Chegou Agora",
+    );
+    await context.close();
   });
 });
 

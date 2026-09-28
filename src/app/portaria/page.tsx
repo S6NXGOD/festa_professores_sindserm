@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CountUp } from "@/components/count-up";
 import { GateSearch } from "@/components/gate/gate-search";
-import { AlarmClock, Clock, Login, QrCode, Search, Users } from "@/components/icons/pixel";
+import { AlarmClock, Clock, Login, QrCode, Search, UserPlus, Users } from "@/components/icons/pixel";
 import { Panel } from "@/components/retro/bits";
 import { DeadlineTimer } from "@/components/retro/countdown";
 import { LiveRefresh } from "@/components/retro/live-refresh";
 import { SegmentMeter } from "@/components/staff/panel-ui";
+import { Button } from "@/components/ui/button";
 import { can } from "@/domain/rules";
 import { db } from "@/server/db";
 import { getEventInfo } from "@/server/queries/config";
@@ -20,6 +21,8 @@ export default async function GateHomePage() {
   const actor = await requirePageActor("viewGate");
   const [stats, event] = await Promise.all([getDashboardStats(db), getEventInfo()]);
   const notStarted = event ? !event.started : false;
+  // Cadastro rápido de quem chegou sem inscrição: quem cuida das inscrições (Atendimento).
+  const canRegister = can(actor.access, "registerAtEvent");
   return (
     <div className="space-y-5">
       {notStarted && event?.startsAt ? (
@@ -76,8 +79,20 @@ export default async function GateHomePage() {
         ) : null}
       </div>
 
-      <Panel title="Localizar pessoa" icon={Search}>
-        <GateSearch requireFullCpf={!can(actor.access, "viewFullCpf")} />
+      <Panel
+        title="Localizar pessoa"
+        icon={Search}
+        action={
+          canRegister ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href="/portaria/cadastro" data-testid="open-quick-register">
+                <UserPlus /> Cadastro rápido
+              </Link>
+            </Button>
+          ) : null
+        }
+      >
+        <GateSearch requireFullCpf={!can(actor.access, "viewFullCpf")} registerHref={canRegister ? "/portaria/cadastro" : null} />
       </Panel>
     </div>
   );

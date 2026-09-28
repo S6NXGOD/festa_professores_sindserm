@@ -5,6 +5,7 @@ import { formatCpf, isValidCpf, maskCpf, normalizeCpf } from "@/lib/cpf";
 import { formatPhone, isValidPhone, normalizePhone } from "@/lib/phone";
 import { utcToZonedLocalInput, zonedLocalToUtc } from "@/lib/datetime";
 import { iconSizeFor, siteIconUrl } from "@/lib/site-icon";
+import { quickRegisterHref } from "@/lib/quick-register";
 import { splitEventName, toSearchText } from "@/lib/text";
 import { authorizationText, nextMonthValue } from "@/domain/affiliation-text";
 import { isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
@@ -370,5 +371,16 @@ describe("Pessoas e kits", () => {
       { pool: "ALL", total: 160, planned: 150, balance: 10 },
       { pool: "EMPLOYEE", total: 25, planned: 30, balance: -5 },
     ]);
+  });
+});
+
+describe("Cadastro rápido da portaria", () => {
+  it("vem preenchido com o que foi digitado: nome vai para o nome, CPF completo para o CPF, código não preenche", () => {
+    expect(quickRegisterHref("/portaria/cadastro", "  Joana Chegou Agora ")).toBe("/portaria/cadastro?nome=Joana%20Chegou%20Agora");
+    expect(quickRegisterHref("/portaria/cadastro", "D'Ávila Sá")).toBe("/portaria/cadastro?nome=D'%C3%81vila%20S%C3%A1");
+    expect(quickRegisterHref("/portaria/cadastro", "390.533.447-05")).toBe("/portaria/cadastro?cpf=39053344705");
+    expect(quickRegisterHref("/portaria/cadastro", "390533")).toBe("/portaria/cadastro");
+    expect(quickRegisterHref("/portaria/cadastro", "7EQF-TZJ6")).toBe("/portaria/cadastro");
+    expect(quickRegisterHref("/portaria/cadastro", "A")).toBe("/portaria/cadastro");
   });
 });

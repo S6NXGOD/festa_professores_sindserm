@@ -243,6 +243,7 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
                     onChange={field.onChange}
                     errors={errors.guest}
                     onFieldEdit={(key) => clearErrors(key === "fullName" ? ["guest.fullName", "guest.cpf"] : `guest.${key}`)}
+                    voice={staff ? "staff" : "self"}
                   />
                 )}
               />

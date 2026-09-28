@@ -4,9 +4,12 @@ import { revalidatePath } from "next/cache";
 import type { PreAffiliationInput, RegistrationInput, VoucherRecoveryInput } from "@/domain/schemas";
 import { normalizeCpf } from "@/lib/cpf";
 import type { ActionResult } from "@/lib/action-result";
+import { db } from "@/server/db";
 import { PUBLIC_ACTOR } from "@/server/services/actor";
+import { DomainError } from "@/server/services/errors";
 import { enforceRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
 import { createPreAffiliation, createRegistration, recoverRegistrationAccess } from "@/server/services/registration";
+import { loadRegistrationState } from "@/server/services/state";
 import { clientIp, requireActionActor } from "@/server/session";
 import { runAction } from "./result";
 
@@ -18,6 +21,22 @@ export async function submitPublicRegistration(
     await enforceRateLimit(RATE_LIMITS.publicRegistration, await clientIp());
     const created = await createRegistration(PUBLIC_ACTOR, input);
     return { accessToken: created.accessToken };
+  });
+}
+
+/**
+ * Cadastro rápido na portaria: a mesma inscrição do "Cadastrar na hora"
+ * (aguardando conferência), devolvendo a pessoa para abrir direto na conferência.
+ */
+export async function submitGateRegistration(input: RegistrationInput): Promise<ActionResult<{ personId: string; registrationId: string }>> {
+  return runAction(async () => {
+    const actor = await requireActionActor();
+    const created = await createRegistration(actor, input);
+    const state = await loadRegistrationState(db, created.registrationId);
+    if (!state) throw new DomainError("NOT_FOUND", "Inscrição não encontrada depois de gravar. Busque a pessoa pelo nome.");
+    revalidatePath("/painel", "layout");
+    revalidatePath("/portaria", "layout");
+    return { personId: state.member.id, registrationId: created.registrationId };
   });
 }
 

@@ -211,6 +211,15 @@ type GuestField = keyof GuestInput;
 
 const EMPTY_GUEST: GuestInput = { fullName: "", cpf: "", isMinor: false };
 
+/** Quem fala: a própria pessoa (site), a equipe antes da festa ou a portaria (a pessoa está ali). */
+type GuestVoice = "self" | "staff" | "gate";
+
+const GUEST_CHOICE: Record<GuestVoice, { yes: string; no: string; later: string }> = {
+  self: { yes: "Vou levar convidado(a)", no: "Vou sozinho(a)", later: "Dá para cadastrar depois, na festa" },
+  staff: { yes: "Vai levar convidado(a)", no: "Vai sozinho(a)", later: "Dá para cadastrar depois, na festa" },
+  gate: { yes: "Veio com convidado(a)", no: "Veio sozinho(a)", later: "Se chegar alguém depois, cadastre na tela da pessoa" },
+};
+
 /** Campos do convidado, validados um a um (ver validateGuestStep). */
 export const GUEST_FIELD_PATHS = ["guest.fullName", "guest.cpf", "guest.isMinor"] as const;
 
@@ -238,13 +247,16 @@ export function GuestFields({
   onChange,
   errors,
   onFieldEdit,
+  voice = "self",
 }: {
   value: GuestInput | null | undefined;
   onChange: (value: GuestInput | null) => void;
   errors: GuestErrors;
   /** Campo editado: permite apagar a mensagem de erro antiga daquele campo. */
   onFieldEdit?: (field: GuestField) => void;
+  voice?: GuestVoice;
 }) {
+  const words = GUEST_CHOICE[voice];
   const bringing = Boolean(value);
   const guest = value ?? EMPTY_GUEST;
   const edit = (patch: Partial<GuestInput>, field: GuestField) => {
@@ -261,7 +273,7 @@ export function GuestFields({
             onChange(value ?? { ...EMPTY_GUEST });
           }}
           icon={UserPlus}
-          title="Vou levar convidado(a)"
+          title={words.yes}
           hint="1 pessoa, com direito ao kit"
           testId="guest-yes"
         />
@@ -272,8 +284,8 @@ export function GuestFields({
             onChange(null);
           }}
           icon={User}
-          title="Vou sozinho(a)"
-          hint="Dá para cadastrar depois, na festa"
+          title={words.no}
+          hint={words.later}
           testId="guest-no"
         />
       </div>
