@@ -4,15 +4,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { StockSettingsForm } from "@/components/settings/settings-forms";
 import { EmptyState, PageHeader, Pagination, Panel } from "@/components/staff/panel-ui";
+import { PeopleKits } from "@/components/staff/people-kits";
 import { StockCard } from "@/components/staff/stock-card";
 import { ToneBadge } from "@/components/status/status-badge";
+import { peopleKitsSummary } from "@/domain/kit-comparison";
 import { KIT_TYPE_LABEL, STOCK_MODE_LABEL } from "@/domain/labels";
 import { can } from "@/domain/rules";
 import { formatShortDateTime } from "@/lib/datetime";
 import { db } from "@/server/db";
 import { listDeliveries, pageNumber } from "@/server/queries/panel";
-import { getEventInfo } from "@/server/queries/config";
-import { getDashboardStats } from "@/server/services/stats";
+import { APP_NAME, getConfig, getEventInfo } from "@/server/queries/config";
+import { getDashboardStats, getPeopleKitComparison } from "@/server/services/stats";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Kits e estoque" };
@@ -22,9 +24,17 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
   const canPeople = can(actor.access, "viewPeople");
   const query = await searchParams;
   const page = pageNumber(query.page);
-  const [stats, deliveries, event] = await Promise.all([getDashboardStats(db), listDeliveries({ page }), getEventInfo()]);
+  const [stats, deliveries, event, comparison, config] = await Promise.all([
+    getDashboardStats(db),
+    listDeliveries({ page }),
+    getEventInfo(),
+    getPeopleKitComparison(db),
+    getConfig(),
+  ]);
   const stock = stats.stock;
   const byPool = Object.fromEntries((stock?.pools ?? []).map((p) => [p.pool, p.total]));
+  const pools = (stock?.pools ?? []).map((p) => ({ pool: p.pool, total: p.total }));
+  const summary = peopleKitsSummary({ eventName: config?.name ?? APP_NAME, when: formatShortDateTime(new Date()), comparison, pools });
 
   return (
     <div className="space-y-6">
@@ -41,25 +51,16 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
           ) : null
         }
       />
+      {/* Quem vem x quem tem kit, grupo por grupo (substitui os números "entregues / a entregar" separados por barra). */}
+      <PeopleKits
+        comparison={comparison}
+        pools={pools}
+        summary={summary}
+        links={{ registrations: can(actor.access, "viewRegistrations"), employees: can(actor.access, "viewEmployees") }}
+      />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Panel title="Saldo" icon={Gift}>
           {stock ? <StockCard stock={stock} demand={stats.kitDemand} /> : null}
-          <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <dt className="text-xs text-fg-muted">Entregues (professoras e professores / convidados{stats.employees ? " / colaboradores" : ""})</dt>
-              <dd className="display text-2xl text-fg tabular">
-                {stats.kitsDeliveredMember} / {stats.kitsDeliveredGuest}
-                {stats.employees ? ` / ${stats.kitsDeliveredEmployee}` : ""}
-              </dd>
-            </div>
-            <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <dt className="text-xs text-fg-muted">A entregar na entrada (professoras e professores / convidados{stats.employees ? " / colaboradores" : ""})</dt>
-              <dd className="display text-2xl text-fg tabular">
-                {stats.kitsOwedMember} / {stats.kitsOwedGuest}
-                {stats.employees ? ` / ${stats.kitsOwedEmployee}` : ""}
-              </dd>
-            </div>
-          </dl>
         </Panel>
         {can(actor.access, "manageSettings") && stock ? (
           <Panel title="Quantidades" icon={Package}>

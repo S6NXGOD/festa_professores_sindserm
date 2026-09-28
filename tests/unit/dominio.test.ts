@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ROLE_PRESETS } from "@/domain/access";
+import { type PeopleGroupRow, poolDemand, stockBalance, visibleRows } from "@/domain/kit-comparison";
 import { formatCpf, isValidCpf, maskCpf, normalizeCpf } from "@/lib/cpf";
 import { formatPhone, isValidPhone, normalizePhone } from "@/lib/phone";
 import { utcToZonedLocalInput, zonedLocalToUtc } from "@/lib/datetime";
@@ -338,5 +339,36 @@ describe("Nome da festa e ícone", () => {
     expect(iconSizeFor(4000)).toBe(512);
     expect(siteIconUrl(32, "q1-abc")).toBe("/icone?s=32&v=q1-abc");
     expect(siteIconUrl(192)).toBe("/icone?s=192");
+  });
+});
+
+describe("Pessoas e kits", () => {
+  const row = (id: PeopleGroupRow["id"], people: number, delivered = 0): PeopleGroupRow => ({ id, people, withKit: people, pending: 0, delivered, present: 0 });
+
+  it("professoras e professores, convidados e colaboradores sempre aparecem; os outros grupos só com alguém", () => {
+    const rows = [row("TEACHERS", 0), row("TEACHER_GUESTS", 0), row("OTHER_MEMBERS", 0), row("EMPLOYEES", 0), row("COURTESIES", 0), row("WITHOUT_KIT", 2)];
+    expect(visibleRows(rows).map((r) => r.id)).toEqual(["TEACHERS", "TEACHER_GUESTS", "EMPLOYEES", "WITHOUT_KIT"]);
+    // Kit entregue mantém a linha (mesmo sem ninguém no grupo agora).
+    expect(visibleRows([row("COURTESIES", 0, 1)]).map((r) => r.id)).toEqual(["COURTESIES"]);
+  });
+
+  it("previsão por estoque e o saldo de cada um (sobra positiva, falta negativa)", () => {
+    const demand = { member: 90, guest: 60, employee: 30 };
+    expect(poolDemand("ALL", demand)).toBe(150);
+    expect(poolDemand("MEMBER", demand)).toBe(90);
+    expect(poolDemand("GUEST", demand)).toBe(60);
+    expect(poolDemand("EMPLOYEE", demand)).toBe(30);
+    expect(
+      stockBalance(
+        [
+          { pool: "ALL", total: 160 },
+          { pool: "EMPLOYEE", total: 25 },
+        ],
+        demand,
+      ),
+    ).toEqual([
+      { pool: "ALL", total: 160, planned: 150, balance: 10 },
+      { pool: "EMPLOYEE", total: 25, planned: 30, balance: -5 },
+    ]);
   });
 });

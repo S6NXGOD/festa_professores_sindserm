@@ -461,6 +461,13 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.getByTestId("stat-teachers")).toHaveText("1");
       await expect(admin.getByTestId("stat-kits-owed")).toHaveText("0");
       await expect(admin.getByTestId("stock-forecast-all")).toContainText("Previsão com os inscritos: 2 kits");
+      // Comparativo: do placar, um toque abre "Pessoas e kits" (quem vem x quem tem kit, grupo por grupo).
+      await admin.getByTestId("dashboard-people-kits").click();
+      await expect(admin).toHaveURL(/\/painel\/kits#comparativo$/);
+      const board = admin.getByTestId("people-kits");
+      await expect(board.getByTestId("people-planned")).toHaveText("2");
+      await expect(board.getByTestId("people-row-teachers")).toContainText("Professoras e professores");
+      await expect(board.getByTestId("people-row-teacher-guests")).toContainText("Convidados das professoras e professores");
       // Vouchers do grupo (professora + convidada) numa folha só, para imprimir.
       await admin.goto("/painel/inscricoes");
       const memberRow = admin.getByTestId("registration-row").filter({ hasText: MEMBER.name });
@@ -797,6 +804,12 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(clara.getByTestId("employee-companions")).toContainText("1 sem kit");
       await admin.goto("/painel/cortesias");
       await expect(admin.getByTestId("courtesy-row").filter({ hasText: "Tiago Amigo da Clara" })).toContainText("Sem kit");
+
+      // No comparativo, colaboradores por categoria e quem entrou sem kit numa linha própria.
+      await admin.goto("/painel/kits");
+      const board = admin.getByTestId("people-kits");
+      await expect(board.getByTestId("people-row-employees")).toContainText("1 funcionário(a) · 2 prestadores");
+      await expect(board.getByTestId("people-row-without-kit")).toContainText("1 trazido por colaborador(a)");
     });
 
     await context.close();

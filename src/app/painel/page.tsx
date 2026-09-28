@@ -297,6 +297,7 @@ export default async function DashboardPage() {
           label="Convidados"
           value={stats.guests + stats.employeeGuests}
           icon={Users}
+          href={canKits ? "/painel/kits#comparativo" : undefined}
           hint={stats.employeeGuests ? `${stats.employeeGuests} de colaboradores` : undefined}
           testId="stat-guests"
         />
@@ -309,6 +310,7 @@ export default async function DashboardPage() {
           value={stats.kitsOwedMember + stats.kitsOwedGuest + stats.kitsOwedEmployee}
           icon={Gift}
           tone="neutral"
+          href={canKits ? "/painel/kits#comparativo" : undefined}
           hint={`${stats.kitsOwedMember} prof. · ${stats.kitsOwedGuest} conv.${stats.kitsOwedEmployee ? ` · ${stats.kitsOwedEmployee} colab.` : ""} · saem na entrada`}
           testId="stat-kits-owed"
         />
@@ -350,7 +352,9 @@ export default async function DashboardPage() {
           action={
             canKits ? (
               <Button asChild variant="ghost" size="sm">
-                <Link href="/painel/kits">Detalhes</Link>
+                <Link href="/painel/kits#comparativo" data-testid="dashboard-people-kits">
+                  Pessoas e kits
+                </Link>
               </Button>
             ) : null
           }

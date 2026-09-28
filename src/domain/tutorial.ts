@@ -141,7 +141,12 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
           title: "Entradas e kits",
           bullets: [
             ...(can(access, "viewEntries") ? ["Entradas: quem entrou, a que horas e quem registrou (tem planilha para o Excel)."] : []),
-            ...(can(access, "viewKits") ? ["Kits e estoque: quantos saíram e quantos sobram, com aviso quando estiver acabando."] : []),
+            ...(can(access, "viewKits")
+              ? [
+                  "Kits e estoque: o quadro Pessoas e kits compara, grupo por grupo, quem vem e quem tem direito a kit (e manda o resumo no WhatsApp).",
+                  "O estoque avisa quando estiver acabando.",
+                ]
+              : []),
           ],
         }
       : null,

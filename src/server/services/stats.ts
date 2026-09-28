@@ -1,5 +1,6 @@
 import "server-only";
 import { sql } from "drizzle-orm";
+import type { PeopleGroupId, PeopleGroupRow, PeopleKitComparison } from "@/domain/kit-comparison";
 import type { Executor } from "@/server/db";
 import { getStockOverview, type StockOverview } from "./settings";
 
@@ -164,6 +165,120 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
     employeeGuests: n("employee_guests"),
     kitDemand: { member: n("teachers"), guest: n("demand_guest"), employee: n("employees_with_kit") + n("entitled_employee_guest") },
     stock: await getStockOverview(ex),
+  };
+}
+
+const WAITING_STATUSES = sql`('PENDING', 'AWAITING_SIGNATURE')`;
+
+/**
+ * Quadro "Pessoas e kits": para cada grupo, quantas pessoas, quantas com direito
+ * a kit (e quantas ganham kit se a filiação for confirmada), kits entregues e
+ * quem já entrou. As contas de direito são as mesmas do placar e da previsão do
+ * estoque (ver `kitDemandOf`).
+ */
+export async function getPeopleKitComparison(ex: Executor): Promise<PeopleKitComparison> {
+  const result = await ex.execute<Record<string, number>>(sql`
+    WITH active_checkins AS (
+      SELECT DISTINCT person_id FROM check_in WHERE cancelled_at IS NULL
+    ),
+    expected_regs AS (
+      SELECT id, member_person_id, status, is_teacher FROM registration WHERE status IN ${EXPECTED_STATUSES}
+    ),
+    teacher_guests AS (
+      SELECT gl.guest_person_id AS person_id
+        FROM guest_link gl
+        JOIN expected_regs r ON r.id = gl.registration_id
+       WHERE gl.status = 'ACTIVE'
+    ),
+    active_employees AS (
+      SELECT id, person_id, category, with_kit, host_employee_id FROM employee WHERE removed_at IS NULL
+    ),
+    employee_guests AS (
+      SELECT gl.guest_person_id AS person_id
+        FROM guest_link gl
+        JOIN active_employees e ON e.id = gl.employee_id
+       WHERE gl.status = 'ACTIVE'
+    ),
+    employee_kits AS (
+      SELECT kd.kit_type, e.category, e.with_kit
+        FROM kit_delivery kd
+        JOIN employee e ON e.id = kd.employee_id
+       WHERE kd.cancelled_at IS NULL
+    )
+    SELECT
+      (SELECT count(*) FROM expected_regs WHERE is_teacher)::int AS teachers,
+      (SELECT count(*) FROM expected_regs WHERE is_teacher AND status IN ${ACTIVE_STATUSES})::int AS teachers_with_kit,
+      (SELECT count(*) FROM expected_regs WHERE is_teacher AND status IN ${WAITING_STATUSES})::int AS teachers_pending,
+      (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'MEMBER')::int AS teachers_delivered,
+      (SELECT count(*) FROM expected_regs r JOIN active_checkins c ON c.person_id = r.member_person_id WHERE r.is_teacher)::int AS teachers_present,
+
+      (SELECT count(*) FROM teacher_guests)::int AS guests,
+      (SELECT count(*) FROM registration r
+        WHERE r.status IN ${ACTIVE_STATUSES} AND r.is_teacher
+          AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
+               OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
+      )::int AS guests_with_kit,
+      (SELECT count(*) FROM registration r
+        WHERE r.status IN ${WAITING_STATUSES} AND r.is_teacher
+          AND EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
+      )::int AS guests_pending,
+      (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'GUEST' AND employee_id IS NULL)::int AS guests_delivered,
+      (SELECT count(*) FROM teacher_guests g JOIN active_checkins c ON c.person_id = g.person_id)::int AS guests_present,
+
+      (SELECT count(*) FROM expected_regs WHERE NOT is_teacher)::int AS others,
+      (SELECT count(*) FROM expected_regs r JOIN active_checkins c ON c.person_id = r.member_person_id WHERE NOT r.is_teacher)::int AS others_present,
+      (SELECT count(*) FROM registration WHERE status = 'REJECTED')::int AS rejected,
+
+      (SELECT count(*) FROM active_employees WHERE category <> 'COURTESY')::int AS employees,
+      (SELECT count(*) FROM active_employees WHERE category = 'BOARD')::int AS employees_board,
+      (SELECT count(*) FROM active_employees WHERE category = 'STAFF')::int AS employees_staff,
+      (SELECT count(*) FROM active_employees WHERE category = 'CONTRACTOR')::int AS employees_contractor,
+      (SELECT count(*) FROM employee_kits WHERE kit_type = 'EMPLOYEE' AND category <> 'COURTESY')::int AS employees_delivered,
+      (SELECT count(*) FROM active_employees e JOIN active_checkins c ON c.person_id = e.person_id WHERE e.category <> 'COURTESY')::int AS employees_present,
+
+      (SELECT count(*) FROM employee_guests)::int AS employee_guests,
+      (SELECT count(*) FROM active_employees e
+        WHERE EXISTS (SELECT 1 FROM guest_link gl WHERE gl.employee_id = e.id AND gl.status = 'ACTIVE')
+           OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.employee_id = e.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL)
+      )::int AS employee_guests_with_kit,
+      (SELECT count(*) FROM employee_kits WHERE kit_type = 'GUEST')::int AS employee_guests_delivered,
+      (SELECT count(*) FROM employee_guests g JOIN active_checkins c ON c.person_id = g.person_id)::int AS employee_guests_present,
+
+      (SELECT count(*) FROM active_employees WHERE category = 'COURTESY' AND with_kit)::int AS courtesies,
+      (SELECT count(*) FROM employee_kits WHERE kit_type = 'EMPLOYEE' AND category = 'COURTESY' AND with_kit)::int AS courtesies_delivered,
+      (SELECT count(*) FROM active_employees e JOIN active_checkins c ON c.person_id = e.person_id WHERE e.category = 'COURTESY' AND e.with_kit)::int AS courtesies_present,
+
+      (SELECT count(*) FROM active_employees WHERE NOT with_kit)::int AS without_kit,
+      (SELECT count(*) FROM active_employees WHERE NOT with_kit AND host_employee_id IS NOT NULL)::int AS companions,
+      -- Kit entregue antes de a cortesia virar "sem kit": aparece aqui, para a soma bater com as entregas.
+      (SELECT count(*) FROM employee_kits WHERE kit_type = 'EMPLOYEE' AND category = 'COURTESY' AND NOT with_kit)::int AS without_kit_delivered,
+      (SELECT count(*) FROM active_employees e JOIN active_checkins c ON c.person_id = e.person_id WHERE NOT e.with_kit)::int AS without_kit_present
+  `);
+  const row = result.rows[0]!;
+  const n = (key: string) => Number(row[key] ?? 0);
+  const group = (id: PeopleGroupId, prefix: string, withKit: number, pending = 0): PeopleGroupRow => ({
+    id,
+    people: n(prefix),
+    withKit,
+    pending,
+    delivered: n(`${prefix}_delivered`),
+    present: n(`${prefix}_present`),
+  });
+  return {
+    registrations: [
+      group("TEACHERS", "teachers", n("teachers_with_kit"), n("teachers_pending")),
+      group("TEACHER_GUESTS", "guests", n("guests_with_kit"), n("guests_pending")),
+      group("OTHER_MEMBERS", "others", 0),
+    ],
+    house: [
+      group("EMPLOYEES", "employees", n("employees")),
+      group("EMPLOYEE_GUESTS", "employee_guests", n("employee_guests_with_kit")),
+      group("COURTESIES", "courtesies", n("courtesies")),
+      group("WITHOUT_KIT", "without_kit", 0),
+    ],
+    rejected: n("rejected"),
+    employeeCategories: { BOARD: n("employees_board"), STAFF: n("employees_staff"), CONTRACTOR: n("employees_contractor") },
+    companions: n("companions"),
   };
 }
 

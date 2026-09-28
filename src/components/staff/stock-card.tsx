@@ -1,23 +1,11 @@
 import { Package, Warning } from "@/components/icons/pixel";
+import { type KitDemand, poolDemand } from "@/domain/kit-comparison";
 import { STOCK_POOL_LABEL } from "@/domain/labels";
 import { plural } from "@/lib/plural";
 import { cn } from "@/lib/utils";
 import type { StockPool } from "@/domain/types";
 import type { StockOverview, StockPoolView } from "@/server/services/settings";
 import { SegmentMeter } from "./panel-ui";
-
-/** Quantos kits os inscritos garantem em cada estoque (inclui entregues e quem aguarda conferência). */
-function demandFor(pool: StockPool, demand: StockDemand) {
-  if (pool === "ALL") return demand.member + demand.guest;
-  if (pool === "EMPLOYEE") return demand.employee ?? 0;
-  return pool === "MEMBER" ? demand.member : demand.guest;
-}
-
-interface StockDemand {
-  member: number;
-  guest: number;
-  employee?: number;
-}
 
 /** Quantos kits faltam para os funcionários que ainda vão receber. */
 export function employeeShortfall(pool: StockPoolView) {
@@ -33,7 +21,7 @@ export function stockAlertText(pool: StockPoolView) {
 }
 
 /** Saldo de kits por estoque, num medidor de segmentos, com alerta de estoque baixo e previsão. */
-export function StockCard({ stock, demand }: { stock: StockOverview; demand?: StockDemand }) {
+export function StockCard({ stock, demand }: { stock: StockOverview; demand?: KitDemand }) {
   return (
     <div className="space-y-5">
       {stock.pools.map((pool) => (
@@ -53,7 +41,8 @@ export function StockCard({ stock, demand }: { stock: StockOverview; demand?: St
             </p>
           </div>
           <SegmentMeter className="mt-3" value={pool.available} max={pool.total} invert label={`Estoque disponível: ${pool.available} de ${pool.total}`} />
-          {demand ? <Forecast total={pool.total} demand={demandFor(pool.pool, demand)} pool={pool.pool} /> : null}
+          {/* Quantos kits os inscritos garantem neste estoque (inclui entregues e quem aguarda conferência). */}
+          {demand ? <Forecast total={pool.total} demand={poolDemand(pool.pool, demand)} pool={pool.pool} /> : null}
           {pool.low ? (
             <p className="mt-2 flex items-center gap-1.5 text-xs font-bold text-danger">
               <Warning className="size-3.5 animate-blink" />
