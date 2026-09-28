@@ -478,6 +478,11 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.getByTestId("person-header")).toContainText(MEMBER.name);
       await admin.getByTestId("print-group-vouchers").click();
       await expect(admin.getByTestId("registration-vouchers").getByTestId("voucher-card")).toHaveCount(2);
+      // "Confirmadas": na ordem da confirmação e com quem confirmou (a mesma informação da Auditoria).
+      await admin.goto("/painel/inscricoes?filtro=CONFIRMED");
+      await expect(admin.getByTestId("registration-row").filter({ hasText: MEMBER.name }).getByTestId("registration-decision")).toContainText(
+        `confirmada por ${ATTENDANT.name}`,
+      );
       await admin.goto("/painel/auditoria");
       const auditEntries = (label: string) => admin.locator("summary").filter({ has: admin.getByText(label, { exact: true }) });
       await expect(auditEntries("Kit entregue")).toHaveCount(2);
@@ -486,6 +491,10 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(auditEntries("Entrada registrada").filter({ hasText: "O kit fica para a chegada de" })).toHaveCount(1);
       await expect(auditEntries("Entrada registrada").filter({ hasText: "com kit entregue" })).toHaveCount(1);
       await expect(auditEntries("Entrada registrada").filter({ hasText: `Kit do convidado ${GUEST.name} entregue junto` })).toHaveCount(1);
+      // Da Auditoria, um toque abre o cadastro de quem teve a filiação confirmada.
+      await auditEntries("Filiação confirmada").filter({ hasText: MEMBER.name }).getByTestId("audit-open").click();
+      await expect(admin).toHaveURL(/\/painel\/participantes\/[0-9a-f-]{36}$/);
+      await expect(admin.getByTestId("person-header")).toContainText(MEMBER.name);
     });
 
     await test.step("controle de entrada: quem entrou, a que horas, quem registrou e como (e a planilha)", async () => {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Check, ChevronRight, Gift, List, Login, UserPlus } from "@/components/icons/pixel";
+import { Cancel, Check, ChevronRight, ClipboardNote, Gift, List, Login, UserPlus } from "@/components/icons/pixel";
 import { PlayerTag } from "@/components/retro/bits";
 import { AnimatedList } from "@/components/staff/animated-list";
 import { ChipFilters, DayHeading, EmptyState, FilterBar, OrderToggle, PageHeader, Pagination } from "@/components/staff/panel-ui";
@@ -14,12 +14,13 @@ import { REGISTRATION_ORIGIN_LABEL } from "@/domain/labels";
 import { can } from "@/domain/rules";
 import { AFFILIATION_STATUSES, type AffiliationStatus } from "@/domain/types";
 import { registrationWhatsappMessage } from "@/domain/whatsapp-messages";
-import { formatTime, groupByDay } from "@/lib/datetime";
+import { formatShortDateTime, formatTime, groupByDay, todayInZone, zonedDayKey } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
 import { cn } from "@/lib/utils";
 import { APP_NAME, getConfig } from "@/server/queries/config";
 import {
   hasAnyEntry,
+  isDecidedStatus,
   listOrder,
   listRegistrations,
   listVerificationQueue,
@@ -41,6 +42,59 @@ const FILTER_LABEL: Record<Exclude<AffiliationStatus, "PENDING">, string> = {
   REJECTED: "Não confirmadas",
   JOINED_AT_EVENT: "Filiaram-se na festa",
 };
+
+/** Nos filtros de decisão, o título do dia conta decisões (não inscrições). */
+const DAY_NOUN: Partial<Record<AffiliationStatus, [string, string]>> = {
+  CONFIRMED: ["confirmada", "confirmadas"],
+  REJECTED: ["não confirmada", "não confirmadas"],
+  JOINED_AT_EVENT: ["ficha assinada", "fichas assinadas"],
+};
+
+/** A decisão, em palavras ("confirmada 15:29 por Cryslanne Lima"). */
+const DECISION_WORD: Partial<Record<AffiliationStatus, string>> = {
+  CONFIRMED: "confirmada",
+  REJECTED: "não confirmada",
+  JOINED_AT_EVENT: "ficha assinada",
+};
+
+/** "15:29" hoje; "27/09 às 15:29" em outro dia. */
+function whenLabel(date: Date, todayKey: string) {
+  return zonedDayKey(date) === todayKey ? formatTime(date) : formatShortDateTime(date);
+}
+
+/**
+ * Quem decidiu e quando: a mesma informação da Auditoria, na própria linha.
+ * `withTime`: fora dos filtros de decisão a hora da esquerda é a da inscrição,
+ * então a da decisão vem aqui.
+ */
+function Decision({
+  status,
+  at,
+  by,
+  withTime,
+  todayKey,
+}: {
+  status: AffiliationStatus;
+  at: Date | null;
+  by: string | null;
+  withTime: boolean;
+  todayKey: string;
+}) {
+  const word = DECISION_WORD[status];
+  if (!word || !at) return null;
+  const Icon = status === "REJECTED" ? Cancel : status === "JOINED_AT_EVENT" ? ClipboardNote : Check;
+  return (
+    <span
+      className={cn("inline-flex items-center gap-1 font-semibold", status === "REJECTED" ? "text-danger" : "text-success-text")}
+      data-testid="registration-decision"
+    >
+      <Icon className="size-3.5 shrink-0" />
+      {word}
+      {withTime ? ` ${whenLabel(at, todayKey)}` : ""}
+      {by ? ` por ${by}` : ""}
+    </span>
+  );
+}
 
 /** "entrou 19:42" / "ainda não entrou" — a portaria em cada linha. */
 function Presence({ at }: { at: Date | null }) {
@@ -84,6 +138,10 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
   ]);
   const data = queue ?? list!;
   const today = statusCounts.today;
+  // "Confirmadas", "Não confirmadas" e "Filiaram-se na festa": a lista segue a hora da decisão (como a Auditoria).
+  const byDecision = isDecidedStatus(status);
+  const todayKey = todayInZone();
+  const listTime = (row: { createdAt: Date; statusChangedAt: Date | null }) => (byDecision ? (row.statusChangedAt ?? row.createdAt) : row.createdAt);
   const canOpenPeople = can(actor.access, "viewPeople");
 
   return (
@@ -96,7 +154,11 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
             ? `Confira se quem declarou ser filiado(a) realmente é filiado(a) ao SINDSERM. ${
                 order === "antigas" ? "Quem espera há mais tempo aparece primeiro." : "As mais recentes aparecem primeiro."
               }`
-            : `${plural(statusCounts.total, "inscrição", "inscrições")}${today ? ` · ${today} hoje` : ""}. Cada uma é o(a) professor(a) ou filiado(a) e, se houver, o convidado. A busca acha também o convidado.`
+            : byDecision
+              ? `Na ordem da ${status === "JOINED_AT_EVENT" ? "assinatura" : "decisão"} (${
+                  order === "antigas" ? "as mais antigas primeiro" : "as últimas primeiro"
+                }), como na Auditoria. A hora da inscrição aparece em cada linha.`
+              : `${plural(statusCounts.total, "inscrição", "inscrições")}${today ? ` · ${today} hoje` : ""}. Cada uma é o(a) professor(a) ou filiado(a) e, se houver, o convidado. A busca acha também o convidado.`
         }
         actions={
           can(actor.access, "registerAtEvent") ? (
@@ -154,9 +216,9 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
         </EmptyState>
       ) : list ? (
         <div className="space-y-4">
-          {groupByDay(list.rows, (row) => row.createdAt).map((group) => (
+          {groupByDay(list.rows, listTime).map((group) => (
             <section key={group.key} className="space-y-2">
-              <DayHeading title={group.title} count={group.rows.length} />
+              <DayHeading title={group.title} count={group.rows.length} noun={(status && DAY_NOUN[status]) || undefined} />
               <div className="overflow-hidden rounded-xl border border-line bg-surface">
                 <ul className="divide-y divide-line">
                   {group.rows.map((row) => (
@@ -166,7 +228,12 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
                       data-testid="registration-row"
                     >
                       {/* No celular, a hora vai para a linha de detalhes: sobra largura para o nome e os selos. */}
-                      <span className="pixel hidden w-11 shrink-0 pt-1 text-[0.6rem] text-red tabular sm:block">{formatTime(row.createdAt)}</span>
+                      <span
+                        className="pixel hidden w-11 shrink-0 pt-1 text-[0.6rem] text-red tabular sm:block"
+                        title={byDecision ? "Hora da decisão" : "Hora da inscrição"}
+                      >
+                        {formatTime(listTime(row))}
+                      </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           {canOpenPeople ? (
@@ -185,7 +252,13 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
                           <TeacherBadge isTeacher={row.isTeacher} />
                         </div>
                         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-muted">
-                          <span className="pixel text-[0.55rem] text-red tabular sm:hidden">{formatTime(row.createdAt)}</span>
+                          <span className="pixel text-[0.55rem] text-red tabular sm:hidden">{formatTime(listTime(row))}</span>
+                          {byDecision ? (
+                            <>
+                              <Decision status={row.status} at={row.statusChangedAt} by={row.statusChangedByName} withTime={false} todayKey={todayKey} />
+                              <span data-testid="registration-created">inscrição {whenLabel(row.createdAt, todayKey)}</span>
+                            </>
+                          ) : null}
                           <span className="rounded border border-line-strong px-1.5 py-px font-semibold" data-testid="registration-origin">
                             {REGISTRATION_ORIGIN_LABEL[row.origin]}
                           </span>
@@ -195,6 +268,9 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
                               <Gift className="size-3.5" /> {row.kitsDelivered}/{row.guestName ? 2 : 1} kits
                             </span>
                           ) : null}
+                          {byDecision ? null : (
+                            <Decision status={row.status} at={row.statusChangedAt} by={row.statusChangedByName} withTime todayKey={todayKey} />
+                          )}
                         </p>
                         {row.guestName ? (
                           <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-muted" data-testid="registration-guest">

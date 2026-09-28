@@ -96,6 +96,32 @@ describe("filas do Atendimento", () => {
     expect(await registrationStatusCounts()).toMatchObject({ total: 3, today: 3, byStatus: { PENDING: 2, CONFIRMED: 1 } });
   });
 
+  it("confirmadas: na ordem da confirmação (como a Auditoria), com quem confirmou; a lista geral segue a inscrição", async () => {
+    const cedo = await registerMember({ memberName: "Alice Cedo Rocha" });
+    const tarde = await registerMember({ memberName: "Bruna Tarde Rocha" });
+    const recusada = await registerMember({ memberName: "Carla Recusada Rocha" });
+    // Quem se inscreveu por último é confirmada primeiro; quem se inscreveu cedo é confirmada depois.
+    await decideAffiliation(attendant, { registrationId: tarde.registrationId, decision: "CONFIRM" });
+    await decideAffiliation(attendant, { registrationId: cedo.registrationId, decision: "CONFIRM" });
+    await decideAffiliation(attendant, { registrationId: recusada.registrationId, decision: "REJECT" });
+    const names = (rows: { fullName: string }[]) => rows.map((row) => row.fullName);
+
+    const confirmed = await listRegistrations({ page: 1, status: "CONFIRMED" });
+    expect(names(confirmed.rows)).toEqual(["Alice Cedo Rocha", "Bruna Tarde Rocha"]);
+    expect(confirmed.rows[0]).toMatchObject({ statusChangedByName: "Paulo Atendente" });
+    expect(confirmed.rows[0]!.statusChangedAt!.getTime()).toBeGreaterThan(confirmed.rows[0]!.createdAt.getTime());
+    expect(names((await listRegistrations({ page: 1, status: "CONFIRMED", order: "antigas" })).rows)).toEqual([
+      "Bruna Tarde Rocha",
+      "Alice Cedo Rocha",
+    ]);
+    expect((await listRegistrations({ page: 1, status: "REJECTED" })).rows[0]).toMatchObject({
+      fullName: "Carla Recusada Rocha",
+      statusChangedByName: "Paulo Atendente",
+    });
+    // "Todas" continua na ordem das inscrições (a decisão aparece na linha).
+    expect(names((await listRegistrations({ page: 1 })).rows)).toEqual(["Carla Recusada Rocha", "Bruna Tarde Rocha", "Alice Cedo Rocha"]);
+  });
+
   it("lista unificada: acha o grupo pelo convidado, mostra quem já entrou e filtra quem ainda não entrou", async () => {
     const group = await registerMember({ guest: true, memberName: "Maria Grupo Souza", guestName: "Luiza Convidada Lima" });
     const solo = await registerMember({ memberName: "Joana Sozinha Reis" });

@@ -197,6 +197,16 @@ const guestCheckedInSql = sql<Date | null>`(SELECT ci.checked_in_at FROM ${guest
  * Inscrições (grupos: quem se inscreveu e o convidado), com quem já entrou.
  * `ausentes`: grupos esperados na festa em que alguém ainda não entrou.
  */
+/**
+ * Situações que são uma decisão da equipe (confirmar, não confirmar, assinar a
+ * ficha): nesses filtros a lista segue a hora da decisão, como a Auditoria.
+ */
+export const DECIDED_STATUSES = ["CONFIRMED", "REJECTED", "JOINED_AT_EVENT"] as const satisfies readonly AffiliationStatus[];
+
+export function isDecidedStatus(status: AffiliationStatus | null | undefined): boolean {
+  return Boolean(status && (DECIDED_STATUSES as readonly string[]).includes(status));
+}
+
 export async function listRegistrations(options: {
   q?: string;
   status?: AffiliationStatus | null;
@@ -204,6 +214,9 @@ export async function listRegistrations(options: {
   page: number;
   order?: ListOrder;
 }) {
+  const decider = alias(user, "decider");
+  // "Confirmadas" (e as outras decisões): as últimas decididas primeiro, não as últimas inscritas.
+  const listTime = isDecidedStatus(options.status) ? sql`coalesce(${registration.statusChangedAt}, ${registration.createdAt})` : registration.createdAt;
   const conditions: SQL[] = [];
   const search = groupSearchCondition(options.q);
   if (search) conditions.push(search);
@@ -223,6 +236,9 @@ export async function listRegistrations(options: {
         isTeacher: registration.isTeacher,
         origin: registration.origin,
         createdAt: registration.createdAt,
+        /** Quando a situação mudou (confirmada, não confirmada, ficha assinada, reaberta) e por quem. */
+        statusChangedAt: registration.statusChangedAt,
+        statusChangedByName: decider.name,
         whatsapp: person.whatsapp,
         guestName: guestNameSql,
         guestPersonId: guestPersonIdSql,
@@ -232,8 +248,11 @@ export async function listRegistrations(options: {
       })
       .from(registration)
       .innerJoin(person, eq(person.id, registration.memberPersonId))
+      .leftJoin(decider, eq(decider.id, registration.statusChangedByUserId))
       .where(where)
-      .orderBy(options.order === "antigas" ? asc(registration.createdAt) : desc(registration.createdAt))
+      .orderBy(
+        ...(options.order === "antigas" ? [asc(listTime), asc(registration.id)] : [desc(listTime), desc(registration.id)]),
+      )
       .limit(PAGE_SIZE)
       .offset((options.page - 1) * PAGE_SIZE),
     db
