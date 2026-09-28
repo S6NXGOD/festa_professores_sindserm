@@ -14,6 +14,7 @@ import {
   Clock,
   ExternalLink,
   Gift,
+  Heart,
   Link as LinkIcon,
   Loader,
   Pencil,
@@ -91,6 +92,25 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
   const own = view.ownRegistration;
   const p = view.permissions;
   const host = view.host;
+
+  if (view.employee && view.employee.category === "COURTESY") {
+    // Cortesia da organização: 1 kit (sai com a entrada, do estoque dos colaboradores) e nada de convidado.
+    const courtesy = view.employee;
+    return (
+      <div className="scroll-mt-20 space-y-4" id="person-operations">
+        <EmployeeSection view={view} />
+        {courtesy.active && p.deliverKits ? (
+          <GroupKitsSection
+            view={view}
+            intro="O kit sai sozinho com a entrada, do estoque dos colaboradores."
+            cards={[{ type: "EMPLOYEE", label: "Kit da cortesia", detail: `Para ${view.fullName}, na entrada dele(a)`, state: courtesy.kits.EMPLOYEE }]}
+            onChanged={onChanged}
+          />
+        ) : null}
+        {p.adminCorrections ? <AdminSection view={view} onChanged={onChanged} /> : null}
+      </div>
+    );
+  }
 
   if (view.employee) {
     const staffGroup = view.employee;
@@ -220,22 +240,29 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
 
 // ---------------------------------------------------------------------------
 
-/** Colaborador(a) do SINDSERM: categoria, setor, convidado e voucher. */
+/** Colaborador(a) do SINDSERM (categoria, setor, convidado e voucher) ou cortesia da organização. */
 function EmployeeSection({ view }: { view: GateView }) {
   const staffGroup = view.employee!;
   const p = view.permissions;
+  const courtesy = staffGroup.category === "COURTESY";
+  const listHref = courtesy ? "/painel/cortesias" : "/painel/colaboradores";
+  const listName = courtesy ? "cortesias" : "colaboradores";
   return (
-    <Panel title={EMPLOYEE_CATEGORY_TITLE[staffGroup.category]} icon={Building} action={<PixelTag tone="warning">Da casa</PixelTag>}>
+    <Panel
+      title={EMPLOYEE_CATEGORY_TITLE[staffGroup.category]}
+      icon={courtesy ? Heart : Building}
+      action={<PixelTag tone="warning">{courtesy ? "Cortesia" : "Da casa"}</PixelTag>}
+    >
       {staffGroup.active ? (
         <>
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
             <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <dt className="text-[0.68rem] font-bold tracking-[0.08em] text-fg-dim uppercase">Setor</dt>
+              <dt className="text-[0.68rem] font-bold tracking-[0.08em] text-fg-dim uppercase">{courtesy ? "Quem convidou" : "Setor"}</dt>
               <dd className="font-semibold text-fg">{staffGroup.jobTitle ?? "Não informado"}</dd>
             </div>
             <div className="rounded-lg border border-line bg-surface-2 p-3">
               <dt className="text-[0.68rem] font-bold tracking-[0.08em] text-fg-dim uppercase">Direitos</dt>
-              <dd className="font-semibold text-fg">1 kit + 1 convidado (com kit)</dd>
+              <dd className="font-semibold text-fg">{courtesy ? "1 kit (sem convidado)" : "1 kit + 1 convidado (com kit)"}</dd>
             </div>
           </dl>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -248,8 +275,8 @@ function EmployeeSection({ view }: { view: GateView }) {
             ) : null}
             {p.manageEmployees ? (
               <Button asChild variant="ghost">
-                <Link href="/painel/colaboradores">
-                  <Users /> Lista de colaboradores
+                <Link href={listHref}>
+                  <Users /> Lista de {listName}
                 </Link>
               </Button>
             ) : null}
@@ -257,10 +284,10 @@ function EmployeeSection({ view }: { view: GateView }) {
         </>
       ) : (
         <p className="text-sm text-fg-muted">
-          {view.fullName} foi tirado(a) da lista de colaboradores: o voucher não vale mais.{" "}
+          {view.fullName} foi tirado(a) da lista de {listName}: o voucher não vale mais.{" "}
           {p.manageEmployees ? (
-            <Link href="/painel/colaboradores?filtro=removidos" className="font-semibold text-fg underline underline-offset-4">
-              Ver na lista de colaboradores
+            <Link href={`${listHref}?filtro=removidos`} className="font-semibold text-fg underline underline-offset-4">
+              Ver na lista de {listName}
             </Link>
           ) : (
             "Procure a organização."
@@ -927,6 +954,8 @@ function AdminSection({ view, onChanged }: { view: GateView; onChanged?: () => v
   ]) {
     if (kit.kind === "DELIVERED") delivered.push({ type, kit });
   }
+  // Na cortesia, o kit próprio se chama "kit da cortesia".
+  const kitName = (type: KitType) => (type === "EMPLOYEE" && staffGroup?.category === "COURTESY" ? "Kit da cortesia" : KIT_TYPE_LABEL[type]);
   const canReopen =
     own &&
     (own.status === "CONFIRMED" || own.status === "REJECTED") &&
@@ -961,10 +990,10 @@ function AdminSection({ view, onChanged }: { view: GateView; onChanged?: () => v
             key={type}
             trigger={
               <Button variant="outline">
-                <Undo /> Estornar {KIT_TYPE_LABEL[type].toLowerCase()}
+                <Undo /> Estornar {kitName(type).toLowerCase()}
               </Button>
             }
-            title={`Estornar ${KIT_TYPE_LABEL[type].toLowerCase()}?`}
+            title={`Estornar ${kitName(type).toLowerCase()}?`}
             description={
               staffGroup
                 ? "A entrega é cancelada e o kit volta ao estoque dos colaboradores."

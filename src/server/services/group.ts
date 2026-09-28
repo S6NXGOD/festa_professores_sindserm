@@ -5,6 +5,7 @@ import { affiliationForm, guestLink, person, registration } from "@/server/db/sc
 import {
   type AddGuestInput,
   addGuestSchema,
+  COURTESY_NO_GUEST_MESSAGE,
   guestNameClash,
   SAME_NAME_EMPLOYEE_GUEST_MESSAGE,
   SAME_NAME_GUEST_MESSAGE,
@@ -97,6 +98,7 @@ async function lockHost(tx: Tx, input: { registrationId?: string | null; employe
     return hostFromRegistration(state);
   }
   const state = await lockEmployeeGroup(tx, input.employeeId!);
+  if (state.category === "COURTESY") throw new DomainError("INVALID_STATE", COURTESY_NO_GUEST_MESSAGE);
   if (!state.active) {
     throw new DomainError("INVALID_STATE", "Colaborador(a) fora da lista: traga de volta antes de cadastrar convidado.");
   }

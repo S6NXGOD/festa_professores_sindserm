@@ -1,7 +1,7 @@
 import { FestaEmblem, UnionLogo } from "@/components/brand/brand";
-import { Calendar, ClipboardNote, Gift, Info, Login, MapPin, Star, Warning, Whatsapp } from "@/components/icons/pixel";
+import { Calendar, ClipboardNote, Gift, Heart, Info, Login, MapPin, Star, Warning, Whatsapp } from "@/components/icons/pixel";
 import { PlayerTag } from "@/components/retro/bits";
-import { EMPLOYEE_CATEGORY_LABEL, EMPLOYEE_CATEGORY_TITLE } from "@/domain/labels";
+import { EMPLOYEE_CATEGORY_LABEL, EMPLOYEE_CATEGORY_TITLE, employeeTitleLine } from "@/domain/labels";
 import type { EmployeeCategory } from "@/domain/types";
 import { formatShortDateTime } from "@/lib/datetime";
 import { formatPhone, whatsappLink } from "@/lib/phone";
@@ -142,6 +142,14 @@ const METAL: Record<EmployeeCategory, { card: string; band: string; text: string
     tag: "bg-[#22d3ee] text-ink",
     edge: "border-[#22d3ee]/70",
   },
+  // Cortesia da organização: rosa-neon, a outra cor da arte da festa.
+  COURTESY: {
+    card: "border-[#ff4fb4]/80 shadow-[0_0_46px_-16px_rgb(255_79_180/0.6),0_30px_60px_-30px_rgb(0_0_0/0.9)]",
+    band: "bg-[linear-gradient(90deg,#be185d,#ff9ad5_45%,#ff4fb4)] text-ink",
+    text: "text-[#ff8fd0]",
+    tag: "bg-[#ff4fb4] text-ink",
+    edge: "border-[#ff4fb4]/70",
+  },
 };
 
 /** Voucher de colaborador(a) do SINDSERM: o "passe da casa", diferente do voucher dos filiados. */
@@ -158,6 +166,7 @@ function EmployeePass({
 }) {
   const category: EmployeeCategory = card.category ?? "STAFF";
   const metal = METAL[category];
+  const courtesy = category === "COURTESY";
   return (
     <article
       className={cn(
@@ -167,7 +176,7 @@ function EmployeePass({
       )}
       aria-label={`Voucher de ${EMPLOYEE_CATEGORY_TITLE[category]}: ${card.fullName}`}
       data-testid="voucher-card"
-      data-kind="employee"
+      data-kind={courtesy ? "courtesy" : "employee"}
       data-category={category}
     >
       <div className="relative bg-ink print:bg-white">
@@ -177,7 +186,15 @@ function EmployeePass({
       {/* Faixa no metal da categoria: é assim que a portaria reconhece de longe o passe da casa. */}
       <div className={cn("flex items-center justify-between px-5 py-2 print:border-y print:border-black print:bg-none", metal.band)}>
         <span className="pixel flex items-center gap-1.5 text-[0.7rem]">
-          <Star className="size-3.5" /> Passe da casa
+          {courtesy ? (
+            <>
+              <Heart className="size-3.5" /> Cortesia
+            </>
+          ) : (
+            <>
+              <Star className="size-3.5" /> Passe da casa
+            </>
+          )}
         </span>
         <span className="pixel text-[0.55rem]">SINDSERM</span>
       </div>
@@ -185,7 +202,7 @@ function EmployeePass({
       <div className="relative px-5 pt-3 pb-4">
         <div className="flex items-center justify-between gap-2">
           <span className={cn("pixel inline-flex items-center rounded-[4px] px-1.5 py-1 text-[0.55rem] leading-none", metal.tag)} data-testid="voucher-category">
-            {EMPLOYEE_CATEGORY_LABEL[category]}
+            {courtesy ? "Convidado(a)" : EMPLOYEE_CATEGORY_LABEL[category]}
           </span>
           <span className="pixel text-[0.5rem] text-fg-muted print:text-black">Admit one</span>
         </div>
@@ -193,8 +210,7 @@ function EmployeePass({
           {card.fullName}
         </h3>
         <p className={cn("mt-1 text-sm font-semibold print:text-black", metal.text)} data-testid="voucher-job">
-          {EMPLOYEE_CATEGORY_TITLE[category]}
-          {card.jobTitle ? ` · ${card.jobTitle}` : ""}
+          {employeeTitleLine(category, card.jobTitle)}
         </p>
       </div>
 

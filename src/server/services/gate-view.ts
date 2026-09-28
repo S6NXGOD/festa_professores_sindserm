@@ -212,7 +212,15 @@ function employeeKitPreview(
       detail: `O de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
     };
   }
-  if (!ownReason) return { kind: "WILL_DELIVER", count: 1, label: "1 kit de colaborador(a)", detail: KIT_TYPE_LABEL.EMPLOYEE };
+  if (!ownReason) {
+    const courtesy = group.category === "COURTESY";
+    return {
+      kind: "WILL_DELIVER",
+      count: 1,
+      label: courtesy ? "1 kit da cortesia" : "1 kit de colaborador(a)",
+      detail: courtesy ? "Kit da cortesia" : KIT_TYPE_LABEL.EMPLOYEE,
+    };
+  }
   if (guestOut) {
     return {
       kind: "WILL_DELIVER",

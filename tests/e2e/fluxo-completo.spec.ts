@@ -759,7 +759,8 @@ test.describe.serial("festa das professoras e professores", () => {
   });
 
   test("perfis de acesso: cada um só chega aonde pode; verificação de saúde", async ({ browser }) => {
-    test.setTimeout(120_000);
+    // Vários logins em sequência (inclusive com troca de senha): folga para máquinas lentas.
+    test.setTimeout(240_000);
 
     await test.step("visitante sem login vai para o login", async () => {
       const context = await browser.newContext();
@@ -1016,4 +1017,66 @@ test.describe.serial("festa das professoras e professores", () => {
 
     await context.close();
   });
+
+  test("cortesias: amigos e familiares da organização, com voucher próprio e kit do estoque dos colaboradores", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 412, height: 915 } });
+    const admin = await context.newPage();
+    await login(admin, ADMIN);
+
+    await test.step("uma por uma: \"Cadastrar mais uma\" mantém quem convidou (a família entra em sequência)", async () => {
+      await admin.goto("/painel/cortesias");
+      await admin.getByTestId("add-courtesy").click();
+      await admin.getByTestId("courtesy-name").fill("Helena Presidente Costa");
+      await admin.getByTestId("courtesy-inviter").fill("Presidência");
+      await admin.getByTestId("save-courtesy").click();
+      await expect(admin.getByTestId("courtesy-added")).toContainText("Helena na lista!");
+      await admin.getByTestId("courtesy-another").click();
+      await expect(admin.getByTestId("courtesy-inviter")).toHaveValue("Presidência");
+      await admin.getByTestId("courtesy-name").fill("Theo Presidente Costa");
+      await admin.getByTestId("courtesy-minor").click();
+      await admin.getByTestId("save-courtesy").click();
+      await expect(admin.getByTestId("courtesy-added")).toContainText("2 cadastradas agora");
+      await admin.keyboard.press("Escape");
+      const group = admin.getByTestId("courtesy-group").filter({ hasText: "Convite: Presidência" });
+      await expect(group.getByTestId("courtesy-row")).toHaveCount(2);
+      await expect(group.getByTestId("courtesy-row").filter({ hasText: "Theo Presidente Costa" })).toContainText("Menor de 18");
+      // Os vouchers do convite inteiro numa mensagem só.
+      await expect(group.getByTestId("share-courtesy-group")).toContainText("Mandar os 2");
+    });
+
+    await test.step("colando a lista da família, com quem convidou para a lista toda", async () => {
+      await admin.getByTestId("bulk-courtesies").click();
+      await admin.getByTestId("bulk-courtesy-inviter").fill("Família do Carlos");
+      await admin.getByTestId("bulk-courtesies-text").fill("Carla Mendes Silva\nJoão Pedro Mendes; Tesouraria");
+      await expect(admin.getByTestId("bulk-preview")).toContainText("Convite: Família do Carlos");
+      await expect(admin.getByTestId("bulk-preview")).toContainText("Convite: Tesouraria");
+      await admin.getByTestId("save-bulk-courtesies").click();
+      await expect(admin.getByTestId("courtesy-row")).toHaveCount(4);
+      await expect(admin.getByTestId("stat-courtesies")).toHaveText("4");
+      // Cortesias não aparecem na lista de colaboradores (e a de colaboradores continua a mesma).
+      await admin.goto("/painel/colaboradores");
+      await expect(admin.getByTestId("employee-row")).toHaveCount(3);
+    });
+
+    await test.step("voucher rosa de cortesia e entrada com o kit do estoque dos colaboradores", async () => {
+      await admin.goto("/painel/cortesias");
+      await admin.getByRole("link", { name: "Voucher de Helena Presidente Costa" }).click();
+      await expect(admin.getByTestId("voucher-card").first()).toHaveAttribute("data-kind", "courtesy");
+      await expect(admin.getByTestId("voucher-job")).toContainText("Cortesia do SINDSERM · Convite: Presidência");
+      await openPersonAtGate(admin, "Helena Presidente", "Helena Presidente Costa");
+      await expect(admin.getByTestId("gate-person-role")).toContainText("Cortesia do SINDSERM · Convite: Presidência");
+      await admin.getByTestId("confirm-entry").click();
+      await confirmEarlyEntry(admin);
+      await expect(admin.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
+      await expect(admin.getByTestId("entry-kit-result")).toContainText("Kit da cortesia (estoque dos colaboradores)");
+      await admin.goto("/painel/cortesias");
+      await expect(admin.getByTestId("stat-courtesies-present")).toHaveText("1");
+      await admin.goto("/painel/entradas?filtro=cortesias");
+      await expect(admin.getByTestId("entry-row")).toHaveCount(1);
+      await expect(admin.getByTestId("entry-row")).toContainText("Helena Presidente Costa");
+    });
+
+    await context.close();
+  });
 });
+

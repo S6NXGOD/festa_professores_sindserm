@@ -80,8 +80,10 @@ export const affiliationFormOriginEnum = pgEnum("affiliation_form_origin", ["PUB
  * Colaboradores do SINDSERM liberados para a festa: funcionários (STAFF, o
  * padrão de quem já estava na lista), diretoria (BOARD) e prestadores de
  * serviço (CONTRACTOR). Todos com a mesma regra: voucher próprio, 1 kit e 1 convidado.
+ * Cortesias da organização (COURTESY: amigos, familiares, autoridades) usam o
+ * mesmo cadastro: voucher próprio e 1 kit do estoque dos colaboradores, sem convidado.
  */
-export const employeeCategoryEnum = pgEnum("employee_category", ["STAFF", "BOARD", "CONTRACTOR"]);
+export const employeeCategoryEnum = pgEnum("employee_category", ["STAFF", "BOARD", "CONTRACTOR", "COURTESY"]);
 
 // ---------------------------------------------------------------------------
 // Better Auth (equipe). Participantes não possuem conta.

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { EMPLOYEE_CATEGORY_TITLE } from "@/domain/labels";
+import { employeeTitleLine } from "@/domain/labels";
 import type { EmployeeCategory } from "@/domain/types";
 import { formatPhone } from "@/lib/phone";
 import { firstName, properName } from "@/lib/text";
@@ -30,6 +30,7 @@ const METAL: Record<EmployeeCategory, { accent: string; rgb: string; tagText: st
   BOARD: { accent: "#e4e4e7", rgb: "228,228,231", tagText: "#0e0e0f", tag: "DIRETORIA" },
   STAFF: { accent: AMBER, rgb: "248,192,0", tagText: "#1a1300", tag: "FUNCIONÁRIO(A)" },
   CONTRACTOR: { accent: "#22d3ee", rgb: "34,211,238", tagText: "#0e0e0f", tag: "PRESTADOR(A)" },
+  COURTESY: { accent: "#ff4fb4", rgb: "255,79,180", tagText: "#1a0010", tag: "CORTESIA" },
 };
 const INK = "#080808";
 /** Nenhum bloco encolhe: a altura de cada um é garantida pela conta do layout. */
@@ -70,7 +71,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
       : `1 kit de consumação, depois que ${card.hostName ? firstName(card.hostName) : "quem te convidou"} chegar`;
   const tag = isEmployee ? metal.tag : isMember ? "PLAYER 1" : "PLAYER 2";
   const subtitle = isEmployee
-    ? `${EMPLOYEE_CATEGORY_TITLE[category]}${card.jobTitle ? ` · ${card.jobTitle}` : ""}`
+    ? employeeTitleLine(category, card.jobTitle)
     : isMember
       ? card.isTeacher
         ? "Professor(a) filiado(a)"
@@ -128,7 +129,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                 {tag}
               </div>
               <div style={{ display: "flex", fontFamily: "Pixel", fontSize: 28, letterSpacing: 2, color: isEmployee ? metal.accent : "#a8a49e" }}>
-                {isEmployee ? "PASSE DA CASA" : "ADMIT ONE"}
+                {isEmployee ? (category === "COURTESY" ? "CONVITE ESPECIAL" : "PASSE DA CASA") : "ADMIT ONE"}
               </div>
             </div>
             <div

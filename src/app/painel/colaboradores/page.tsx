@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ConfirmActionDialog } from "@/components/common/confirm-action-dialog";
 import { Building, Gift, Login, Pencil, Printer, QrCode, Reload, Trash, Users, Warning } from "@/components/icons/pixel";
 import { PlayerTag } from "@/components/retro/bits";
+import { CATEGORY_AVATAR } from "@/components/staff/category-avatar";
 import { CategoryChip } from "@/components/staff/employee-category";
 import { BulkEmployeesDialog, EditEmployeeDialog, EmployeeDialog } from "@/components/staff/employee-dialogs";
 import { ChipFilters, EmptyState, PageHeader, StatTile } from "@/components/staff/panel-ui";
@@ -10,7 +11,7 @@ import { ToneBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
 import { can } from "@/domain/access";
 import { employeeCategoryCount } from "@/domain/labels";
-import { EMPLOYEE_CATEGORIES, type EmployeeCategory } from "@/domain/types";
+import { COLLABORATOR_CATEGORIES, type CollaboratorCategory } from "@/domain/types";
 import { formatCpf } from "@/lib/cpf";
 import { formatTime } from "@/lib/datetime";
 import { maskPhoneInput } from "@/lib/phone";
@@ -32,13 +33,6 @@ const FILTERS = {
   removidos: "Tirados da lista",
 } as const;
 
-/** Iniciais no "metal" da categoria. */
-const AVATAR: Record<EmployeeCategory, string> = {
-  BOARD: "bg-[#e4e4e7] text-ink shadow-[0_3px_0_0_#71717a]",
-  STAFF: "bg-warning text-warning-foreground shadow-[0_3px_0_0_#8a6a00]",
-  CONTRACTOR: "bg-[#22d3ee] text-ink shadow-[0_3px_0_0_#0e7490]",
-};
-
 export default async function EmployeesPage({ searchParams }: PageProps<"/painel/colaboradores">) {
   const actor = await requirePageActor("viewEmployees");
   const canManage = can(actor.access, "manageEmployees");
@@ -46,17 +40,20 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
   const filterParam = typeof query.filtro === "string" ? query.filtro : typeof query.removidos === "string" ? "removidos" : "";
   const filter = (Object.hasOwn(FILTERS, filterParam) ? filterParam : "") as keyof typeof FILTERS;
   const categoryParam = typeof query.categoria === "string" ? query.categoria : "";
-  const category = (EMPLOYEE_CATEGORIES as readonly string[]).includes(categoryParam) ? (categoryParam as EmployeeCategory) : null;
-  const [all, stock] = await Promise.all([listEmployees(db, { includeRemoved: true }), getStockOverview(db)]);
+  const category = (COLLABORATOR_CATEGORIES as readonly string[]).includes(categoryParam) ? (categoryParam as CollaboratorCategory) : null;
+  const [everyone, stock] = await Promise.all([listEmployees(db, { includeRemoved: true, kind: "all" }), getStockOverview(db)]);
+  // Cortesias têm tela própria, mas tiram kit do mesmo estoque: entram só na conta do estoque.
+  const all = everyone.filter((row) => row.category !== "COURTESY");
+  const courtesies = everyone.filter((row) => row.category === "COURTESY" && !row.removedAt).length;
   const active = all.filter((row) => !row.removedAt);
   const present = active.filter((row) => row.checkedInAt);
   const guests = active.filter((row) => row.guest);
   const guestsPresent = guests.filter((row) => row.guest?.checkedInAt).length;
-  // Todo colaborador tem kit; o convidado dele também (os dois do estoque dos colaboradores).
-  const kitsNeeded = active.length + guests.length;
+  // Todo colaborador tem kit; o convidado dele também; cada cortesia, 1 (tudo do estoque dos colaboradores).
+  const kitsNeeded = active.length + guests.length + courtesies;
   const employeePool = stock?.pools.find((pool) => pool.pool === "EMPLOYEE") ?? null;
-  const byCategory = Object.fromEntries(EMPLOYEE_CATEGORIES.map((c) => [c, active.filter((row) => row.category === c).length])) as Record<
-    EmployeeCategory,
+  const byCategory = Object.fromEntries(COLLABORATOR_CATEGORIES.map((c) => [c, active.filter((row) => row.category === c).length])) as Record<
+    CollaboratorCategory,
     number
   >;
   const inStatus =
@@ -68,7 +65,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
           ? active.filter((row) => !row.checkedInAt)
           : active;
   const rows = category ? inStatus.filter((row) => row.category === category) : inStatus;
-  const breakdown = EMPLOYEE_CATEGORIES.filter((c) => byCategory[c] > 0)
+  const breakdown = COLLABORATOR_CATEGORIES.filter((c) => byCategory[c] > 0)
     .map((c) => employeeCategoryCount(c, byCategory[c]))
     .join(" · ");
 
@@ -77,7 +74,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
       <PageHeader
         eyebrow="Cadastro interno"
         title="Colaboradores do SINDSERM"
-        description="Diretoria, funcionários e prestadores de serviço liberados para a festa: cada um tem voucher próprio (o passe da casa, com a categoria), 1 kit de consumação e pode levar 1 convidado com kit. Os kits saem do estoque dos colaboradores."
+        description="Diretoria, funcionários e prestadores de serviço liberados para a festa: cada um tem voucher próprio (o passe da casa, com a categoria), 1 kit de consumação e pode levar 1 convidado com kit. Os kits saem do estoque dos colaboradores. Amigos e familiares a mais entram como cortesias."
         actions={
           <>
             {canManage ? (
@@ -124,8 +121,8 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
           <Warning className="mt-0.5 size-4 shrink-0 text-warning" />
           <span>
             {employeePool
-              ? `O estoque dos colaboradores (${employeePool.total}) é menor que os kits previstos: ${plural(active.length, "colaborador", "colaboradores")} + ${plural(guests.length, "convidado", "convidados")} = ${kitsNeeded}.`
-              : `Nenhum kit cadastrado no estoque dos colaboradores: são previstos ${kitsNeeded} (colaboradores + convidados).`}{" "}
+              ? `O estoque dos colaboradores (${employeePool.total}) é menor que os kits previstos: ${plural(active.length, "colaborador", "colaboradores")} + ${plural(guests.length, "convidado", "convidados")}${courtesies ? ` + ${plural(courtesies, "cortesia", "cortesias")}` : ""} = ${kitsNeeded}.`
+              : `Nenhum kit cadastrado no estoque dos colaboradores: são previstos ${kitsNeeded} (colaboradores + convidados${courtesies ? " + cortesias" : ""}).`}{" "}
             <Link href="/painel/kits" className="underline underline-offset-4">
               Ajustar em Kits e estoque
             </Link>
@@ -151,7 +148,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
         }))}
       />
       {/* Filtro de categoria: só aparece quando há mais de uma na lista. */}
-      {EMPLOYEE_CATEGORIES.filter((c) => byCategory[c] > 0).length > 1 ? (
+      {COLLABORATOR_CATEGORIES.filter((c) => byCategory[c] > 0).length > 1 ? (
         <div className="no-scrollbar -mx-4 -mt-1 mb-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0" data-testid="category-filter">
           <Link
             href={filter ? `/painel/colaboradores?filtro=${filter}` : "/painel/colaboradores"}
@@ -163,7 +160,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
           >
             Todas as categorias
           </Link>
-          {EMPLOYEE_CATEGORIES.filter((c) => byCategory[c] > 0).map((c) => (
+          {COLLABORATOR_CATEGORIES.filter((c) => byCategory[c] > 0).map((c) => (
             <Link
               key={c}
               href={`/painel/colaboradores?${new URLSearchParams({ ...(filter ? { filtro: filter } : {}), categoria: c }).toString()}`}
@@ -194,7 +191,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
                 className={cn("flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5", row.removedAt && "opacity-60")}
                 data-testid="employee-row"
               >
-                <span className={cn("pixel inline-flex size-10 shrink-0 items-center justify-center rounded-md text-[0.6rem]", AVATAR[row.category])}>
+                <span className={cn("pixel inline-flex size-10 shrink-0 items-center justify-center rounded-md text-[0.6rem]", CATEGORY_AVATAR[row.category])}>
                   {initials(row.fullName)}
                 </span>
                 <div className="min-w-0 flex-1">

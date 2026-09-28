@@ -1,0 +1,1 @@
+ALTER TYPE "public"."employee_category" ADD VALUE 'COURTESY';

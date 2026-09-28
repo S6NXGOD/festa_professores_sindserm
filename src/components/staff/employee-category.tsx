@@ -1,8 +1,8 @@
 "use client";
 
-import { Building, Crown, type PixelIcon, Settings } from "@/components/icons/pixel";
+import { Building, Crown, Heart, type PixelIcon, Settings } from "@/components/icons/pixel";
 import { EMPLOYEE_CATEGORY_LABEL } from "@/domain/labels";
-import { EMPLOYEE_CATEGORIES, type EmployeeCategory } from "@/domain/types";
+import { COLLABORATOR_CATEGORIES, type EmployeeCategory } from "@/domain/types";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
  * Identidade de cada categoria de colaborador(a) do SINDSERM — todas no
  * "passe da casa", cada uma com o seu metal: diretoria em platina, funcionários
  * em dourado (o de sempre) e prestadores de serviço em ciano (cor da arte da festa).
+ * Cortesias (amigos, familiares e convidados da organização) em rosa-neon, a outra cor da arte.
  */
 export const CATEGORY_STYLE: Record<
   EmployeeCategory,
@@ -36,6 +37,13 @@ export const CATEGORY_STYLE: Record<
     selected: "border-[#22d3ee] bg-[#22d3ee]/15 text-[#67e8f9] shadow-[0_0_18px_-8px_rgb(34_211_238/0.7)]",
     hint: "Quem presta serviço ao sindicato (limpeza, segurança, TI...).",
   },
+  COURTESY: {
+    icon: Heart,
+    text: "text-[#ff8fd0]",
+    chip: "border-[#ff4fb4]/55 bg-[#ff4fb4]/12 text-[#ff8fd0]",
+    selected: "border-[#ff4fb4] bg-[#ff4fb4]/15 text-[#ff8fd0] shadow-[0_0_18px_-8px_rgb(255_79_180/0.7)]",
+    hint: "Amigos, familiares e convidados da organização.",
+  },
 };
 
 /** Etiqueta da categoria (lista, portaria, busca). */
@@ -60,13 +68,14 @@ export function CategoryPicker({
 }: {
   value: EmployeeCategory;
   onChange: (category: EmployeeCategory) => void;
+  /* Só as três categorias de colaborador(a): cortesia tem tela própria. */
   label?: string;
 }) {
   return (
     <div className="grid gap-1.5">
       <p className="text-sm font-bold text-fg">{label}</p>
       <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label={label}>
-        {EMPLOYEE_CATEGORIES.map((category) => {
+        {COLLABORATOR_CATEGORIES.map((category) => {
           const style = CATEGORY_STYLE[category];
           const Icon = style.icon;
           const selected = value === category;

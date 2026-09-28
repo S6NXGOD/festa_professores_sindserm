@@ -1,10 +1,11 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, type SQL } from "drizzle-orm";
 import type { Executor, Tx } from "@/server/db";
 import { checkIn, employee, guestLink, kitDelivery, person } from "@/server/db/schema";
 import {
   type BulkEmployeesInput,
   bulkEmployeesSchema,
+  COURTESY_NO_GUEST_MESSAGE,
   type EmployeeData,
   type EmployeeInput,
   employeeSchema,
@@ -32,7 +33,17 @@ import { ensureActiveVoucher, revokeActiveVoucher } from "./vouchers";
  * prestadores de serviço: cadastro só interno, voucher próprio, 1 kit do
  * estoque dos colaboradores e 1 convidado (com kit do mesmo estoque, depois
  * que o(a) colaborador(a) chegar).
+ *
+ * Cortesias da organização (amigos, familiares, autoridades) usam o mesmo
+ * cadastro com a categoria COURTESY: voucher próprio e 1 kit do estoque dos
+ * colaboradores, que sai na entrada da própria pessoa. Não levam convidado:
+ * cada pessoa convidada é uma cortesia.
  */
+
+/** "da lista de colaboradores" / "da lista de cortesias". */
+function listName(category: EmployeeCategory) {
+  return category === "COURTESY" ? "cortesias" : "colaboradores";
+}
 
 function mapEmployeeError(error: unknown): never {
   if (isUniqueViolation(error, "person_cpf_unique")) {
@@ -72,14 +83,14 @@ async function insertEmployee(tx: Tx, actor: StaffActor, input: EmployeeFields) 
       restoredId = current?.id ?? null;
       await tx
         .update(person)
-        .set({ ...personSearchFields(input.fullName), ...(input.whatsapp ? { whatsapp: input.whatsapp } : {}) })
+        .set({ ...personSearchFields(input.fullName), isMinor: input.isMinor, ...(input.whatsapp ? { whatsapp: input.whatsapp } : {}) })
         .where(eq(person.id, existing.id));
     }
   }
   if (!personId) {
     const [created] = await tx
       .insert(person)
-      .values({ ...personSearchFields(input.fullName), cpf: input.cpf, whatsapp: input.whatsapp })
+      .values({ ...personSearchFields(input.fullName), cpf: input.cpf, whatsapp: input.whatsapp, isMinor: input.isMinor })
       .returning({ id: person.id });
     personId = created!.id;
   }
@@ -152,7 +163,8 @@ export async function createEmployee(actor: Actor, raw: EmployeeInput) {
 export async function createEmployeesFromList(actor: Actor, raw: BulkEmployeesInput) {
   assertPermission(actor, "manageEmployees");
   const input = bulkEmployeesSchema.parse(raw);
-  const { rows, errors } = parseEmployeeLines(input.text);
+  const courtesy = input.category === "COURTESY";
+  const { rows, errors } = parseEmployeeLines(input.text, { courtesy });
   if (errors.length) {
     throw new DomainError("VALIDATION", `Revise a lista: ${errors.slice(0, 3).map((e) => (e.line ? `linha ${e.line} — ${e.message}` : e.message)).join("; ")}.`, {
       text: errors.map((e) => (e.line ? `Linha ${e.line}: ${e.message}` : e.message)).join("\n"),
@@ -177,7 +189,15 @@ export async function createEmployeesFromList(actor: Actor, raw: BulkEmployeesIn
           continue;
         }
         known.add(key);
-        const fields = { fullName: row.fullName, cpf: null, whatsapp: null, jobTitle: row.jobTitle, category: input.category };
+        const fields = {
+          fullName: row.fullName,
+          cpf: null,
+          whatsapp: null,
+          // Cortesia: quem convidou vem da linha ou, se a linha não disser, do campo da lista toda.
+          jobTitle: row.jobTitle ?? (courtesy ? input.invitedBy : null),
+          category: input.category,
+          isMinor: false,
+        };
         const employeeRow = await insertEmployee(tx, actor, fields);
         if (row.guestName) {
           const added = await attachGuest(tx, actor, newHost(employeeRow, fields), { fullName: row.guestName, cpf: null, isMinor: false });
@@ -189,9 +209,10 @@ export async function createEmployeesFromList(actor: Actor, raw: BulkEmployeesIn
         await writeAudit(tx, actor, {
           action: "EMPLOYEE_ADDED",
           entityType: "employee",
-          summary:
-            `${created.length === 1 ? "1 colaborador(a) do SINDSERM liberado(a)" : `${created.length} colaboradores do SINDSERM liberados`} pela lista (${EMPLOYEE_CATEGORY_LABEL[input.category]})` +
-            (guests.length ? `, com ${plural(guests.length, "convidado", "convidados")}.` : "."),
+          summary: courtesy
+            ? `${plural(created.length, "cortesia liberada", "cortesias liberadas")} pela lista${input.invitedBy ? ` (convite: ${input.invitedBy})` : ""}.`
+            : `${created.length === 1 ? "1 colaborador(a) do SINDSERM liberado(a)" : `${created.length} colaboradores do SINDSERM liberados`} pela lista (${EMPLOYEE_CATEGORY_LABEL[input.category]})` +
+              (guests.length ? `, com ${plural(guests.length, "convidado", "convidados")}.` : "."),
           after: { names: created, guests, skipped },
         });
       }
@@ -208,13 +229,16 @@ export async function updateEmployee(actor: Actor, raw: UpdateEmployeeInput) {
   try {
     return await withTx(async (tx) => {
       const current = await lockEmployeeGroupWithPeople(tx, input.employeeId);
+      if (input.category === "COURTESY" && current.guest) {
+        throw new DomainError("INVALID_STATE", `${COURTESY_NO_GUEST_MESSAGE} Tire o convidado de ${current.person.fullName} antes.`);
+      }
       if (input.cpf && input.cpf !== current.person.cpf) {
         const [other] = await tx.select({ id: person.id }).from(person).where(eq(person.cpf, input.cpf)).limit(1);
         if (other) throw new DomainError("CPF_TAKEN", "Este CPF já pertence a outra pessoa cadastrada.", { cpf: "CPF de outra pessoa" });
       }
       await tx
         .update(person)
-        .set({ ...personSearchFields(input.fullName), cpf: input.cpf, whatsapp: input.whatsapp })
+        .set({ ...personSearchFields(input.fullName), cpf: input.cpf, whatsapp: input.whatsapp, isMinor: input.isMinor })
         .where(eq(person.id, current.person.id));
       await tx.update(employee).set({ jobTitle: input.jobTitle, category: input.category }).where(eq(employee.id, current.id));
       await writeAudit(tx, actor, {
@@ -255,13 +279,13 @@ export async function removeEmployee(actor: Actor, input: { employeeId: string }
       guestName = (await endGuestLink(tx, actor, hostFromEmployee(current), "Colaborador(a) saiu da lista")).fullName;
     }
     await tx.update(employee).set({ removedAt: new Date(), removedByUserId: actor.userId }).where(eq(employee.id, current.id));
-    await revokeActiveVoucher(tx, current.person.id, actor.userId, "Removido(a) da lista de colaboradores");
+    await revokeActiveVoucher(tx, current.person.id, actor.userId, `Removido(a) da lista de ${listName(current.category)}`);
     await writeAudit(tx, actor, {
       action: "EMPLOYEE_REMOVED",
       entityType: "employee",
       entityId: current.id,
       summary:
-        `${current.person.fullName} tirado(a) da lista de colaboradores; o voucher foi cancelado` +
+        `${current.person.fullName} tirado(a) da lista de ${listName(current.category)}; o voucher foi cancelado` +
         (guestName ? ` e o convite de ${guestName} também.` : "."),
     });
     return { removed: true, guestRemoved: Boolean(guestName) };
@@ -281,7 +305,7 @@ export async function restoreEmployee(actor: Actor, input: { employeeId: string 
       action: "EMPLOYEE_RESTORED",
       entityType: "employee",
       entityId: current.id,
-      summary: `${current.person.fullName} voltou para a lista de colaboradores (voucher novo).`,
+      summary: `${current.person.fullName} voltou para a lista de ${listName(current.category)} (voucher novo).`,
     });
     return { restored: true };
   });
@@ -307,13 +331,25 @@ export interface EmployeeRow {
   whatsapp: string | null;
   jobTitle: string | null;
   category: EmployeeCategory;
+  isMinor: boolean;
   removedAt: Date | null;
   checkedInAt: Date | null;
   kitDeliveredAt: Date | null;
   guest: EmployeeGuestRow | null;
 }
 
-export async function listEmployees(ex: Executor, options: { includeRemoved?: boolean } = {}): Promise<EmployeeRow[]> {
+/**
+ * Lista do cadastro interno. `kind`: só os colaboradores (tela Colaboradores),
+ * só as cortesias (tela Cortesias) ou todos.
+ */
+export async function listEmployees(
+  ex: Executor,
+  options: { includeRemoved?: boolean; kind?: "collaborators" | "courtesies" | "all" } = {},
+): Promise<EmployeeRow[]> {
+  const conditions: SQL[] = [];
+  if (!options.includeRemoved) conditions.push(isNull(employee.removedAt));
+  if (options.kind === "collaborators") conditions.push(ne(employee.category, "COURTESY"));
+  if (options.kind === "courtesies") conditions.push(eq(employee.category, "COURTESY"));
   const rows = await ex
     .select({
       employeeId: employee.id,
@@ -323,11 +359,12 @@ export async function listEmployees(ex: Executor, options: { includeRemoved?: bo
       whatsapp: person.whatsapp,
       jobTitle: employee.jobTitle,
       category: employee.category,
+      isMinor: person.isMinor,
       removedAt: employee.removedAt,
     })
     .from(employee)
     .innerJoin(person, eq(person.id, employee.personId))
-    .where(options.includeRemoved ? undefined : isNull(employee.removedAt))
+    .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(asc(person.searchName));
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.employeeId);

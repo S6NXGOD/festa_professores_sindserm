@@ -14,7 +14,7 @@ import { type Page, PAGE_SIZE } from "./panel";
  * como (QR, busca, código), os kits que saíram junto e os estornos.
  */
 
-export const ENTRY_FILTERS = ["todas", "filiados", "convidados", "colaboradores", "estornadas"] as const;
+export const ENTRY_FILTERS = ["todas", "filiados", "convidados", "colaboradores", "cortesias", "estornadas"] as const;
 export type EntryFilter = (typeof ENTRY_FILTERS)[number];
 
 export interface EntryRow {
@@ -57,7 +57,10 @@ function filterConditions(options: { q?: string; filter: EntryFilter; operator?:
   conditions.push(options.filter === "estornadas" ? isNotNull(checkIn.cancelledAt) : isNull(checkIn.cancelledAt));
   if (options.filter === "filiados") conditions.push(eq(checkIn.role, "MEMBER"));
   if (options.filter === "convidados") conditions.push(eq(checkIn.role, "GUEST"));
-  if (options.filter === "colaboradores") conditions.push(eq(checkIn.role, "EMPLOYEE"));
+  // Cortesias usam o cadastro dos colaboradores: separa pela categoria (subconsulta, vale também na contagem).
+  const courtesyIds = sql`(SELECT e.id FROM ${employee} e WHERE e.category = 'COURTESY')`;
+  if (options.filter === "colaboradores") conditions.push(and(eq(checkIn.role, "EMPLOYEE"), sql`${checkIn.employeeId} NOT IN ${courtesyIds}`)!);
+  if (options.filter === "cortesias") conditions.push(and(eq(checkIn.role, "EMPLOYEE"), sql`${checkIn.employeeId} IN ${courtesyIds}`)!);
   if (options.operator) conditions.push(eq(checkIn.checkedInByUserId, options.operator));
   const search = options.q ? personSearchCondition(options.q, { allowPartialCpf: true }) : null;
   if (search) conditions.push(search);
@@ -195,6 +198,7 @@ export function csvCell(value: string | number | null | undefined): string {
 
 function entryType(row: EntryRow): string {
   if (row.role === "GUEST") return "Convidado(a)";
+  if (row.role === "EMPLOYEE" && row.employeeCategory === "COURTESY") return "Cortesia";
   if (row.role === "EMPLOYEE") return `Colaborador(a) · ${row.employeeCategory ? EMPLOYEE_CATEGORY_LABEL[row.employeeCategory] : "SINDSERM"}`;
   return row.isTeacher ? "Professor(a)" : "Filiado(a)";
 }

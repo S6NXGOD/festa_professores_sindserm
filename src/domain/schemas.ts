@@ -379,11 +379,14 @@ export const teacherStatusSchema = z.object({
 export type TeacherStatusInput = z.input<typeof teacherStatusSchema>;
 
 // ---------------------------------------------------------------------------
-// Colaboradores do SINDSERM: diretoria, funcionários e prestadores (cadastro só interno)
+// Colaboradores do SINDSERM (diretoria, funcionários e prestadores) e cortesias
+// da organização (amigos, familiares, autoridades): cadastro só interno
 // ---------------------------------------------------------------------------
 
 /** Setor ou cargo no sindicato (opcional). */
 export const employeeJobTitleField = optionalText(60);
+
+export const COURTESY_NO_GUEST_MESSAGE = "Cortesia não leva convidado: cadastre cada pessoa como uma cortesia.";
 
 export const SAME_NAME_EMPLOYEE_GUEST_MESSAGE =
   "Mesmo nome do(a) colaborador(a): informe o CPF do convidado para mostrar que é outra pessoa";
@@ -394,9 +397,12 @@ const employeeFields = z.object({
   cpf: optionalCpfField,
   /** Opcional: para mandar o voucher direto no WhatsApp da pessoa. */
   whatsapp: optionalPhoneField,
+  /** Setor ou cargo do(a) colaborador(a); na cortesia, quem convidou (ex.: "Presidência", "Família do Carlos"). */
   jobTitle: employeeJobTitleField,
-  /** Diretoria, funcionário(a) ou prestador(a) de serviço: mesma regra, voucher com a categoria. */
+  /** Diretoria, funcionário(a), prestador(a) de serviço ou cortesia: voucher com a categoria. */
   category: z.enum(EMPLOYEE_CATEGORIES).default("STAFF"),
+  /** Cortesias costumam incluir crianças: a portaria vê o aviso "menor de 18". */
+  isMinor: z.boolean().default(false),
 });
 
 /** Cadastro do(a) funcionário(a), já com o convidado (opcional). */
@@ -404,7 +410,9 @@ export const employeeSchema = employeeFields
   .extend({ guest: guestInputSchema.nullable() })
   .superRefine((data, ctx) => {
     if (!data.guest) return;
-    if (data.guest.cpf && data.cpf && data.guest.cpf === data.cpf) {
+    if (data.category === "COURTESY") {
+      ctx.addIssue({ code: "custom", path: ["guest", "fullName"], message: COURTESY_NO_GUEST_MESSAGE });
+    } else if (data.guest.cpf && data.cpf && data.guest.cpf === data.cpf) {
       ctx.addIssue({ code: "custom", path: ["guest", "cpf"], message: "O convidado precisa ter outro CPF" });
     } else if (guestNameClash(data.guest, data.fullName)) {
       ctx.addIssue({ code: "custom", path: ["guest", "cpf"], message: SAME_NAME_EMPLOYEE_GUEST_MESSAGE });
@@ -423,8 +431,10 @@ export const MAX_BULK_EMPLOYEES = 200;
 
 export const bulkEmployeesSchema = z.object({
   text: z.string().max(20_000, "Lista muito longa"),
-  /** A lista colada inteira é de uma categoria (ex.: só a diretoria). */
+  /** A lista colada inteira é de uma categoria (ex.: só a diretoria, ou só cortesias). */
   category: z.enum(EMPLOYEE_CATEGORIES).default("STAFF"),
+  /** Cortesias: quem convidou, para as linhas que não disserem (ex.: a família inteira de alguém). */
+  invitedBy: employeeJobTitleField.optional().default(null),
 });
 export type BulkEmployeesInput = z.input<typeof bulkEmployeesSchema>;
 
@@ -447,7 +457,12 @@ const NUMBER_CELL = /^\d{1,3}[.)ºª]?$/;
  * numeração ("1.", "•") e colunas vazias no começo (planilha) são ignoradas;
  * coluna vazia no meio mantém a posição (ex.: "Maria Souza;; João Souza").
  */
-export function parseEmployeeLines(text: string): { rows: BulkEmployeeLine[]; errors: { line: number; message: string }[] } {
+export function parseEmployeeLines(
+  text: string,
+  options: { courtesy?: boolean } = {},
+): { rows: BulkEmployeeLine[]; errors: { line: number; message: string }[] } {
+  // Cortesia: "Nome; Quem convidou" (cada pessoa é a própria cortesia, sem convidado).
+  const columns = options.courtesy ? "nome; quem convidou" : "nome; setor; convidado";
   const rows: BulkEmployeeLine[] = [];
   const errors: { line: number; message: string }[] = [];
   text
@@ -469,13 +484,13 @@ export function parseEmployeeLines(text: string): { rows: BulkEmployeeLine[]; er
         errors.push({ line, message: `${namePart || "(vazio)"}: ${name.error.issues[0]?.message ?? "nome inválido"}` });
         return;
       }
-      if (extra.length > 0) {
-        errors.push({ line, message: `${name.data}: use no máximo 3 colunas (nome; setor; convidado)` });
+      if (extra.length > 0 || (options.courtesy && guestPart)) {
+        errors.push({ line, message: `${name.data}: use no máximo ${options.courtesy ? 2 : 3} colunas (${columns})` });
         return;
       }
       const job = employeeJobTitleField.safeParse(jobPart);
       if (!job.success) {
-        errors.push({ line, message: `${name.data}: setor inválido` });
+        errors.push({ line, message: `${name.data}: ${options.courtesy ? "quem convidou" : "setor"} inválido` });
         return;
       }
       let guestName: string | null = null;

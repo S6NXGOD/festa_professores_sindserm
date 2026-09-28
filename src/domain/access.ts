@@ -64,10 +64,10 @@ export const MODULE_INFO: Record<AccessModule, { label: string; levels: readonly
     edit: "Fazer fichas, anexar documentos e confirmar assinatura",
   },
   colaboradores: {
-    label: "Colaboradores SINDSERM",
+    label: "Colaboradores e cortesias",
     levels: ["none", "view", "edit"],
-    view: "Ver a lista e os vouchers",
-    edit: "Liberar, editar e tirar da lista",
+    view: "Ver as listas e os vouchers",
+    edit: "Liberar colaboradores e cortesias, editar e tirar da lista",
   },
   correcoes: {
     label: "Correções",

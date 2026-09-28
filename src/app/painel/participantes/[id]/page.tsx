@@ -14,7 +14,7 @@ import { WhatsAppButton } from "@/components/staff/whatsapp-button";
 import { AffiliationBadge, TeacherBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
 import { homePathFor } from "@/domain/access";
-import { EMPLOYEE_CATEGORY_TITLE, REGISTRATION_ORIGIN_LABEL } from "@/domain/labels";
+import { EMPLOYEE_CATEGORY_TITLE, employeeDetail, REGISTRATION_ORIGIN_LABEL } from "@/domain/labels";
 import { can } from "@/domain/rules";
 import type { AffiliationStatus } from "@/domain/types";
 import { personWhatsappMessage, registrationWhatsappMessage } from "@/domain/whatsapp-messages";
@@ -74,7 +74,13 @@ export default async function PersonPage({ params, searchParams }: PageProps<"/p
   const canVouchers = can(actor.access, "reissueVoucher");
   const hostPersonId = host?.member.id ?? employeeHost?.person.id ?? null;
   const hostName = host?.member.fullName ?? employeeHost?.person.fullName ?? null;
-  const back = !canPeople && fromEmployees ? { href: "/painel/colaboradores", label: "Colaboradores" } : { href: "/painel/inscricoes", label: "Inscrições" };
+  const courtesy = employee?.category === "COURTESY";
+  const back =
+    !canPeople && fromEmployees
+      ? courtesy
+        ? { href: "/painel/cortesias", label: "Cortesias" }
+        : { href: "/painel/colaboradores", label: "Colaboradores" }
+      : { href: "/painel/inscricoes", label: "Inscrições" };
 
   return (
     <div className="space-y-4">
@@ -98,7 +104,7 @@ export default async function PersonPage({ params, searchParams }: PageProps<"/p
       <div className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5 sm:flex-row sm:items-start sm:justify-between" data-testid="person-header">
         <div className="min-w-0">
           <p className="pixel text-[0.55rem] text-red">
-            {kind === "member" ? "Inscrição" : kind === "employee" ? "Colaborador(a) do SINDSERM" : "Convidado(a)"}
+            {kind === "member" ? "Inscrição" : kind === "employee" ? (courtesy ? "Cortesia do SINDSERM" : "Colaborador(a) do SINDSERM") : "Convidado(a)"}
           </p>
           <h1 className="display mt-1 text-4xl break-words text-fg">{person.fullName}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-fg-muted">
@@ -114,7 +120,9 @@ export default async function PersonPage({ params, searchParams }: PageProps<"/p
             ) : employee ? (
               <>
                 <CategoryChip category={employee.category} />
-                <span className="font-semibold text-fg">{employee.jobTitle ?? "Setor não informado"}</span>
+                <span className="font-semibold text-fg">
+                  {employeeDetail(employee.category, employee.jobTitle) ?? (courtesy ? "Sem indicação de quem convidou" : "Setor não informado")}
+                </span>
               </>
             ) : hostName ? (
               <>
@@ -181,6 +189,7 @@ export default async function PersonPage({ params, searchParams }: PageProps<"/p
                     whatsapp: person.whatsapp ? maskPhoneInput(person.whatsapp) : "",
                     jobTitle: employee.jobTitle ?? "",
                     category: employee.category,
+                    isMinor: person.isMinor,
                   }}
                   trigger={
                     <Button variant="outline" size="sm" data-testid="edit-employee-data">

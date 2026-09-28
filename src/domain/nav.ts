@@ -34,6 +34,8 @@ export const PANEL_NAV: { title: string; items: NavEntry[] }[] = [
       { href: "/painel/inscricoes", label: "Inscrições", permission: "viewRegistrations", badge: "pending", queueHref: "/painel/inscricoes?filtro=conferir" },
       { href: "/painel/filiacoes", label: "Fichas de filiação", permission: "viewForms", badge: "signature", queueHref: "/painel/filiacoes?filtro=assinar" },
       { href: "/painel/colaboradores", label: "Colaboradores SINDSERM", permission: "viewEmployees" },
+      // Amigos, familiares e convidados da organização (mesmo cadastro e mesma permissão dos colaboradores).
+      { href: "/painel/cortesias", label: "Cortesias", permission: "viewEmployees" },
     ],
   },
   {

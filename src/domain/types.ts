@@ -4,9 +4,22 @@ export type AffiliationStatus = (typeof AFFILIATION_STATUSES)[number];
 export const STAFF_ROLES = ["ADMIN", "ATTENDANT", "SECURITY"] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
-/** Colaboradores do SINDSERM liberados para a festa (mesma regra de voucher, kit e convidado). */
-export const EMPLOYEE_CATEGORIES = ["BOARD", "STAFF", "CONTRACTOR"] as const;
+/**
+ * Cadastro interno da organização: colaboradores do SINDSERM (diretoria,
+ * funcionários e prestadores: voucher, 1 kit e 1 convidado) e cortesias
+ * (amigos, familiares e convidados da organização: voucher e 1 kit, sem convidado).
+ */
+export const EMPLOYEE_CATEGORIES = ["BOARD", "STAFF", "CONTRACTOR", "COURTESY"] as const;
 export type EmployeeCategory = (typeof EMPLOYEE_CATEGORIES)[number];
+
+/** Só os colaboradores (a tela Colaboradores e a escolha de categoria). */
+export const COLLABORATOR_CATEGORIES = ["BOARD", "STAFF", "CONTRACTOR"] as const satisfies readonly EmployeeCategory[];
+export type CollaboratorCategory = (typeof COLLABORATOR_CATEGORIES)[number];
+
+/** Cortesia da organização: cada pessoa é a própria cortesia (não leva convidado). */
+export function isCourtesy(category: EmployeeCategory | null | undefined): boolean {
+  return category === "COURTESY";
+}
 
 /** EMPLOYEE: kit do(a) funcionário(a) do SINDSERM (estoque dos funcionários). */
 export type KitType = "MEMBER" | "GUEST" | "EMPLOYEE";

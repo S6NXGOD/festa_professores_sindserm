@@ -79,12 +79,13 @@ export const EMPLOYEE_CATEGORY_LABEL: Record<EmployeeCategory, string> = {
   BOARD: "Diretoria",
   STAFF: "Funcionário(a)",
   CONTRACTOR: "Prestador(a) de serviço",
+  COURTESY: "Cortesia",
 };
 
 /** "1 da diretoria", "3 funcionários", "1 prestador(a)". */
 export function employeeCategoryCount(category: EmployeeCategory, count: number): string {
-  const one = { BOARD: "da diretoria", STAFF: "funcionário(a)", CONTRACTOR: "prestador(a)" }[category];
-  const many = { BOARD: "da diretoria", STAFF: "funcionários", CONTRACTOR: "prestadores" }[category];
+  const one = { BOARD: "da diretoria", STAFF: "funcionário(a)", CONTRACTOR: "prestador(a)", COURTESY: "cortesia" }[category];
+  const many = { BOARD: "da diretoria", STAFF: "funcionários", CONTRACTOR: "prestadores", COURTESY: "cortesias" }[category];
   return `${count} ${count === 1 ? one : many}`;
 }
 
@@ -93,6 +94,7 @@ export const EMPLOYEE_CATEGORY_TITLE: Record<EmployeeCategory, string> = {
   BOARD: "Diretoria do SINDSERM",
   STAFF: "Funcionário(a) do SINDSERM",
   CONTRACTOR: "Prestador(a) de serviço do SINDSERM",
+  COURTESY: "Cortesia do SINDSERM",
 };
 
 /** Dentro de frases ("convidado(a) de Ana, diretoria do SINDSERM"). */
@@ -100,7 +102,23 @@ export const EMPLOYEE_CATEGORY_INLINE: Record<EmployeeCategory, string> = {
   BOARD: "diretoria do SINDSERM",
   STAFF: "funcionário(a) do SINDSERM",
   CONTRACTOR: "prestador(a) de serviço do SINDSERM",
+  COURTESY: "cortesia do SINDSERM",
 };
+
+/**
+ * O complemento ao lado da categoria: o setor do(a) colaborador(a) ou, na
+ * cortesia, quem convidou ("Convite: Presidência").
+ */
+export function employeeDetail(category: EmployeeCategory, jobTitle: string | null | undefined): string | null {
+  if (!jobTitle) return null;
+  return category === "COURTESY" ? `Convite: ${jobTitle}` : jobTitle;
+}
+
+/** "Cortesia do SINDSERM · Convite: Presidência", "Funcionário(a) do SINDSERM · Financeiro". */
+export function employeeTitleLine(category: EmployeeCategory, jobTitle: string | null | undefined): string {
+  const detail = employeeDetail(category, jobTitle);
+  return `${EMPLOYEE_CATEGORY_TITLE[category]}${detail ? ` · ${detail}` : ""}`;
+}
 
 /** De onde veio a inscrição (lista de Inscrições). */
 export const REGISTRATION_ORIGIN_LABEL: Record<RegistrationOrigin, string> = {

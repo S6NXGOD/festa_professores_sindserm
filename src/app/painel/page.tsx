@@ -6,6 +6,7 @@ import {
   ClipboardNote,
   Clock,
   Gift,
+  Heart,
   List,
   Login,
   Package,
@@ -311,15 +312,30 @@ export default async function DashboardPage() {
           hint={`${stats.kitsOwedMember} prof. · ${stats.kitsOwedGuest} conv.${stats.kitsOwedEmployee ? ` · ${stats.kitsOwedEmployee} func.` : ""} · saem na entrada`}
           testId="stat-kits-owed"
         />
-        {stats.employees > 0 || isAdmin ? (
+        {stats.employees - stats.courtesies > 0 || isAdmin ? (
           <StatTile
             label="Colaboradores"
-            value={stats.employeesPresent}
+            value={stats.employeesPresent - stats.courtesiesPresent}
             icon={Building}
             tone="warning"
             href={canEmployees ? "/painel/colaboradores" : undefined}
-            hint={stats.employees ? `de ${plural(stats.employees, "liberado", "liberados")} já entraram` : "Libere os colaboradores do SINDSERM"}
+            hint={
+              stats.employees - stats.courtesies
+                ? `de ${plural(stats.employees - stats.courtesies, "liberado", "liberados")} já entraram`
+                : "Libere os colaboradores do SINDSERM"
+            }
             testId="stat-employees-present"
+          />
+        ) : null}
+        {stats.courtesies > 0 ? (
+          <StatTile
+            label="Cortesias"
+            value={stats.courtesiesPresent}
+            icon={Heart}
+            tone="brand"
+            href={canEmployees ? "/painel/cortesias" : undefined}
+            hint={`de ${plural(stats.courtesies, "cortesia", "cortesias")} já entraram`}
+            testId="stat-courtesies-present"
           />
         ) : null}
       </div>

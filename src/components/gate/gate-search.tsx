@@ -1,10 +1,11 @@
 "use client";
 
-import { EMPLOYEE_CATEGORY_LABEL } from "@/domain/labels";
+import { EMPLOYEE_CATEGORY_LABEL, employeeDetail } from "@/domain/labels";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { Building, ChevronRight, Login, MemberCard, Search, User, Users } from "@/components/icons/pixel";
+import { CategoryChip } from "@/components/staff/employee-category";
 import { AffiliationBadge, ToneBadge } from "@/components/status/status-badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -152,9 +153,16 @@ export function GateSearch({
                   <span className="block truncate text-base font-bold text-fg">{person.fullName}</span>
                   <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-fg-muted">
                     <span className="font-mono">{person.cpfDisplay}</span>
-                    {person.employee ? (
+                    {person.employee?.category === "COURTESY" ? (
+                      // Cortesia: a etiqueta rosa e quem convidou, como no voucher.
+                      <>
+                        <CategoryChip category="COURTESY" />
+                        {person.employee.jobTitle ? <span className="font-semibold text-[#ff8fd0]">Convite: {person.employee.jobTitle}</span> : null}
+                      </>
+                    ) : person.employee ? (
                       <ToneBadge tone="warning" icon={Building}>
-                        {EMPLOYEE_CATEGORY_LABEL[person.employee.category]}{person.employee.jobTitle ? ` · ${person.employee.jobTitle}` : ""}
+                        {EMPLOYEE_CATEGORY_LABEL[person.employee.category]}
+                        {employeeDetail(person.employee.category, person.employee.jobTitle) ? ` · ${employeeDetail(person.employee.category, person.employee.jobTitle)}` : ""}
                       </ToneBadge>
                     ) : null}
                     {person.memberStatus ? <AffiliationBadge status={person.memberStatus} short /> : null}

@@ -19,6 +19,7 @@ import { CategoryChip } from "@/components/staff/employee-category";
 import { ChipFilters, EmptyState, FilterBar, PageHeader, Pagination, Panel, SelectFilter, StatTile } from "@/components/staff/panel-ui";
 import { Button } from "@/components/ui/button";
 import { eventStartAt } from "@/domain/kit-deadline";
+import { employeeTitleLine } from "@/domain/labels";
 import type { CheckInMethod } from "@/domain/types";
 import { formatDayHeading, formatShortDateTime, formatTime, todayInZone, zonedDayKey, zonedHour } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
@@ -44,13 +45,14 @@ const FILTER_LABEL: Record<EntryFilter, string> = {
   filiados: "Filiados(as)",
   convidados: "Convidados",
   colaboradores: "Colaboradores",
+  cortesias: "Cortesias",
   estornadas: "Estornadas",
 };
 
 /** Quem é a pessoa na festa, numa linha. */
 function roleText(row: EntryRow) {
   if (row.role === "GUEST") return `Convidado(a) de ${row.hostName ?? "—"}`;
-  if (row.role === "EMPLOYEE") return `Colaborador(a) do SINDSERM${row.employeeJobTitle ? ` · ${row.employeeJobTitle}` : ""}`;
+  if (row.role === "EMPLOYEE") return employeeTitleLine(row.employeeCategory ?? "STAFF", row.employeeJobTitle);
   return row.isTeacher ? "Professor(a)" : "Filiado(a)";
 }
 
@@ -232,7 +234,8 @@ export default async function EntriesPage({ searchParams }: PageProps<"/painel/e
           basePath="/painel/entradas"
           current={filter}
           params={{ q, por: operator?.userId }}
-          options={ENTRY_FILTERS.map((value) => ({
+          // "Cortesias" só aparece quando a organização cadastrou alguma.
+          options={ENTRY_FILTERS.filter((value) => value !== "cortesias" || stats.courtesies > 0 || filter === "cortesias").map((value) => ({
             value,
             label: FILTER_LABEL[value],
             count: value === "todas" ? summary.total : value === "estornadas" ? summary.cancelled : undefined,

@@ -31,8 +31,12 @@ export interface DashboardStats {
   kitsOwedGuest: number;
   kitsOwedEmployee: number;
   /** Funcionários do SINDSERM na lista, os que já entraram e os convidados deles. */
+  /** Todo o cadastro interno (colaboradores + cortesias): é a demanda do estoque dos colaboradores. */
   employees: number;
   employeesPresent: number;
+  /** Só as cortesias da organização (já contadas em `employees`). */
+  courtesies: number;
+  courtesiesPresent: number;
   employeeGuests: number;
   /**
    * Previsão de kits com todos os inscritos (inclui quem aguarda conferência ou
@@ -116,6 +120,9 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
       )::int AS demand_guest,
       (SELECT count(*) FROM employee WHERE removed_at IS NULL)::int AS employees,
       (SELECT count(*) FROM employee e JOIN active_checkins c ON c.person_id = e.person_id WHERE e.removed_at IS NULL)::int AS employees_present,
+      (SELECT count(*) FROM employee WHERE removed_at IS NULL AND category = 'COURTESY')::int AS courtesies,
+      (SELECT count(*) FROM employee e JOIN active_checkins c ON c.person_id = e.person_id
+        WHERE e.removed_at IS NULL AND e.category = 'COURTESY')::int AS courtesies_present,
       (SELECT count(*) FROM guest_link gl JOIN employee e ON e.id = gl.employee_id
         WHERE gl.status = 'ACTIVE' AND e.removed_at IS NULL)::int AS employee_guests,
       (SELECT count(*) FROM employee e
@@ -151,6 +158,8 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
     kitsOwedEmployee: Math.max(0, n("employees") + n("entitled_employee_guest") - n("delivered_employee")),
     employees: n("employees"),
     employeesPresent: n("employees_present"),
+    courtesies: n("courtesies"),
+    courtesiesPresent: n("courtesies_present"),
     employeeGuests: n("employee_guests"),
     kitDemand: { member: n("teachers"), guest: n("demand_guest"), employee: n("employees") + n("entitled_employee_guest") },
     stock: await getStockOverview(ex),

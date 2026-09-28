@@ -98,7 +98,12 @@ export function GatePersonClient({
         mode={atGate ? "gate" : "panel"}
       />
       {atGate && (view.entry.kind === "ALLOWED" || justCheckedIn) ? (
-        <Disclosure variant="plain" title="Mais ações do atendimento" hint="Convidado, kits e cadastro" testId="gate-more-actions">
+        <Disclosure
+          variant="plain"
+          title="Mais ações do atendimento"
+          hint={view.employee?.category === "COURTESY" ? "Kit e cadastro" : "Convidado, kits e cadastro"}
+          testId="gate-more-actions"
+        >
           {operations}
         </Disclosure>
       ) : (

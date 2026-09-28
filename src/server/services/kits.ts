@@ -182,7 +182,7 @@ export async function recordEmployeeKitDelivery(
     entityId: delivery!.id,
     summary:
       kitType === "EMPLOYEE"
-        ? `Kit de colaborador(a) entregue${where} a ${group.person.fullName}.`
+        ? `${group.category === "COURTESY" ? "Kit da cortesia" : "Kit de colaborador(a)"} entregue${where} a ${group.person.fullName}.`
         : `Kit do convidado ${beneficiary.fullName} entregue${where} (convidado(a) de ${group.person.fullName}, colaborador(a) do SINDSERM).`,
     after: { employeeId: group.id, kitType, pool: "EMPLOYEE", context },
   });

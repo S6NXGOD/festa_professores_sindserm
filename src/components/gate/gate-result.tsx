@@ -23,7 +23,7 @@ import { ScrollHint } from "@/components/retro/scroll-hint";
 import { CATEGORY_STYLE } from "@/components/staff/employee-category";
 import { AffiliationBadge, ToneBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
-import { AFFILIATION_STATUS_LABEL, CHECK_IN_METHOD_LABEL, EMPLOYEE_CATEGORY_INLINE, EMPLOYEE_CATEGORY_TITLE } from "@/domain/labels";
+import { AFFILIATION_STATUS_LABEL, CHECK_IN_METHOD_LABEL, EMPLOYEE_CATEGORY_INLINE, EMPLOYEE_CATEGORY_TITLE, employeeTitleLine } from "@/domain/labels";
 import { formatShortDateTime, formatTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import type { EntryKitResult } from "@/server/services/checkin";
@@ -74,7 +74,7 @@ function roleLine(view: GateView): { icon: PixelIcon; iconClass: string; text: s
     return {
       icon: style.icon,
       iconClass: style.text,
-      text: `${EMPLOYEE_CATEGORY_TITLE[view.employee.category]}${view.employee.jobTitle ? ` · ${view.employee.jobTitle}` : ""}`,
+      text: employeeTitleLine(view.employee.category, view.employee.jobTitle),
     };
   }
   if (view.role === "GUEST" && view.host) {
@@ -245,7 +245,7 @@ export function KitOnEntryTile({
 }
 
 /** Resultado dos kits na hora da entrada: a recepção vê de longe quantos entregar. */
-function EntryKitBanner({ kit, guestKit }: { kit: EntryKitResult; guestKit: EntryKitResult | null }) {
+function EntryKitBanner({ kit, guestKit, courtesy = false }: { kit: EntryKitResult; guestKit: EntryKitResult | null; courtesy?: boolean }) {
   const count = deliveredKitCount(kit, guestKit);
   const waiting = kit.kind === "WAITING";
   const lines: string[] = [];
@@ -254,7 +254,9 @@ function EntryKitBanner({ kit, guestKit }: { kit: EntryKitResult; guestKit: Entr
       kit.kitType === "GUEST"
         ? `Kit de convidado para ${kit.beneficiaryName}.`
         : kit.kitType === "EMPLOYEE"
-          ? "Kit de colaborador(a) (estoque dos colaboradores)."
+          ? courtesy
+            ? "Kit da cortesia (estoque dos colaboradores)."
+            : "Kit de colaborador(a) (estoque dos colaboradores)."
           : "Kit de consumação do(a) professor(a).",
     );
   } else {
@@ -325,19 +327,24 @@ function DetailRows({ view }: { view: GateView }) {
               <span className="block">
                 Seu kit: <KitStatusText kit={view.employee.kits.EMPLOYEE} />
               </span>
-              <span className="mt-1 block">
-                Kit do convidado
-                {view.employee.kits.GUEST.kind === "DELIVERED"
-                  ? ` (${view.employee.kits.GUEST.beneficiaryName})`
-                  : view.employee.guest
-                    ? ` (${view.employee.guest.fullName})`
-                    : ""}
-                : <KitStatusText kit={view.employee.kits.GUEST} />
-              </span>
+              {/* Cortesia não leva convidado: só o próprio kit. */}
+              {view.employee.category !== "COURTESY" ? (
+                <span className="mt-1 block">
+                  Kit do convidado
+                  {view.employee.kits.GUEST.kind === "DELIVERED"
+                    ? ` (${view.employee.kits.GUEST.beneficiaryName})`
+                    : view.employee.guest
+                      ? ` (${view.employee.guest.fullName})`
+                      : ""}
+                  : <KitStatusText kit={view.employee.kits.GUEST} />
+                </span>
+              ) : null}
               {deadline}
             </>
           ) : (
-            <span className="block font-semibold text-danger">Fora da lista de colaboradores</span>
+            <span className="block font-semibold text-danger">
+              {view.employee.category === "COURTESY" ? "Fora da lista de cortesias" : "Fora da lista de colaboradores"}
+            </span>
           )}
         </InfoRow>
       ) : null}
@@ -489,7 +496,7 @@ export function GateResult({
           </div>
         </div>
         {header.detail ? <p className="mt-2 text-sm font-bold opacity-95">{header.detail}</p> : null}
-        {justCheckedIn && entryKit ? <EntryKitBanner kit={entryKit} guestKit={entryGuestKit} /> : null}
+        {justCheckedIn && entryKit ? <EntryKitBanner kit={entryKit} guestKit={entryGuestKit} courtesy={view.employee?.category === "COURTESY"} /> : null}
         {justCheckedIn ? (
           <motion.span
             initial={{ opacity: 0, y: 0 }}
@@ -514,7 +521,7 @@ export function GateResult({
                     CATEGORY_STYLE[view.employee.category].chip,
                   )}
                 >
-                  Da casa
+                  {view.employee.category === "COURTESY" ? "Cortesia" : "Da casa"}
                 </span>
               ) : view.role !== "NONE" ? (
                 <PlayerTag player={view.role === "GUEST" ? 2 : 1} />
@@ -572,7 +579,15 @@ export function GateResult({
           <Disclosure
             key={quick ? "rapido" : "aberto"}
             title="Detalhes"
-            hint={own ? "Filiação, kits e convidado" : view.employee ? "Kits e convidado" : "Quem convidou e kit"}
+            hint={
+              own
+                ? "Filiação, kits e convidado"
+                : view.employee?.category === "COURTESY"
+                  ? "Kit e quem convidou"
+                  : view.employee
+                    ? "Kits e convidado"
+                    : "Quem convidou e kit"
+            }
             defaultOpen={!quick}
             testId="gate-details"
           >
