@@ -11,6 +11,7 @@ import { initials } from "@/lib/text";
 import { APP_NAME, getConfig } from "@/server/queries/config";
 import { queueCounts } from "@/server/queries/panel";
 import { requirePageActor } from "@/server/session";
+import { appVersionLabel } from "@/server/version";
 
 export default async function PanelLayout({ children }: LayoutProps<"/painel">) {
   const actor = await requirePageActor("viewPanel");
@@ -32,7 +33,7 @@ export default async function PanelLayout({ children }: LayoutProps<"/painel">) 
               <div className="flex-1" />
             )}
             <div className="ml-auto">
-              <UserMenu name={actor.name} role={actor.role} showGate={can(actor.access, "viewGate")} />
+              <UserMenu name={actor.name} role={actor.role} showGate={can(actor.access, "viewGate")} version={appVersionLabel()} />
             </div>
           </div>
           <div className="neon-line h-px opacity-60" aria-hidden />

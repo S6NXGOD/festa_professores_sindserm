@@ -46,6 +46,8 @@ const documentHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Commit publicado (o Railway informa no build): mostra no painel qual versão está no ar.
+  env: { APP_BUILD_COMMIT: process.env.RAILWAY_GIT_COMMIT_SHA ?? "" },
   // O selo "N" do modo de desenvolvimento cobria o rodapé do menu do painel.
   devIndicators: false,
   // Quem pede /favicon.ico direto (favoritos, leitores de link) recebe o ícone atual do site.

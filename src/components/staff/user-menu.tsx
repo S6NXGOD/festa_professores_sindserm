@@ -27,12 +27,15 @@ export function UserMenu({
   showPanel,
   showGate,
   compact = false,
+  version,
 }: {
   name: string;
   role: StaffRole;
   showPanel?: boolean;
   showGate?: boolean;
   compact?: boolean;
+  /** "Versão ae46af8 · no ar desde ...": para conferir que uma mudança já foi publicada. */
+  version?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -127,6 +130,14 @@ export function UserMenu({
         <DropdownMenuItem onSelect={signOut} disabled={pending} variant="destructive" data-testid="sign-out">
           <Logout /> Sair
         </DropdownMenuItem>
+        {version ? (
+          <>
+            <DropdownMenuSeparator />
+            <p className="px-2 py-1.5 text-[0.68rem] leading-snug text-fg-dim tabular" data-testid="app-version">
+              {version}
+            </p>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

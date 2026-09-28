@@ -835,7 +835,8 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(page).toHaveURL(/\/entrar\?next=%2Fpainel$/);
       const health = await page.request.get("/api/health");
       expect(health.status()).toBe(200);
-      expect(await health.json()).toEqual({ ok: true });
+      // Informa também o commit no ar (fora do Railway, nulo).
+      expect(await health.json()).toEqual({ ok: true, version: null });
       await context.close();
     });
 
@@ -1031,6 +1032,8 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(page.getByTestId("gate-search-input")).toBeVisible();
       await expect(page.getByTestId("tutorial")).toHaveCount(0);
       await page.getByTestId("user-menu").click();
+      // O menu diz qual versão está no ar (no computador, "local").
+      await expect(page.getByTestId("app-version")).toContainText(/^Versão local · no ar desde \d{2}\/\d{2} às \d{2}:\d{2}$/);
       await page.getByTestId("open-tutorial").click();
       await expect(page.getByTestId("tutorial-step-boas-vindas")).toBeVisible();
       await page.getByTestId("tutorial-skip").click();

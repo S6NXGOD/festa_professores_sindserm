@@ -84,7 +84,7 @@ npm run db:reset -- --manter-festa   # mantém data, horários, local, foto, íc
 
 ## 4. Publicar no Railway
 
-O `railway.json` já configura tudo: build `npm run build`, antes de cada deploy `npm run db:deploy` (migrations + primeiro administrador), início `npm start` (o servidor repete esse preparo ao ligar) e verificação em `/api/health` (banco e tabelas; se falhar, a versão anterior continua no ar).
+O `railway.json` já configura tudo: build `npm run build`, antes de cada deploy `npm run db:deploy` (migrations + primeiro administrador), início `npm start` (o servidor repete esse preparo ao ligar) e verificação em `/api/health` (banco e tabelas; se falhar, a versão anterior continua no ar). **Qual versão está no ar:** menu do usuário ("Versão ae46af8 · no ar desde ...") e o campo `version` do `/api/health` mostram o commit publicado; um deploy costuma levar de 3 a 6 minutos depois do push.
 
 1. No projeto do Railway: **New → Database → PostgreSQL** e **New → GitHub Repo** (este repositório). O Railway já tenta um deploy na hora; sem as variáveis ele para com "DATABASE_URL não configurada" — é esperado, siga os passos.
 2. No serviço do app, em **Settings → Networking**, clique em **Generate Domain** (HTTPS pronto; a câmera da portaria só funciona em HTTPS).

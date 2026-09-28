@@ -13,6 +13,7 @@ import { db } from "@/server/db";
 import { APP_NAME, getConfig } from "@/server/queries/config";
 import { countCheckInsBy } from "@/server/services/stats";
 import { requirePageActor } from "@/server/session";
+import { appVersionLabel } from "@/server/version";
 
 export default async function GateLayout({ children }: LayoutProps<"/portaria">) {
   const actor = await requirePageActor("viewGate");
@@ -45,7 +46,7 @@ export default async function GateLayout({ children }: LayoutProps<"/portaria">)
                 {String(score).padStart(4, "0")}
               </span>
             </span>
-            <UserMenu name={actor.name} role={actor.role} showPanel={showPanel} compact />
+            <UserMenu name={actor.name} role={actor.role} showPanel={showPanel} compact version={appVersionLabel()} />
           </div>
         </div>
         <div className="neon-line h-px opacity-60" aria-hidden />
