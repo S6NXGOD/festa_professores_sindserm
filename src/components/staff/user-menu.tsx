@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { Chart, ChevronDown, Key, Logout, Play, QrCode, Volume, VolumeOff } from "@/components/icons/pixel";
+import { Chart, ChevronDown, Gamepad, Key, Logout, Play, QrCode, Volume, VolumeOff } from "@/components/icons/pixel";
+import { openTutorial } from "@/components/tutorial/tutorial";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -101,19 +102,22 @@ export function UserMenu({
           {soundOn ? <Volume className="mt-0.5" /> : <VolumeOff className="mt-0.5" />}
           <span className="flex flex-col">
             <span>{soundOn ? "Sons 8-bit: ligados" : "Sons 8-bit: desligados"}</span>
-            <span className="text-xs font-normal text-fg-muted">Tocam ao ler QR, confirmar entrada e entregar kit</span>
+            <span className="text-xs font-normal text-fg-muted">Tocam ao ler QR, confirmar entrada, entregar kit e a cada inscrição nova</span>
           </span>
         </DropdownMenuItem>
         {soundOn ? (
           <DropdownMenuItem
             onSelect={(event) => {
               event.preventDefault();
-              playSound("coin");
+              playSound("levelup");
             }}
           >
             <Play /> Ouvir um exemplo
           </DropdownMenuItem>
         ) : null}
+        <DropdownMenuItem onSelect={() => openTutorial()} data-testid="open-tutorial">
+          <Gamepad /> Tutorial do sistema
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/conta">
             <Key /> Trocar senha

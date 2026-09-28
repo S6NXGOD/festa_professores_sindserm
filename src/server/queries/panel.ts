@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, exists, ilike, inArray, isNotNull, isNull, not, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, exists, gt, ilike, inArray, isNotNull, isNull, not, or, type SQL, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/server/db";
 import {
@@ -243,6 +243,39 @@ export async function listRegistrations(options: {
       .where(where),
   ]);
   return paged(rows, Number(totalRow?.total ?? 0), options.page);
+}
+
+/**
+ * Inscrições novas desde um instante (radar do painel: som de level up e aviso).
+ * Deixa de fora as feitas pela própria pessoa (quem cadastrou na hora já sabe).
+ */
+export async function registrationsSince(since: Date, options: { excludeUserId?: string; limit?: number } = {}) {
+  const conditions: SQL[] = [gt(registration.createdAt, since)];
+  if (options.excludeUserId) {
+    conditions.push(or(isNull(registration.createdByUserId), not(eq(registration.createdByUserId, options.excludeUserId)))!);
+  }
+  const where = and(...conditions);
+  const [rows, [totalRow]] = await Promise.all([
+    db
+      .select({
+        registrationId: registration.id,
+        personId: person.id,
+        fullName: person.fullName,
+        guestName: guestNameSql,
+        status: registration.status,
+        origin: registration.origin,
+        isTeacher: registration.isTeacher,
+        createdAt: registration.createdAt,
+      })
+      .from(registration)
+      .innerJoin(person, eq(person.id, registration.memberPersonId))
+      .where(where)
+      // As mais recentes: se chegarem muitas de uma vez, o aviso mostra as últimas.
+      .orderBy(desc(registration.createdAt))
+      .limit(options.limit ?? 10),
+    db.select({ total: count() }).from(registration).where(where),
+  ]);
+  return { rows, total: Number(totalRow?.total ?? 0) };
 }
 
 /** Convidados que já saíram do grupo (removidos ou convertidos em filiados). */

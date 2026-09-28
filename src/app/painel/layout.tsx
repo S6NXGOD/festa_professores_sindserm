@@ -2,8 +2,12 @@ import { redirect } from "next/navigation";
 import { RetroBackdrop } from "@/components/retro/retro-backdrop";
 import { PanelMobileNav, PanelSidebar } from "@/components/staff/panel-nav";
 import { QuickSearch } from "@/components/staff/quick-search";
+import { RegistrationRadar } from "@/components/staff/registration-radar";
+import { Tutorial } from "@/components/tutorial/tutorial";
 import { UserMenu } from "@/components/staff/user-menu";
 import { can } from "@/domain/access";
+import { tutorialSteps } from "@/domain/tutorial";
+import { initials } from "@/lib/text";
 import { APP_NAME, getConfig } from "@/server/queries/config";
 import { queueCounts } from "@/server/queries/panel";
 import { requirePageActor } from "@/server/session";
@@ -35,6 +39,12 @@ export default async function PanelLayout({ children }: LayoutProps<"/painel">) 
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-16 sm:px-6 print:max-w-none print:p-0">{children}</main>
       </div>
+      {/* Inscrição nova (de qualquer lugar): level up, aviso com o nome e números atualizados. */}
+      {can(actor.access, "viewRegistrations") ? (
+        <RegistrationRadar since={new Date().toISOString()} canOpenPeople={can(actor.access, "viewPeople")} />
+      ) : null}
+      <Tutorial steps={tutorialSteps(actor.access, actor.name)} autoOpen={!actor.tutorialSeen} initials={initials(actor.name)} />
+      {!actor.tutorialSeen ? <span hidden data-testid="tutorial-pending" /> : null}
     </div>
   );
 }

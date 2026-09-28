@@ -129,8 +129,14 @@ export function PanelMobileNav({ access, badges, eventName }: { access: AccessMa
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon-lg" className="relative lg:hidden" aria-label="Abrir menu">
           <Menu />
+          {/* Quantas coisas esperam a equipe (para conferir + para assinar), já no botão do menu. */}
           {badges.pending + badges.signature > 0 ? (
-            <span className="absolute top-2 right-2 size-2 animate-blink rounded-[2px] bg-warning" />
+            <span
+              className="pixel absolute -top-0.5 -right-0.5 min-w-5 rounded-[3px] bg-warning px-1 py-0.5 text-center text-[0.5rem] text-warning-foreground tabular shadow-[0_2px_0_0_#8a6a00]"
+              data-testid="nav-menu-badge"
+            >
+              {badges.pending + badges.signature}
+            </span>
           ) : null}
         </Button>
       </SheetTrigger>

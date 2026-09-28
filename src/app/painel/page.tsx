@@ -251,7 +251,7 @@ export default async function DashboardPage() {
             value={stats.kitsDeliveredMember + stats.kitsDeliveredGuest + stats.kitsDeliveredEmployee}
             icon={Package}
             tone="success"
-            hint={`${stats.kitsDeliveredMember} prof. · ${stats.kitsDeliveredGuest} conv.${stats.kitsDeliveredEmployee ? ` · ${stats.kitsDeliveredEmployee} func.` : ""}`}
+            hint={`${stats.kitsDeliveredMember} prof. · ${stats.kitsDeliveredGuest} conv.${stats.kitsDeliveredEmployee ? ` · ${stats.kitsDeliveredEmployee} colab.` : ""}`}
             testId="stat-kits-delivered"
           />
           <div
@@ -309,7 +309,7 @@ export default async function DashboardPage() {
           value={stats.kitsOwedMember + stats.kitsOwedGuest + stats.kitsOwedEmployee}
           icon={Gift}
           tone="neutral"
-          hint={`${stats.kitsOwedMember} prof. · ${stats.kitsOwedGuest} conv.${stats.kitsOwedEmployee ? ` · ${stats.kitsOwedEmployee} func.` : ""} · saem na entrada`}
+          hint={`${stats.kitsOwedMember} prof. · ${stats.kitsOwedGuest} conv.${stats.kitsOwedEmployee ? ` · ${stats.kitsOwedEmployee} colab.` : ""} · saem na entrada`}
           testId="stat-kits-owed"
         />
         {stats.employees - stats.courtesies > 0 || isAdmin ? (

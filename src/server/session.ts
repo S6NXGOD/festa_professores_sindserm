@@ -19,6 +19,8 @@ export const getSession = cache(async () => auth.api.getSession({ headers: await
 export interface SessionActor extends StaffActor {
   /** Senha provisória (dada pelo administrador): a pessoa cria a própria antes de usar o sistema. */
   mustChangePassword: boolean;
+  /** Já viu (ou pulou) o tutorial do primeiro acesso. */
+  tutorialSeen: boolean;
 }
 
 export const getActor = cache(async (): Promise<SessionActor | null> => {
@@ -32,6 +34,7 @@ export const getActor = cache(async (): Promise<SessionActor | null> => {
       active: user.active,
       permissions: user.permissions,
       mustChangePassword: user.mustChangePassword,
+      tutorialSeenAt: user.tutorialSeenAt,
     })
     .from(user)
     .where(eq(user.id, session.user.id));
@@ -43,6 +46,7 @@ export const getActor = cache(async (): Promise<SessionActor | null> => {
     role: row.role,
     access: resolveAccess(row.role, row.permissions),
     mustChangePassword: row.mustChangePassword,
+    tutorialSeen: row.tutorialSeenAt !== null,
   };
 });
 

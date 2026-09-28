@@ -50,6 +50,13 @@
       "when": 1790595193689,
       "tag": "0006_cortesias",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790599696964,
+      "tag": "0007_tutorial_primeiro_acesso",
+      "breakpoints": true
     }
   ]
 }

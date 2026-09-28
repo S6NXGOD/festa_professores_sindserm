@@ -104,6 +104,8 @@ export const user = pgTable("user", {
   permissions: text("permissions"),
   /** Senha provisória (criada ou redefinida pelo administrador): troca obrigatória no próximo acesso. */
   mustChangePassword: boolean("must_change_password").notNull().default(false),
+  /** Quando a pessoa terminou (ou pulou) o tutorial do primeiro acesso. Nulo = o tutorial abre sozinho. */
+  tutorialSeenAt: timestamptz("tutorial_seen_at"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

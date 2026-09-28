@@ -28,7 +28,7 @@ export function employeeShortfall(pool: StockPoolView) {
 export function stockAlertText(pool: StockPoolView) {
   const label = STOCK_POOL_LABEL[pool.pool].toLowerCase();
   if (pool.available === 0) return `${label}: esgotado`;
-  if (pool.pool === "EMPLOYEE") return `${label}: faltam ${employeeShortfall(pool)} para colaboradores e convidados deles`;
+  if (pool.pool === "EMPLOYEE") return `${label}: faltam ${employeeShortfall(pool)} para quem ainda vai receber`;
   return `${label}: restam ${pool.available}`;
 }
 
@@ -59,8 +59,8 @@ export function StockCard({ stock, demand }: { stock: StockOverview; demand?: St
               <Warning className="size-3.5 animate-blink" />
               {pool.pool === "EMPLOYEE"
                 ? pool.available === 0
-                  ? `Esgotado: ${plural(pool.awaiting ?? 0, "kit", "kits")} ainda por sair (colaboradores e convidados)`
-                  : `Faltam ${plural(employeeShortfall(pool), "kit", "kits")} para colaboradores e convidados deles`
+                  ? `Esgotado: ${plural(pool.awaiting ?? 0, "kit", "kits")} ainda por sair (colaboradores, convidados deles e cortesias)`
+                  : `Faltam ${plural(employeeShortfall(pool), "kit", "kits")} para quem ainda vai receber (colaboradores, convidados deles e cortesias)`
                 : pool.available === 0
                   ? "Estoque esgotado"
                   : `Estoque baixo (alerta em ${stock.threshold})`}

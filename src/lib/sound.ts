@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
  * Efeitos sonoros de videogame 8-bit sintetizados no navegador (sem arquivos
  * de áudio). Usados na portaria e nas entregas; podem ser desligados.
  */
-export type SoundName = "blip" | "coin" | "powerup" | "fanfare" | "warn" | "error";
+export type SoundName = "blip" | "coin" | "powerup" | "fanfare" | "levelup" | "warn" | "error";
 
 type Note = [frequency: number, start: number, duration: number, wave?: OscillatorType];
 
@@ -29,6 +29,17 @@ const SEQUENCES: Record<SoundName, Note[]> = {
     [1047, 0.3, 0.26],
     [784, 0.52, 0.09],
     [1047, 0.62, 0.36],
+  ],
+  // Subiu de nível: arpejo rápido de dó maior até o agudo e um brilho no fim (inscrição nova, fim do tutorial).
+  levelup: [
+    [523, 0, 0.06],
+    [659, 0.06, 0.06],
+    [784, 0.12, 0.06],
+    [1047, 0.18, 0.06],
+    [1319, 0.24, 0.06],
+    [1568, 0.3, 0.2],
+    [1319, 0.52, 0.06],
+    [2093, 0.58, 0.3, "triangle"],
   ],
   warn: [
     [466, 0, 0.11],

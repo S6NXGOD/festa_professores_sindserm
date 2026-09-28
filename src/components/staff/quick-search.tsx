@@ -17,6 +17,7 @@ export function QuickSearch({ personPath = "/painel/participantes" }: { personPa
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const search = useCallback((text: string) => searchPeopleAction(text, "auto"), []);
   const { results, loading, run } = useDebouncedSearch<PersonSearchResult>(search, 250);
 
@@ -26,6 +27,19 @@ export function QuickSearch({ personPath = "/painel/participantes" }: { personPa
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  // Atalho "/": vai direto para a busca (fora de campos de texto), como nos sites de busca.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      event.preventDefault();
+      inputRef.current?.focus();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, []);
 
   function onChange(value: string) {
@@ -42,6 +56,7 @@ export function QuickSearch({ personPath = "/painel/participantes" }: { personPa
     <div ref={containerRef} className="relative w-full max-w-md">
       <Search className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-fg-dim" />
       <Input
+        ref={inputRef}
         value={query}
         onChange={(event) => onChange(event.target.value)}
         onFocus={() => setOpen(true)}
@@ -50,7 +65,13 @@ export function QuickSearch({ personPath = "/painel/participantes" }: { personPa
         className="h-11 pl-11"
         aria-label="Busca rápida por nome, CPF ou matrícula"
       />
-      {loading ? <Loader className="absolute top-1/2 right-3.5 size-4 -translate-y-1/2 animate-spin-steps text-fg-muted" /> : null}
+      {loading ? (
+        <Loader className="absolute top-1/2 right-3.5 size-4 -translate-y-1/2 animate-spin-steps text-fg-muted" />
+      ) : !query ? (
+        <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border border-line-strong bg-surface-2 px-1.5 py-0.5 font-mono text-[0.7rem] text-fg-dim lg:block" aria-hidden>
+          /
+        </kbd>
+      ) : null}
       {open && results !== null ? (
         <div className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-line-strong bg-popover shadow-2xl">
           {visible.length === 0 ? (

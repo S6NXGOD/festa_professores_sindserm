@@ -227,6 +227,14 @@ export async function resetStaffPassword(actor: Actor, rawInput: { userId: strin
 }
 
 /** A pessoa criou a própria senha: acaba a senha provisória. */
+/** Tutorial do primeiro acesso terminado (ou pulado): não abre mais sozinho. Vale a primeira data. */
+export async function markTutorialSeen(ex: Executor, actor: StaffActor) {
+  await ex
+    .update(user)
+    .set({ tutorialSeenAt: new Date() })
+    .where(and(eq(user.id, actor.userId), sql`${user.tutorialSeenAt} IS NULL`));
+}
+
 export async function markPasswordChanged(actor: StaffActor) {
   return withTx(async (tx) => {
     const [row] = await tx

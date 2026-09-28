@@ -77,7 +77,7 @@ function localInput(date: Date) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
-async function login(page: Page, user: { email: string; password: string }) {
+async function login(page: Page, user: { email: string; password: string }, options: { keepTutorial?: boolean } = {}) {
   await page.goto("/entrar");
   await page.fill("#email", user.email);
   await page.fill("#password", user.password);
@@ -94,6 +94,12 @@ async function login(page: Page, user: { email: string; password: string }) {
     await page.getByTestId("change-password-submit").click();
     await page.waitForURL((url) => url.pathname !== "/conta");
     user.password = own;
+    await page.waitForLoadState("networkidle");
+  }
+  // Primeiro acesso: o tutorial abre sozinho. Nos fluxos ele é pulado (o tutorial tem teste próprio).
+  if (!options.keepTutorial && (await page.getByTestId("tutorial-pending").count()) > 0) {
+    await page.getByTestId("tutorial-skip").click();
+    await expect(page.getByTestId("tutorial")).toHaveCount(0);
   }
 }
 
@@ -166,6 +172,10 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.getByText("22h30")).toBeVisible();
       await admin.getByTestId("finish-setup").click();
       await admin.waitForURL("**/painel");
+      // Primeiro acesso ao painel: o tutorial abre sozinho (tem teste próprio); aqui ele é pulado.
+      await expect(admin.getByTestId("tutorial-step-boas-vindas")).toBeVisible();
+      await admin.getByTestId("tutorial-skip").click();
+      await expect(admin.getByTestId("tutorial")).toHaveCount(0);
       await expect(admin.getByTestId("stat-kits-available")).toHaveText("150");
       // A festa é daqui a 20 dias e ninguém entrou: o placar mostra a preparação, não "quem falta".
       const preEvent = admin.getByTestId("pre-event-hero");
@@ -940,9 +950,35 @@ test.describe.serial("festa das professoras e professores", () => {
 
       const context = await browser.newContext();
       const page = await context.newPage();
-      await login(page, VIEWER);
+      await login(page, VIEWER, { keepTutorial: true });
       // Sem Placar: cai na primeira área que pode ver, a portaria.
       await expect(page).toHaveURL(/\/portaria$/);
+      // Primeiro acesso: o tutorial abre sozinho, só com as fases do que ela usa.
+      const tutorial = page.getByTestId("tutorial");
+      await expect(tutorial).toBeVisible();
+      await expect(page.getByTestId("tutorial-step-boas-vindas")).toContainText("Bem-vindo(a) à equipe, Vera!");
+      await expect(tutorial).toContainText("fase 1/4");
+      await page.getByTestId("tutorial-next").click();
+      await expect(page.getByTestId("tutorial-step-inscricoes")).toBeVisible();
+      await page.getByTestId("tutorial-next").click();
+      await expect(page.getByTestId("tutorial-step-portaria")).toContainText("só para consultar");
+      await page.getByTestId("tutorial-back").click();
+      await expect(page.getByTestId("tutorial-step-inscricoes")).toBeVisible();
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("ArrowRight");
+      await expect(page.getByTestId("tutorial-step-pronto")).toBeVisible();
+      await expect(tutorial).not.toContainText("Administração");
+      await page.getByTestId("tutorial-finish").click();
+      await expect(tutorial).toHaveCount(0);
+      // Não abre mais sozinho; dá para rever pelo menu do nome.
+      await page.reload();
+      await expect(page.getByTestId("gate-search-input")).toBeVisible();
+      await expect(page.getByTestId("tutorial")).toHaveCount(0);
+      await page.getByTestId("user-menu").click();
+      await page.getByTestId("open-tutorial").click();
+      await expect(page.getByTestId("tutorial-step-boas-vindas")).toBeVisible();
+      await page.getByTestId("tutorial-skip").click();
+      await expect(page.getByTestId("tutorial")).toHaveCount(0);
       // Busca e vê a situação de quem ainda não entrou, mas não tem o botão de confirmar.
       await openPersonAtGate(page, "Clara Juridico", "Clara Juridico Dias");
       await expect(page.getByTestId("gate-status-title")).toHaveText("LIBERADO PARA ENTRADA");
@@ -1078,5 +1114,45 @@ test.describe.serial("festa das professoras e professores", () => {
 
     await context.close();
   });
+
+  test("inscrição nova toca o level up no painel e mostra quem chegou", async ({ browser }) => {
+    const staffContext = await browser.newContext();
+    const staff = await staffContext.newPage();
+    await login(staff, ATTENDANT);
+    await staff.goto("/painel/inscricoes?filtro=todas");
+    await expect(staff.getByTestId("registration-row").first()).toBeVisible();
+    // Dá tempo de o radar anotar o que já existia antes de a inscrição chegar.
+    await staff.waitForTimeout(1500);
+
+    const visitor = await browser.newContext({ ...devices["Pixel 7"] });
+    const page = await visitor.newPage();
+    await page.goto("/inscricao");
+    await page.getByTestId("answer-member-yes").click();
+    await page.fill("#member-name", "Rita Radar Souza");
+    await page.fill("#member-cpf", "48627591300");
+    await page.fill("#member-whatsapp", "86977776666");
+    await page.fill("#member-registration", "55555-5");
+    await page.fill("#member-workplace", "Escola Municipal Leste");
+    await page.getByTestId("teacher-no").click();
+    await page.getByTestId("wizard-next").click();
+    await page.locator("label[for=privacy-consent]").click();
+    await page.getByTestId("submit-registration").click();
+    await page.waitForURL("**/vouchers/**");
+    await visitor.close();
+
+    // O painel pergunta a cada 15 s: o aviso aparece com o nome e o atalho para conferir.
+    const toast = staff.getByTestId("new-registration-toast");
+    await expect(toast).toBeVisible({ timeout: 30_000 });
+    await expect(toast).toContainText("LEVEL UP! +1 INSCRIÇÃO");
+    await expect(toast).toContainText("Rita Radar Souza");
+    await expect(toast).toContainText("Pelo site · para conferir");
+    // A tela se atualiza sozinha: a fila do menu já conta a nova inscrição.
+    await expect(staff.getByTestId("nav-badge-pending").first()).toHaveText("1");
+    await toast.getByTestId("new-registration-open").click();
+    await expect(staff).toHaveURL(/\/painel\/participantes\/[0-9a-f-]{36}$/);
+    await expect(staff.getByTestId("person-header")).toContainText("Rita Radar Souza");
+    await staffContext.close();
+  });
 });
+
 

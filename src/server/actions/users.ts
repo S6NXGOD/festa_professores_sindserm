@@ -8,9 +8,17 @@ import type { ActionResult } from "@/lib/action-result";
 import { auth } from "@/server/auth";
 import { DomainError } from "@/server/services/errors";
 import { enforceRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
-import { createStaffUser, markPasswordChanged, resetStaffPassword, updateStaffUser } from "@/server/services/users";
+import { createStaffUser, markPasswordChanged, markTutorialSeen, resetStaffPassword, updateStaffUser } from "@/server/services/users";
+import { db } from "@/server/db";
 import { getActor, requireActionActor } from "@/server/session";
 import { runAction } from "./result";
+
+/** O tutorial do primeiro acesso foi concluído (ou pulado): não abre mais sozinho para esta pessoa. */
+export async function finishTutorialAction(): Promise<ActionResult> {
+  return runAction(async () => {
+    await markTutorialSeen(db, await requireActionActor());
+  });
+}
 
 export async function createUserAction(input: CreateUserInput): Promise<ActionResult<{ userId: string }>> {
   return runAction(async () => {
