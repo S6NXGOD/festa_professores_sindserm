@@ -248,6 +248,14 @@ describe("Regras de kits e convidado", () => {
     expect(employeeKitAvailability({ ...group, deadlinePassed: true }, "EMPLOYEE")).toEqual({ kind: "BLOCKED", code: "DEADLINE_PASSED" });
     expect(employeeKitAvailability({ ...group, deadlinePassed: true, deliveries: { EMPLOYEE: delivery } }, "EMPLOYEE").kind).toBe("DELIVERED");
   });
+  it("cortesia sem kit (ex.: convidado sem kit de colaborador(a)): entra, mas o kit nunca sai", () => {
+    const courtesy = { active: true, withKit: false, employeeCheckedIn: true, hasGuest: false, guestCheckedIn: false, deliveries: {}, deadlinePassed: false };
+    expect(employeeKitAvailability(courtesy, "EMPLOYEE")).toEqual({ kind: "BLOCKED", code: "WITHOUT_KIT" });
+    // Fora da lista pesa mais; kit já entregue (antes de virar "sem kit") continua aparecendo para o estorno.
+    expect(employeeKitAvailability({ ...courtesy, active: false }, "EMPLOYEE")).toEqual({ kind: "BLOCKED", code: "EMPLOYEE_REMOVED" });
+    expect(employeeKitAvailability({ ...courtesy, deliveries: { EMPLOYEE: delivery } }, "EMPLOYEE").kind).toBe("DELIVERED");
+    expect(employeeKitAvailability({ ...courtesy, withKit: true }, "EMPLOYEE")).toEqual({ kind: "AVAILABLE" });
+  });
   it("alerta do estoque dos funcionários: falta kit para quem ainda vai receber", () => {
     expect(isLowEmployeeStock(4, 2)).toBe(false);
     expect(isLowEmployeeStock(2, 2)).toBe(false);

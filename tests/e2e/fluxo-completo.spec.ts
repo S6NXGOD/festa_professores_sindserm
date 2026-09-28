@@ -765,6 +765,40 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.getByTestId("stat-employee-stock")).toHaveText("3");
     });
 
+    await test.step("convidado sem kit da prestadora, cadastrado na hora pela portaria: entra e o estoque não mexe", async () => {
+      await openPersonAtGate(admin, "Clara Juridico", "Clara Juridico Dias");
+      await admin.getByTestId("gate-more-actions").getByRole("button").first().click();
+      await admin.getByTestId("open-add-companion").click();
+      await admin.getByTestId("companion-name").fill("Tiago Amigo da Clara");
+      await admin.getByTestId("save-companion").click();
+      await expect(admin.getByTestId("companion-added")).toContainText("Tiago na lista!");
+      await admin.getByTestId("companion-enter-now").click();
+
+      // Já abre na pessoa nova, perguntando se registra a entrada (e avisando que é sem kit).
+      const prompt = admin.getByTestId("entry-prompt");
+      await expect(prompt).toBeVisible();
+      await expect(prompt.getByTestId("prompt-kit")).toContainText("Sem kit");
+      await prompt.getByTestId("prompt-confirm-entry").click();
+      await confirmEarlyEntry(admin);
+      await expect(admin.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
+      await expect(admin.getByTestId("gate-person-role")).toContainText(
+        "Convidado(a) de Clara Juridico Dias (prestador(a) de serviço do SINDSERM) · sem kit",
+      );
+      await expect(admin.getByTestId("entry-kit-result")).toContainText("Cadastro sem kit de consumação.");
+
+      await openPersonAtGate(admin, "Clara Juridico", "Clara Juridico Dias");
+      await admin.getByTestId("gate-more-actions").getByRole("button").first().click();
+      await expect(admin.getByTestId("companions-list")).toContainText("Tiago Amigo da Clara");
+      await expect(admin.getByTestId("companions-list")).toContainText("Presente");
+
+      await admin.goto("/painel/colaboradores");
+      await expect(admin.getByTestId("stat-employee-stock")).toHaveText("3");
+      const clara = admin.getByTestId("employee-row").filter({ hasText: "Clara Juridico Dias" });
+      await expect(clara.getByTestId("employee-companions")).toContainText("1 sem kit");
+      await admin.goto("/painel/cortesias");
+      await expect(admin.getByTestId("courtesy-row").filter({ hasText: "Tiago Amigo da Clara" })).toContainText("Sem kit");
+    });
+
     await context.close();
   });
 
@@ -1087,8 +1121,9 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.getByTestId("bulk-preview")).toContainText("Convite: Família do Carlos");
       await expect(admin.getByTestId("bulk-preview")).toContainText("Convite: Tesouraria");
       await admin.getByTestId("save-bulk-courtesies").click();
-      await expect(admin.getByTestId("courtesy-row")).toHaveCount(4);
-      await expect(admin.getByTestId("stat-courtesies")).toHaveText("4");
+      // + o convidado sem kit da prestadora (teste dos colaboradores), que também é cortesia.
+      await expect(admin.getByTestId("courtesy-row")).toHaveCount(5);
+      await expect(admin.getByTestId("stat-courtesies")).toHaveText("5");
       // Cortesias não aparecem na lista de colaboradores (e a de colaboradores continua a mesma).
       await admin.goto("/painel/colaboradores");
       await expect(admin.getByTestId("employee-row")).toHaveCount(3);
@@ -1106,10 +1141,11 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
       await expect(admin.getByTestId("entry-kit-result")).toContainText("Kit da cortesia (estoque dos colaboradores)");
       await admin.goto("/painel/cortesias");
-      await expect(admin.getByTestId("stat-courtesies-present")).toHaveText("1");
+      // Helena e o convidado sem kit que já tinha entrado.
+      await expect(admin.getByTestId("stat-courtesies-present")).toHaveText("2");
       await admin.goto("/painel/entradas?filtro=cortesias");
-      await expect(admin.getByTestId("entry-row")).toHaveCount(1);
-      await expect(admin.getByTestId("entry-row")).toContainText("Helena Presidente Costa");
+      await expect(admin.getByTestId("entry-row")).toHaveCount(2);
+      await expect(admin.getByTestId("entry-row").filter({ hasText: "Helena Presidente Costa" })).toHaveCount(1);
     });
 
     await context.close();

@@ -473,7 +473,7 @@ export function ScannerScreen() {
                       <Disclosure
                         variant="plain"
                         title="Mais ações do atendimento"
-                        hint={current.view.employee?.category === "COURTESY" ? "Kit e cadastro" : "Convidado, kits e cadastro"}
+                        hint={current.view.employee?.category === "COURTESY" ? "Kit e cadastro" : current.view.employee ? "Convidados, kits e cadastro" : "Convidado, kits e cadastro"}
                         testId="gate-more-actions"
                       >
                         <PersonOperations

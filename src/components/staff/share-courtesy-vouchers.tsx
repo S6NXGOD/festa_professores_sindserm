@@ -2,6 +2,7 @@
 
 import { Whatsapp } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
+import { courtesyClosingLine } from "@/domain/whatsapp-messages";
 import { playSound } from "@/lib/sound";
 import { firstName } from "@/lib/text";
 
@@ -16,7 +17,7 @@ export function ShareCourtesyVouchersButton({
   eventName,
 }: {
   inviter: string | null;
-  people: { fullName: string; token: string }[];
+  people: { fullName: string; token: string; withKit: boolean }[];
   eventName: string;
 }) {
   if (people.length === 0) return null;
@@ -28,13 +29,7 @@ export function ShareCourtesyVouchersButton({
       people.length === 1
         ? `Olá, ${firstName(people[0]!.fullName)}! Aqui está o seu voucher de cortesia para a ${eventName}:`
         : `Olá! Os vouchers de cortesia para a ${eventName}${inviter ? ` (convite: ${inviter})` : ""}:`;
-    const text = [
-      intro,
-      ...people.map((person) => `• ${person.fullName}: ${origin}/v/${person.token}`),
-      people.length === 1
-        ? "Na entrada, é só mostrar o QR Code. O seu kit de consumação sai junto com a entrada."
-        : "Na entrada, cada pessoa mostra o próprio QR Code. O kit de consumação de cada um sai junto com a entrada.",
-    ].join("\n");
+    const text = [intro, ...people.map((person) => `• ${person.fullName}: ${origin}/v/${person.token}`), courtesyClosingLine(people)].join("\n");
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   }
 

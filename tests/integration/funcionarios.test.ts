@@ -110,7 +110,7 @@ describe("cadastro interno dos funcionários", () => {
     const pasted = await createEmployeesFromList(admin, { text: "Tiago Limpeza Souza; Limpeza\nVera Seguranca Dias; Segurança", category: "CONTRACTOR" });
     expect(pasted.created).toBe(2);
     const [found] = await searchPeople(db, "Tiago Limpeza", { fullCpf: false });
-    expect(found?.employee).toEqual({ jobTitle: "Limpeza", category: "CONTRACTOR" });
+    expect(found?.employee).toEqual({ jobTitle: "Limpeza", category: "CONTRACTOR", withKit: true });
 
     // Sem categoria informada, continua sendo funcionário(a) (como quem já estava na lista).
     const staff = await createEmployee(admin, employee({ fullName: "Otavio Sem Categoria" }));

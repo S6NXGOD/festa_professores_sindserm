@@ -86,7 +86,9 @@ export type KitBlockCode =
   | "GUEST_NOT_CHECKED_IN"
   | "MEMBER_GOT_GUEST_KIT"
   | "EMPLOYEE_REMOVED"
-  | "EMPLOYEE_NOT_CHECKED_IN";
+  | "EMPLOYEE_NOT_CHECKED_IN"
+  /** Cortesia ou convidado(a) de colaborador(a) cadastrado(a) sem kit de consumação. */
+  | "WITHOUT_KIT";
 
 export type KitAvailability =
   | { kind: "DELIVERED"; delivery: DeliveryInfo }
@@ -140,6 +142,8 @@ export function kitAvailability(reg: KitRegistrationInput, kitType: GroupKitType
 export interface EmployeeKitInput {
   /** Na lista de funcionários (não foi tirado(a) da lista). */
   active: boolean;
+  /** Tem direito a kit (só cortesia pode ser cadastrada "sem kit"). */
+  withKit?: boolean;
   employeeCheckedIn: boolean;
   hasGuest: boolean;
   /** O convidado do(a) funcionário(a) já entrou na festa. */
@@ -157,6 +161,7 @@ export function employeeKitAvailability(input: EmployeeKitInput, kitType: Employ
   const delivered = input.deliveries[kitType];
   if (delivered) return { kind: "DELIVERED", delivery: delivered };
   if (!input.active) return { kind: "BLOCKED", code: "EMPLOYEE_REMOVED" };
+  if (kitType === "EMPLOYEE" && input.withKit === false) return { kind: "BLOCKED", code: "WITHOUT_KIT" };
   if (input.deadlinePassed) return { kind: "BLOCKED", code: "DEADLINE_PASSED" };
   if (kitType === "EMPLOYEE") {
     if (!input.employeeCheckedIn) return { kind: "BLOCKED", code: "EMPLOYEE_NOT_CHECKED_IN" };

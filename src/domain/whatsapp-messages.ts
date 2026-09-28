@@ -26,3 +26,20 @@ export function registrationWhatsappMessage(input: { fullName: string; status: A
 export function personWhatsappMessage(input: { fullName: string; eventName: string }): string {
   return `Olá, ${first(input.fullName)}! Aqui é da organização da ${input.eventName}.`;
 }
+
+/** Última linha da mensagem com os vouchers de cortesia: o que acontece na entrada, com ou sem kit de consumação. */
+export function courtesyClosingLine(people: { fullName: string; withKit: boolean }[]) {
+  const withKit = people.filter((person) => person.withKit);
+  if (people.length === 1) {
+    return withKit.length
+      ? "Na entrada, é só mostrar o QR Code. O seu kit de consumação sai junto com a entrada."
+      : "Na entrada, é só mostrar o QR Code (entrada sem kit de consumação).";
+  }
+  if (withKit.length === people.length) {
+    return "Na entrada, cada pessoa mostra o próprio QR Code. O kit de consumação de cada um sai junto com a entrada.";
+  }
+  if (withKit.length === 0) return "Na entrada, cada pessoa mostra o próprio QR Code (entrada sem kit de consumação).";
+  const names = withKit.map((person) => first(person.fullName));
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
+  return `Na entrada, cada pessoa mostra o próprio QR Code. Kit de consumação: só ${list}, junto com a entrada.`;
+}

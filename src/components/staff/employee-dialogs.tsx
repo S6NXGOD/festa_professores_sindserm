@@ -9,7 +9,7 @@ import { Controller, type FieldPath, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { FormField } from "@/components/forms/form-field";
 import { CpfInput, PhoneInput } from "@/components/forms/masked-input";
-import { Check, Gift, Heart, List, Loader, Pencil, QrCode, UserPlus, Users, Warning } from "@/components/icons/pixel";
+import { Check, Gift, Heart, List, Loader, Login, Pencil, QrCode, UserPlus, Users, Warning } from "@/components/icons/pixel";
 import { PlayerTag } from "@/components/retro/bits";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,7 +40,7 @@ import { playSound } from "@/lib/sound";
 import type { EmployeeCategory } from "@/domain/types";
 import { cn } from "@/lib/utils";
 import { createEmployeeAction, createEmployeesFromListAction, updateEmployeeAction } from "@/server/actions/employees";
-import { CategoryPicker } from "./employee-category";
+import { CATEGORY_STYLE, CategoryPicker } from "./employee-category";
 import { firstName } from "@/lib/text";
 
 /** Setores e cargos comuns no sindicato (sugestões; dá para escrever qualquer outro). */
@@ -108,15 +108,67 @@ function InviterField({
 }
 
 /** O que cada cortesia ganha. */
-function CourtesyRightsNote() {
+function CourtesyRightsNote({ withKit = true }: { withKit?: boolean }) {
   return (
     <p className="flex items-start gap-2.5 rounded-xl border border-[#ff4fb4]/45 bg-[#ff4fb4]/10 p-3 text-sm text-fg">
       <Heart className="mt-0.5 size-4 shrink-0 text-[#ff8fd0]" />
-      <span>
-        Ganha voucher próprio e <strong>1 kit de consumação</strong>, que sai junto com a entrada (do estoque dos colaboradores). Não
-        leva convidado: cada pessoa é uma cortesia.
-      </span>
+      {withKit ? (
+        <span>
+          Ganha voucher próprio e <strong>1 kit de consumação</strong>, que sai junto com a entrada (do estoque dos colaboradores). Não
+          leva convidado: cada pessoa é uma cortesia.
+        </span>
+      ) : (
+        <span>
+          Ganha voucher próprio e entra <strong>sem kit de consumação</strong>: a portaria vê o aviso e o estoque não é mexido. Não leva
+          convidado: cada pessoa é uma cortesia.
+        </span>
+      )}
     </p>
+  );
+}
+
+/** Cortesia com ou sem kit de consumação (ex.: quem vem só para a festa). */
+function KitChoice({ value, onChange }: { value: boolean; onChange: (withKit: boolean) => void }) {
+  const options = [
+    { withKit: true, label: "Com kit", hint: "Entrada + 1 kit de consumação", icon: Gift },
+    { withKit: false, label: "Sem kit", hint: "Só a entrada", icon: Login },
+  ];
+  return (
+    <div className="grid gap-1.5">
+      <p className="text-sm font-bold text-fg">Kit de consumação</p>
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Kit de consumação">
+        {options.map((option) => {
+          const selected = value === option.withKit;
+          return (
+            <button
+              key={option.label}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => {
+                playSound("blip");
+                onChange(option.withKit);
+              }}
+              className={cn(
+                "flex min-h-14 items-center gap-2.5 rounded-xl border-2 px-3 py-2 text-left transition-[color,background-color,border-color,box-shadow,transform] active:scale-95",
+                selected
+                  ? option.withKit
+                    ? CATEGORY_STYLE.COURTESY.selected
+                    : "border-fg/70 bg-surface-3 text-fg shadow-[0_0_18px_-8px_rgb(255_255_255/0.5)]"
+                  : "border-line-strong bg-surface-2 text-fg-muted hover:text-fg",
+              )}
+              data-testid={option.withKit ? "courtesy-with-kit" : "courtesy-without-kit"}
+            >
+              <option.icon className="size-5 shrink-0" />
+              <span className="min-w-0 leading-tight">
+                <span className="block text-sm font-bold">{option.label}</span>
+                <span className="block text-xs font-medium opacity-80">{option.hint}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -296,6 +348,8 @@ export interface EmployeeEditValues {
   jobTitle: string;
   category: EmployeeCategory;
   isMinor?: boolean;
+  /** Cortesia com kit (colaborador(a) sempre true). */
+  withKit?: boolean;
 }
 
 /** Corrigir os dados de um(a) colaborador(a) (o convidado é trocado na tela da pessoa). */
@@ -312,7 +366,7 @@ export function EditEmployeeDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const values = { ...initial, isMinor: initial.isMinor ?? false };
+  const values = { ...initial, isMinor: initial.isMinor ?? false, withKit: initial.withKit ?? true };
   const courtesy = initial.category === "COURTESY";
   const form = useForm<UpdateEmployeeInput, unknown, UpdateEmployeeData>({ resolver: zodResolver(updateEmployeeSchema), defaultValues: values });
   const e = form.formState.errors;
@@ -375,11 +429,18 @@ export function EditEmployeeDialog({
             </FormField>
           </div>
           {courtesy ? (
-            <Controller
-              control={form.control}
-              name="isMinor"
-              render={({ field }) => <MinorCheckbox checked={Boolean(field.value)} onChange={field.onChange} />}
-            />
+            <>
+              <Controller
+                control={form.control}
+                name="withKit"
+                render={({ field }) => <KitChoice value={field.value !== false} onChange={field.onChange} />}
+              />
+              <Controller
+                control={form.control}
+                name="isMinor"
+                render={({ field }) => <MinorCheckbox checked={Boolean(field.value)} onChange={field.onChange} />}
+              />
+            </>
           ) : null}
         </form>
         <DialogFooter>
@@ -405,6 +466,7 @@ export function BulkEmployeesDialog({ courtesy = false, inviters = [] }: { court
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [invitedBy, setInvitedBy] = useState("");
+  const [withKit, setWithKit] = useState(true);
   const [category, setCategory] = useState<EmployeeCategory>(courtesy ? "COURTESY" : "STAFF");
   const [pending, startTransition] = useTransition();
   const preview = parseEmployeeLines(text, { courtesy });
@@ -413,7 +475,9 @@ export function BulkEmployeesDialog({ courtesy = false, inviters = [] }: { court
 
   function submit() {
     startTransition(async () => {
-      const result = await callAction(createEmployeesFromListAction({ text, category, invitedBy: courtesy ? invitedBy : "" }));
+      const result = await callAction(
+        createEmployeesFromListAction({ text, category, invitedBy: courtesy ? invitedBy : "", withKit: courtesy ? withKit : true }),
+      );
       if (!result.ok) {
         playSound("error");
         toast.error(result.error);
@@ -431,6 +495,7 @@ export function BulkEmployeesDialog({ courtesy = false, inviters = [] }: { court
       );
       setText("");
       setInvitedBy("");
+      setWithKit(true);
       setOpen(false);
       router.refresh();
     });
@@ -521,7 +586,14 @@ export function BulkEmployeesDialog({ courtesy = false, inviters = [] }: { court
           {preview.errors.length ? ` · ${preview.errors.length} com problema: corrija para cadastrar` : ""}
           {` (até ${MAX_BULK_EMPLOYEES} por vez)`}
         </p>
-        {courtesy ? <CourtesyRightsNote /> : <RightsNote />}
+        {courtesy ? (
+          <>
+            <KitChoice value={withKit} onChange={setWithKit} />
+            <CourtesyRightsNote withKit={withKit} />
+          </>
+        ) : (
+          <RightsNote />
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
             Cancelar
@@ -560,14 +632,24 @@ export function CourtesyDialog({ inviters = [] }: { inviters?: string[] }) {
   const [pending, startTransition] = useTransition();
   const [added, setAdded] = useState<{ name: string; personId: string }[]>([]);
   const [justAdded, setJustAdded] = useState<{ name: string; personId: string } | null>(null);
-  const defaults: EmployeeInput = { fullName: "", cpf: "", whatsapp: "", jobTitle: "", category: "COURTESY", isMinor: false, guest: null };
+  const defaults: EmployeeInput = {
+    fullName: "",
+    cpf: "",
+    whatsapp: "",
+    jobTitle: "",
+    category: "COURTESY",
+    isMinor: false,
+    withKit: true,
+    guest: null,
+  };
   const form = useForm<EmployeeInput, unknown, EmployeeData>({ resolver: zodResolver(employeeSchema), defaultValues: defaults });
   const e = form.formState.errors;
+  const withKit = useWatch({ control: form.control, name: "withKit" }) !== false;
 
   function another() {
     playSound("blip");
-    // Mantém quem convidou: a próxima pessoa costuma ser da mesma família ou do mesmo convite.
-    form.reset({ ...defaults, jobTitle: form.getValues("jobTitle") ?? "" });
+    // Mantém quem convidou e o "com/sem kit": a próxima pessoa costuma ser da mesma família ou do mesmo convite.
+    form.reset({ ...defaults, jobTitle: form.getValues("jobTitle") ?? "", withKit: form.getValues("withKit") ?? true });
     setJustAdded(null);
     window.setTimeout(() => document.getElementById("courtesy-name")?.focus(), 50);
   }
@@ -639,7 +721,7 @@ export function CourtesyDialog({ inviters = [] }: { inviters?: string[] }) {
                 <p className="pixel text-[0.55rem] text-[#ff8fd0]">+1 cortesia</p>
                 <p className="display mt-1 text-3xl break-words text-fg">{firstName(justAdded.name)} na lista!</p>
                 <p className="mt-1 text-sm text-fg-muted">
-                  O voucher já está pronto.{added.length > 1 ? ` ${added.length} cadastradas agora.` : ""}
+                  O voucher já está pronto{withKit ? "" : " (sem kit de consumação)"}.{added.length > 1 ? ` ${added.length} cadastradas agora.` : ""}
                 </p>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -681,10 +763,15 @@ export function CourtesyDialog({ inviters = [] }: { inviters?: string[] }) {
               </div>
               <Controller
                 control={form.control}
+                name="withKit"
+                render={({ field }) => <KitChoice value={field.value !== false} onChange={field.onChange} />}
+              />
+              <Controller
+                control={form.control}
                 name="isMinor"
                 render={({ field }) => <MinorCheckbox checked={Boolean(field.value)} onChange={field.onChange} />}
               />
-              <CourtesyRightsNote />
+              <CourtesyRightsNote withKit={withKit} />
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={pending}>
                   {added.length ? "Fechar" : "Cancelar"}

@@ -262,6 +262,7 @@ export async function countEmployeesAwaitingKit(ex: Executor): Promise<number> {
     SELECT (SELECT count(*)
               FROM employee e
              WHERE e.removed_at IS NULL
+               AND e.with_kit
                AND NOT EXISTS (SELECT 1 FROM kit_delivery kd
                                 WHERE kd.employee_id = e.id AND kd.kit_type = 'EMPLOYEE' AND kd.cancelled_at IS NULL))
          + (SELECT count(*)

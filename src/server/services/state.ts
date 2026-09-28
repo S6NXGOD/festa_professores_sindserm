@@ -90,6 +90,21 @@ export interface EmployeeGroupState {
   /** Convidado ativo (no máximo um por funcionário(a)). */
   guest: ActiveGuest | null;
   deliveries: EmployeeDeliveries;
+  /** Tem direito a kit (colaborador(a) sempre; cortesia pode ser "sem kit"). */
+  withKit: boolean;
+  /** Convidado(a) sem kit trazido(a) por um(a) colaborador(a): quem trouxe. */
+  broughtBy: { employeeId: string; personId: string; fullName: string; category: EmployeeCategory } | null;
+  /** Colaborador(a): convidados sem kit que trouxe (ainda na lista). */
+  companions: CompanionInfo[];
+}
+
+/** Convidado(a) sem kit de um(a) colaborador(a) (cortesia ligada a ele(a)). */
+export interface CompanionInfo {
+  employeeId: string;
+  personId: string;
+  fullName: string;
+  isMinor: boolean;
+  checkedIn: boolean;
 }
 
 export interface GuestOfEmployeeState {
@@ -228,12 +243,40 @@ export async function isActiveEmployee(ex: Executor, personId: string) {
 /** Funcionário(a), convidado ativo, entradas e kits do grupo. */
 export async function loadEmployeeGroup(ex: Executor, employeeId: string): Promise<EmployeeGroupState | null> {
   const [row] = await ex
-    .select({ id: employee.id, jobTitle: employee.jobTitle, category: employee.category, removedAt: employee.removedAt, person: personColumns })
+    .select({
+      id: employee.id,
+      jobTitle: employee.jobTitle,
+      category: employee.category,
+      removedAt: employee.removedAt,
+      withKit: employee.withKit,
+      hostEmployeeId: employee.hostEmployeeId,
+      person: personColumns,
+    })
     .from(employee)
     .innerJoin(person, eq(person.id, employee.personId))
     .where(eq(employee.id, employeeId))
     .limit(1);
   if (!row) return null;
+  const hostEmployee = alias(employee, "host_employee");
+  const hostPerson = alias(person, "host_person");
+  const [broughtBy] = row.hostEmployeeId
+    ? await ex
+        .select({ employeeId: hostEmployee.id, personId: hostPerson.id, fullName: hostPerson.fullName, category: hostEmployee.category })
+        .from(hostEmployee)
+        .innerJoin(hostPerson, eq(hostPerson.id, hostEmployee.personId))
+        .where(eq(hostEmployee.id, row.hostEmployeeId))
+        .limit(1)
+    : [];
+  const companionRows =
+    row.category === "COURTESY"
+      ? []
+      : await ex
+          .select({ employeeId: employee.id, personId: person.id, fullName: person.fullName, isMinor: person.isMinor })
+          .from(employee)
+          .innerJoin(person, eq(person.id, employee.personId))
+          .where(and(eq(employee.hostEmployeeId, employeeId), isNull(employee.removedAt)))
+          .orderBy(asc(employee.createdAt));
+  const companionCheckIns = companionRows.length ? await loadActiveCheckIns(ex, companionRows.map((c) => c.personId)) : new Map();
   const [guestRow] = await ex
     .select({
       guestLinkId: guestLink.id,
@@ -258,6 +301,9 @@ export async function loadEmployeeGroup(ex: Executor, employeeId: string): Promi
     checkIn: checkIns.get(row.person.id) ?? null,
     guest: guestRow ? { ...guestRow, checkIn: checkIns.get(guestRow.personId) ?? null } : null,
     deliveries: await loadEmployeeDeliveries(ex, employeeId),
+    withKit: row.withKit,
+    broughtBy: broughtBy ?? null,
+    companions: companionRows.map((c) => ({ ...c, checkedIn: companionCheckIns.has(c.personId) })),
   };
 }
 

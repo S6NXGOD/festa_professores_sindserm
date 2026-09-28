@@ -174,7 +174,8 @@ export default async function PersonPage({ params, searchParams }: PageProps<"/p
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-        <GatePersonClient key={view.personId} view={view} personBasePath="/painel/participantes" />
+        {/* ?entrar=1: convidado(a) sem kit acabou de ser cadastrado(a), já pergunta se registra a entrada. */}
+        <GatePersonClient key={view.personId} view={view} personBasePath="/painel/participantes" promptEntryOnLoad={query.entrar === "1"} />
         <div className="space-y-6">
           <Panel
             title="Dados cadastrais"

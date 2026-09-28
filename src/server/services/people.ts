@@ -27,7 +27,7 @@ export interface PersonSearchResult {
   hostIsEmployee: boolean;
   checkedInAt: Date | null;
   /** Funcionário(a) do SINDSERM na lista (setor, se informado). */
-  employee: { jobTitle: string | null; category: EmployeeCategory } | null;
+  employee: { jobTitle: string | null; category: EmployeeCategory; withKit: boolean } | null;
 }
 
 export type SearchMode = "auto" | "name" | "cpf";
@@ -109,6 +109,7 @@ export async function searchPeople(
       employeeId: employee.id,
       employeeJobTitle: employee.jobTitle,
       employeeCategory: employee.category,
+      employeeWithKit: employee.withKit,
     })
     .from(person)
     .leftJoin(registration, eq(registration.memberPersonId, person.id))
@@ -122,12 +123,12 @@ export async function searchPeople(
     .where(condition)
     .orderBy(asc(person.searchName))
     .limit(options.limit ?? 25);
-  return rows.map(({ cpf, employeeId, employeeJobTitle, employeeCategory, hostMemberName, hostEmployeeName, ...row }) => ({
+  return rows.map(({ cpf, employeeId, employeeJobTitle, employeeCategory, employeeWithKit, hostMemberName, hostEmployeeName, ...row }) => ({
     ...row,
     hostName: hostMemberName ?? hostEmployeeName ?? null,
     hostIsEmployee: Boolean(hostEmployeeName && !hostMemberName),
     cpfDisplay: displayCpf(cpf, options.fullCpf),
-    employee: employeeId && employeeCategory ? { jobTitle: employeeJobTitle, category: employeeCategory } : null,
+    employee: employeeId && employeeCategory ? { jobTitle: employeeJobTitle, category: employeeCategory, withKit: employeeWithKit !== false } : null,
   }));
 }
 

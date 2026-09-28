@@ -123,6 +123,9 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
               ? [
                   "Toque em Confirmar entrada: os kits saem junto e o estoque baixa sozinho.",
                   "Antes do horário da festa, o sistema pede uma confirmação a mais.",
+                  ...(can(access, "manageGuests") || can(access, "manageEmployees")
+                    ? ["Colaborador(a) chegou com alguém sem direito a kit? Abra o nome dele(a) e toque em Convidado sem kit."]
+                    : []),
                 ]
               : ["Seu acesso é só para consultar: quem registra a entrada é a equipe da portaria."]),
           ],
@@ -152,7 +155,8 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
           title: "Colaboradores e cortesias",
           bullets: [
             "Colaboradores do SINDSERM (diretoria, funcionários e prestadores): voucher próprio, 1 kit e 1 convidado.",
-            "Cortesias: amigos e familiares da organização, 1 kit cada, agrupados por quem convidou.",
+            "Cortesias: amigos e familiares da organização, com ou sem kit, agrupados por quem convidou.",
+            "Convidado sem kit de um(a) colaborador(a): na tela da pessoa, botão Convidado sem kit (voucher próprio, sem mexer no estoque).",
           ],
         }
       : null,

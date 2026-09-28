@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigserial,
   boolean,
   check,
@@ -403,13 +404,24 @@ export const employee = pgTable(
     /** Setor ou cargo no sindicato (ex.: Secretaria, Financeiro, Jurídico). */
     jobTitle: text("job_title"),
     category: employeeCategoryEnum("category").notNull().default("STAFF"),
+    /** Cortesia com kit de consumação (colaboradores sempre têm; cortesia pode ser "sem kit"). */
+    withKit: boolean("with_kit").notNull().default(true),
+    /** Convidado sem kit trazido por um(a) colaborador(a): o cadastro de quem trouxe. */
+    hostEmployeeId: uuid("host_employee_id").references((): AnyPgColumn => employee.id, { onDelete: "restrict" }),
     createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     removedAt: timestamptz("removed_at"),
     removedByUserId: text("removed_by_user_id").references(() => user.id, { onDelete: "set null" }),
   },
-  (t) => [uniqueIndex("employee_person_unique").on(t.personId), index("employee_removed_at_idx").on(t.removedAt)],
+  (t) => [
+    uniqueIndex("employee_person_unique").on(t.personId),
+    index("employee_removed_at_idx").on(t.removedAt),
+    index("employee_host_idx").on(t.hostEmployeeId),
+    // Só cortesia fica sem kit ou tem quem a trouxe; colaborador(a) sempre tem kit.
+    // Compara como texto: o valor COURTESY entrou no enum numa migration anterior (banco novo roda tudo junto).
+    check("employee_courtesy_only", sql`${t.category}::text = 'COURTESY' OR (${t.withKit} AND ${t.hostEmployeeId} IS NULL)`),
+  ],
 );
 
 // ---------------------------------------------------------------------------

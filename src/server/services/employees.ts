@@ -5,6 +5,8 @@ import { checkIn, employee, guestLink, kitDelivery, person } from "@/server/db/s
 import {
   type BulkEmployeesInput,
   bulkEmployeesSchema,
+  type CompanionInput,
+  companionSchema,
   COURTESY_NO_GUEST_MESSAGE,
   type EmployeeData,
   type EmployeeInput,
@@ -18,11 +20,12 @@ import type { EmployeeCategory } from "@/domain/types";
 import { maskCpf } from "@/lib/cpf";
 import { plural } from "@/lib/plural";
 import { toSearchText } from "@/lib/text";
+import { can } from "@/domain/access";
 import { type Actor, assertPermission, type StaffActor } from "./actor";
 import { writeAudit } from "./audit";
 import { DomainError, isUniqueViolation } from "./errors";
 import { attachGuest, endGuestLink, type GuestHost, hostFromEmployee, mapGuestError } from "./group";
-import { lockEmployeeGroupWithPeople } from "./locks";
+import { lockEmployeeGroup, lockEmployeeGroupWithPeople } from "./locks";
 import { personSearchFields } from "./registration";
 import { findActiveGuestLink, findRegistrationIdByMember } from "./state";
 import { withTx } from "./tx";
@@ -66,7 +69,13 @@ async function assertNotParticipant(tx: Tx, personId: string) {
   }
 }
 
-type EmployeeFields = Omit<EmployeeData, "guest">;
+type EmployeeFields = Omit<EmployeeData, "guest"> & { hostEmployeeId?: string | null };
+
+/** Colaborador(a) sempre tem kit e não é "trazido(a)" por ninguém: só cortesia usa esses campos. */
+function courtesyFields(input: EmployeeFields) {
+  const courtesy = input.category === "COURTESY";
+  return { withKit: courtesy ? input.withKit : true, hostEmployeeId: courtesy ? (input.hostEmployeeId ?? null) : null };
+}
 
 async function insertEmployee(tx: Tx, actor: StaffActor, input: EmployeeFields) {
   let personId: string | null = null;
@@ -98,13 +107,13 @@ async function insertEmployee(tx: Tx, actor: StaffActor, input: EmployeeFields) 
   if (restoredId) {
     await tx
       .update(employee)
-      .set({ jobTitle: input.jobTitle, category: input.category, removedAt: null, removedByUserId: null })
+      .set({ jobTitle: input.jobTitle, category: input.category, ...courtesyFields(input), removedAt: null, removedByUserId: null })
       .where(eq(employee.id, restoredId));
     employeeId = restoredId;
   } else {
     const [created] = await tx
       .insert(employee)
-      .values({ personId, jobTitle: input.jobTitle, category: input.category, createdByUserId: actor.userId })
+      .values({ personId, jobTitle: input.jobTitle, category: input.category, ...courtesyFields(input), createdByUserId: actor.userId })
       .returning({ id: employee.id });
     employeeId = created!.id;
   }
@@ -138,6 +147,7 @@ export async function createEmployee(actor: Actor, raw: EmployeeInput) {
         entityId: created.employeeId,
         summary:
           `${input.fullName} liberado(a) para a festa como ${EMPLOYEE_CATEGORY_INLINE[input.category]}${input.jobTitle ? ` (${input.jobTitle})` : ""}` +
+          (input.category === "COURTESY" && !input.withKit ? ", sem kit de consumação" : "") +
           (addedGuest ? `, com convidado(a) ${addedGuest.name}.` : "."),
         after: {
           personId: created.personId,
@@ -197,6 +207,7 @@ export async function createEmployeesFromList(actor: Actor, raw: BulkEmployeesIn
           jobTitle: row.jobTitle ?? (courtesy ? input.invitedBy : null),
           category: input.category,
           isMinor: false,
+          withKit: courtesy ? input.withKit : true,
         };
         const employeeRow = await insertEmployee(tx, actor, fields);
         if (row.guestName) {
@@ -210,7 +221,7 @@ export async function createEmployeesFromList(actor: Actor, raw: BulkEmployeesIn
           action: "EMPLOYEE_ADDED",
           entityType: "employee",
           summary: courtesy
-            ? `${plural(created.length, "cortesia liberada", "cortesias liberadas")} pela lista${input.invitedBy ? ` (convite: ${input.invitedBy})` : ""}.`
+            ? `${plural(created.length, "cortesia liberada", "cortesias liberadas")} pela lista${input.invitedBy ? ` (convite: ${input.invitedBy})` : ""}${input.withKit ? "" : ", sem kit de consumação"}.`
             : `${created.length === 1 ? "1 colaborador(a) do SINDSERM liberado(a)" : `${created.length} colaboradores do SINDSERM liberados`} pela lista (${EMPLOYEE_CATEGORY_LABEL[input.category]})` +
               (guests.length ? `, com ${plural(guests.length, "convidado", "convidados")}.` : "."),
           after: { names: created, guests, skipped },
@@ -240,7 +251,16 @@ export async function updateEmployee(actor: Actor, raw: UpdateEmployeeInput) {
         .update(person)
         .set({ ...personSearchFields(input.fullName), cpf: input.cpf, whatsapp: input.whatsapp, isMinor: input.isMinor })
         .where(eq(person.id, current.person.id));
-      await tx.update(employee).set({ jobTitle: input.jobTitle, category: input.category }).where(eq(employee.id, current.id));
+      await tx
+        .update(employee)
+        .set({
+          jobTitle: input.jobTitle,
+          category: input.category,
+          // Mudar "com/sem kit" não mexe em quem trouxe; virou colaborador(a), sempre tem kit.
+          withKit: input.category === "COURTESY" ? input.withKit : true,
+          ...(input.category === "COURTESY" ? {} : { hostEmployeeId: null }),
+        })
+        .where(eq(employee.id, current.id));
       await writeAudit(tx, actor, {
         action: "EMPLOYEE_UPDATED",
         entityType: "employee",
@@ -256,14 +276,72 @@ export async function updateEmployee(actor: Actor, raw: UpdateEmployeeInput) {
   }
 }
 
+/** "Rodrigo Carneiro" para o campo de quem convidou (no máximo 60 letras). */
+function inviterLabel(fullName: string) {
+  if (fullName.length <= 60) return fullName;
+  const words = fullName.split(" ");
+  return `${words[0]} ${words[words.length - 1]}`.slice(0, 60);
+}
+
+/**
+ * Convidado(a) sem kit de um(a) colaborador(a): chegou junto na portaria (ou foi
+ * avisado antes). Vira uma cortesia sem kit ligada a quem trouxe, com voucher
+ * próprio. Quem cuida dos convidados na portaria (Atendimento) também pode.
+ */
+export async function addCompanion(actor: Actor, raw: CompanionInput) {
+  if (actor.kind !== "staff") throw new DomainError("UNAUTHENTICATED", "Faça login para continuar.");
+  if (!can(actor.access, "manageGuests") && !can(actor.access, "manageEmployees")) {
+    throw new DomainError("FORBIDDEN", "Seu perfil não tem permissão para cadastrar convidado.");
+  }
+  const input = companionSchema.parse(raw);
+  try {
+    return await withTx(async (tx) => {
+      const host = await lockEmployeeGroup(tx, input.hostEmployeeId);
+      if (host.category === "COURTESY") throw new DomainError("INVALID_STATE", COURTESY_NO_GUEST_MESSAGE);
+      if (!host.active) throw new DomainError("INVALID_STATE", "Colaborador(a) fora da lista: traga de volta antes de cadastrar convidado.");
+      const created = await insertEmployee(tx, actor, {
+        fullName: input.fullName,
+        cpf: input.cpf,
+        whatsapp: null,
+        jobTitle: inviterLabel(host.person.fullName),
+        category: "COURTESY",
+        isMinor: input.isMinor,
+        withKit: false,
+        hostEmployeeId: host.id,
+      });
+      await writeAudit(tx, actor, {
+        action: "EMPLOYEE_ADDED",
+        entityType: "employee",
+        entityId: created.employeeId,
+        summary: `${input.fullName} entrou na lista como convidado(a) sem kit de ${host.person.fullName} (${EMPLOYEE_CATEGORY_INLINE[host.category]}).`,
+        after: {
+          personId: created.personId,
+          cpf: input.cpf ? maskCpf(input.cpf) : "não informado",
+          host: host.person.fullName,
+          withKit: false,
+          isMinor: input.isMinor,
+        },
+      });
+      return { employeeId: created.employeeId, personId: created.personId, hostName: host.person.fullName };
+    });
+  } catch (error) {
+    mapEmployeeError(error);
+  }
+}
+
 /**
  * Tira da lista: o voucher deixa de valer e o convite do convidado é encerrado.
  * Quem já entrou (ou cujo convidado já entrou) só sai estornando a entrada.
  */
 export async function removeEmployee(actor: Actor, input: { employeeId: string }) {
-  assertPermission(actor, "manageEmployees");
+  // Quem cuida dos convidados (Atendimento) também tira o(a) convidado(a) sem kit cadastrado(a) por engano na portaria.
+  const companionsOnly = actor.kind === "staff" && !can(actor.access, "manageEmployees") && can(actor.access, "manageGuests");
+  if (!companionsOnly) assertPermission(actor, "manageEmployees");
   return withTx(async (tx) => {
     const current = await lockEmployeeGroupWithPeople(tx, String(input.employeeId));
+    if (companionsOnly && !current.broughtBy) {
+      throw new DomainError("FORBIDDEN", "Seu perfil só tira da lista convidados sem kit de colaboradores.");
+    }
     if (!current.active) return { removed: false };
     if (current.checkIn) {
       throw new DomainError("INVALID_STATE", "Já entrou na festa. Para tirar da lista, estorne a entrada antes (os kits voltam ao estoque).");
@@ -332,6 +410,10 @@ export interface EmployeeRow {
   jobTitle: string | null;
   category: EmployeeCategory;
   isMinor: boolean;
+  /** Cortesia com kit (colaborador(a) sempre true). */
+  withKit: boolean;
+  /** Convidado(a) sem kit: o cadastro do(a) colaborador(a) que trouxe. */
+  hostEmployeeId: string | null;
   removedAt: Date | null;
   checkedInAt: Date | null;
   kitDeliveredAt: Date | null;
@@ -360,6 +442,8 @@ export async function listEmployees(
       jobTitle: employee.jobTitle,
       category: employee.category,
       isMinor: person.isMinor,
+      withKit: employee.withKit,
+      hostEmployeeId: employee.hostEmployeeId,
       removedAt: employee.removedAt,
     })
     .from(employee)

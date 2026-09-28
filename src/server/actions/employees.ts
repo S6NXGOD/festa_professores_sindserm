@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { BulkEmployeesInput, EmployeeInput, UpdateEmployeeInput } from "@/domain/schemas";
+import type { BulkEmployeesInput, CompanionInput, EmployeeInput, UpdateEmployeeInput } from "@/domain/schemas";
 import type { ActionResult } from "@/lib/action-result";
 import {
+  addCompanion,
   createEmployee,
   createEmployeesFromList,
   removeEmployee,
@@ -26,6 +27,16 @@ export async function createEmployeeAction(
     const created = await createEmployee(actor, input);
     refresh();
     return { employeeId: created.employeeId, personId: created.personId, restored: created.restored, guestName: created.guest?.name ?? null };
+  });
+}
+
+/** Convidado(a) sem kit que chegou com um(a) colaborador(a). */
+export async function addCompanionAction(input: CompanionInput): Promise<ActionResult<{ employeeId: string; personId: string; hostName: string }>> {
+  return runAction(async () => {
+    const actor = await requireActionActor();
+    const created = await addCompanion(actor, input);
+    refresh();
+    return created;
   });
 }
 

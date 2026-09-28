@@ -81,6 +81,12 @@ export interface GateView {
     category: EmployeeCategory;
     guest: GuestView | null;
     kits: Record<EmployeeKitType, KitView>;
+    /** Tem direito a kit (só cortesia pode ser "sem kit"). */
+    withKit: boolean;
+    /** Convidado(a) sem kit: o(a) colaborador(a) que trouxe. */
+    broughtBy: { personId: string; fullName: string; category: EmployeeCategory } | null;
+    /** Colaborador(a): convidados sem kit que trouxe. */
+    companions: { employeeId: string; personId: string; fullName: string; isMinor: boolean; checkedIn: boolean }[];
   };
   /** Quem convidou esta pessoa: um(a) professor(a) ou um(a) colaborador(a) do SINDSERM. */
   host: null | {
@@ -399,6 +405,17 @@ export function buildGateView(
             EMPLOYEE: toKitView(employeeKitAvailability(employeeKitInput(staffGroup, deadlinePassed), "EMPLOYEE")),
             GUEST: toKitView(employeeKitAvailability(employeeKitInput(staffGroup, deadlinePassed), "GUEST")),
           },
+          withKit: staffGroup.withKit,
+          broughtBy: staffGroup.broughtBy
+            ? { personId: staffGroup.broughtBy.personId, fullName: staffGroup.broughtBy.fullName, category: staffGroup.broughtBy.category }
+            : null,
+          companions: staffGroup.companions.map((c) => ({
+            employeeId: c.employeeId,
+            personId: c.personId,
+            fullName: c.fullName,
+            isMinor: c.isMinor,
+            checkedIn: c.checkedIn,
+          })),
         }
       : null,
     host: hostView(state),

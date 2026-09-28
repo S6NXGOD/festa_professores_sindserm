@@ -158,6 +158,7 @@ export function GateSearch({
                       <>
                         <CategoryChip category="COURTESY" />
                         {person.employee.jobTitle ? <span className="font-semibold text-[#ff8fd0]">Convite: {person.employee.jobTitle}</span> : null}
+                        {person.employee.withKit ? null : <ToneBadge tone="neutral">Sem kit</ToneBadge>}
                       </>
                     ) : person.employee ? (
                       <ToneBadge tone="warning" icon={Building}>

@@ -71,10 +71,15 @@ const TONE: Record<Tone, string> = {
 function roleLine(view: GateView): { icon: PixelIcon; iconClass: string; text: string } | null {
   if (view.employee && (view.role === "EMPLOYEE" || view.role === "NONE")) {
     const style = CATEGORY_STYLE[view.employee.category];
+    const broughtBy = view.employee.broughtBy;
+    // Cortesia sem kit: a recepção já lê na linha de quem é a pessoa que não sai kit.
+    const noKit = view.employee.withKit ? "" : " · sem kit";
     return {
-      icon: style.icon,
+      icon: broughtBy ? Users : style.icon,
       iconClass: style.text,
-      text: employeeTitleLine(view.employee.category, view.employee.jobTitle),
+      text: broughtBy
+        ? `Convidado(a) de ${broughtBy.fullName} (${EMPLOYEE_CATEGORY_INLINE[broughtBy.category]})${noKit}`
+        : `${employeeTitleLine(view.employee.category, view.employee.jobTitle)}${noKit}`,
     };
   }
   if (view.role === "GUEST" && view.host) {
@@ -321,12 +326,24 @@ function DetailRows({ view }: { view: GateView }) {
   return (
     <dl className="grid gap-2">
       {view.employee ? (
-        <InfoRow icon={Building} label={`Kits · ${EMPLOYEE_CATEGORY_TITLE[view.employee.category]}`}>
+        <InfoRow icon={Building} label={`${view.employee.withKit ? "Kits" : "Kit"} · ${EMPLOYEE_CATEGORY_TITLE[view.employee.category]}`}>
           {view.employee.active ? (
             <>
               <span className="block">
                 Seu kit: <KitStatusText kit={view.employee.kits.EMPLOYEE} />
               </span>
+              {view.employee.broughtBy ? (
+                <span className="mt-1 block text-fg-muted">
+                  Veio com <strong className="text-fg">{view.employee.broughtBy.fullName}</strong> (
+                  {EMPLOYEE_CATEGORY_INLINE[view.employee.broughtBy.category]}).
+                </span>
+              ) : null}
+              {view.employee.companions.length > 0 ? (
+                <span className="mt-1 block text-fg-muted" data-testid="gate-companions-line">
+                  {view.employee.companions.length === 1 ? "Convidado sem kit: " : `${view.employee.companions.length} convidados sem kit: `}
+                  {view.employee.companions.map((c) => `${c.fullName}${c.checkedIn ? " (já entrou)" : ""}`).join(", ")}.
+                </span>
+              ) : null}
               {/* Cortesia não leva convidado: só o próprio kit. */}
               {view.employee.category !== "COURTESY" ? (
                 <span className="mt-1 block">
@@ -339,7 +356,8 @@ function DetailRows({ view }: { view: GateView }) {
                   : <KitStatusText kit={view.employee.kits.GUEST} />
                 </span>
               ) : null}
-              {deadline}
+              {/* Sem kit (cortesia sem kit): o horário limite dos kits não interessa. */}
+              {view.employee.withKit ? deadline : null}
             </>
           ) : (
             <span className="block font-semibold text-danger">

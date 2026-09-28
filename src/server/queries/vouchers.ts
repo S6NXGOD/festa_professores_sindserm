@@ -33,6 +33,10 @@ export interface VoucherCardData {
   jobTitle?: string | null;
   /** Categoria do(a) colaborador(a) (diretoria, funcionário(a), prestador(a)). */
   category?: EmployeeCategory | null;
+  /** Cortesia sem kit de consumação (convidado(a) sem kit de colaborador(a), por exemplo). */
+  withoutKit?: boolean;
+  /** Convidado(a) sem kit: quem trouxe. */
+  broughtByName?: string | null;
 }
 
 export async function qrSvgFor(token: string): Promise<string> {
@@ -79,6 +83,8 @@ async function cardFromState(state: PersonState, token: string, code: string): P
       jobTitle: state.employee.jobTitle,
       category: state.employee.category,
       guestName: state.employee.guest?.fullName ?? null,
+      withoutKit: !state.employee.withKit,
+      broughtByName: state.employee.broughtBy?.fullName ?? null,
     };
   }
   const own = state.ownRegistration;

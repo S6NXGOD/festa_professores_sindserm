@@ -53,6 +53,7 @@ import { formatShortDateTime } from "@/lib/datetime";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { cancelAffiliationFormAction, formalizeAffiliationAction } from "@/server/actions/affiliation-forms";
+import { removeEmployeeAction } from "@/server/actions/employees";
 import {
   cancelCheckInAction,
   cancelDeliveryAction,
@@ -70,6 +71,7 @@ import {
 } from "@/server/actions/operations";
 import type { GateView, GuestView, KitView } from "@/server/services/gate-view";
 import { AddGuestDialog } from "./add-guest-dialog";
+import { CompanionDialog } from "./companion-dialog";
 import { KitStatusText } from "./gate-result";
 import { firstName as firstNameOf } from "@/lib/text";
 
@@ -94,12 +96,14 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
   const host = view.host;
 
   if (view.employee && view.employee.category === "COURTESY") {
-    // Cortesia da organização: 1 kit (sai com a entrada, do estoque dos colaboradores) e nada de convidado.
+    // Cortesia da organização: 1 kit (sai com a entrada, do estoque dos colaboradores), ou nenhum se foi
+    // cadastrada "sem kit" (ex.: convidado(a) sem kit de um(a) colaborador(a)), e nada de convidado.
     const courtesy = view.employee;
+    const showKit = courtesy.withKit || courtesy.kits.EMPLOYEE.kind === "DELIVERED";
     return (
       <div className="scroll-mt-20 space-y-4" id="person-operations">
-        <EmployeeSection view={view} />
-        {courtesy.active && p.deliverKits ? (
+        <EmployeeSection view={view} personBasePath={personBasePath} />
+        {courtesy.active && p.deliverKits && showKit ? (
           <GroupKitsSection
             view={view}
             intro="O kit sai sozinho com a entrada, do estoque dos colaboradores."
@@ -116,7 +120,7 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
     const staffGroup = view.employee;
     return (
       <div className="scroll-mt-20 space-y-4" id="person-operations">
-        <EmployeeSection view={view} />
+        <EmployeeSection view={view} personBasePath={personBasePath} />
         {staffGroup.active && p.deliverKits ? (
           <GroupKitsSection
             view={view}
@@ -146,6 +150,7 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
             onChanged={onChanged}
           />
         ) : null}
+        {p.manageGuests || p.manageEmployees ? <CompanionsSection view={view} personBasePath={personBasePath} onChanged={onChanged} /> : null}
         {p.adminCorrections ? <AdminSection view={view} onChanged={onChanged} /> : null}
       </div>
     );
@@ -241,12 +246,15 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
 // ---------------------------------------------------------------------------
 
 /** Colaborador(a) do SINDSERM (categoria, setor, convidado e voucher) ou cortesia da organização. */
-function EmployeeSection({ view }: { view: GateView }) {
+function EmployeeSection({ view, personBasePath }: { view: GateView; personBasePath: string }) {
   const staffGroup = view.employee!;
   const p = view.permissions;
   const courtesy = staffGroup.category === "COURTESY";
   const listHref = courtesy ? "/painel/cortesias" : "/painel/colaboradores";
   const listName = courtesy ? "cortesias" : "colaboradores";
+  const broughtBy = staffGroup.broughtBy;
+  // A regra, não a contagem (os convidados sem kit têm seção própria, com o número).
+  const rights = courtesy ? (staffGroup.withKit ? "1 kit (sem convidado)" : "Sem kit de consumação") : "1 kit + 1 convidado com kit + convidados sem kit";
   return (
     <Panel
       title={EMPLOYEE_CATEGORY_TITLE[staffGroup.category]}
@@ -257,12 +265,27 @@ function EmployeeSection({ view }: { view: GateView }) {
         <>
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
             <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <dt className="text-[0.68rem] font-bold tracking-[0.08em] text-fg-dim uppercase">{courtesy ? "Quem convidou" : "Setor"}</dt>
-              <dd className="font-semibold text-fg">{staffGroup.jobTitle ?? "Não informado"}</dd>
+              <dt className="text-[0.68rem] font-bold tracking-[0.08em] text-fg-dim uppercase">
+                {broughtBy ? "Veio com" : courtesy ? "Quem convidou" : "Setor"}
+              </dt>
+              <dd className="font-semibold text-fg">
+                {broughtBy ? (
+                  <>
+                    <Link href={`${personBasePath}/${broughtBy.personId}`} className="hover:text-red hover:underline" data-testid="brought-by-link">
+                      {broughtBy.fullName}
+                    </Link>
+                    <span className="block text-xs font-medium text-fg-muted">{EMPLOYEE_CATEGORY_TITLE[broughtBy.category]}</span>
+                  </>
+                ) : (
+                  (staffGroup.jobTitle ?? "Não informado")
+                )}
+              </dd>
             </div>
             <div className="rounded-lg border border-line bg-surface-2 p-3">
               <dt className="text-[0.68rem] font-bold tracking-[0.08em] text-fg-dim uppercase">Direitos</dt>
-              <dd className="font-semibold text-fg">{courtesy ? "1 kit (sem convidado)" : "1 kit + 1 convidado (com kit)"}</dd>
+              <dd className="font-semibold text-fg" data-testid="employee-rights">
+                {rights}
+              </dd>
             </div>
           </dl>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -685,6 +708,91 @@ function GuestSection({
       ) : (
         <p className="text-sm text-fg-muted">{blockedText}</p>
       )}
+    </Panel>
+  );
+}
+
+/**
+ * Convidados sem kit do(a) colaborador(a): além do convidado com kit, quem mais
+ * veio junto (ex.: "convidado do Rodrigo, sem kit"). Cada um ganha voucher próprio.
+ */
+function CompanionsSection({ view, personBasePath, onChanged }: { view: GateView; personBasePath: string; onChanged?: () => void }) {
+  const staffGroup = view.employee!;
+  const p = view.permissions;
+  const companions = staffGroup.companions;
+  const first = firstNameOf(view.fullName);
+  return (
+    <Panel
+      title="Convidados sem kit"
+      icon={Users}
+      action={companions.length ? <PixelTag tone="neutral">{companions.length === 1 ? "1 pessoa" : `${companions.length} pessoas`}</PixelTag> : null}
+    >
+      {companions.length ? (
+        <ul className="mb-3 grid gap-2" data-testid="companions-list">
+          {companions.map((c) => (
+            <li key={c.personId} className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface-2 p-3.5">
+              <div className="min-w-[10rem] flex-1">
+                <Link href={`${personBasePath}/${c.personId}`} className="font-bold text-fg hover:text-red hover:underline">
+                  {c.fullName}
+                </Link>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {c.isMinor ? (
+                    <ToneBadge tone="warning" icon={Warning}>
+                      Menor
+                    </ToneBadge>
+                  ) : null}
+                  <ToneBadge tone={c.checkedIn ? "success" : "neutral"}>{c.checkedIn ? "Presente" : "Não entrou"}</ToneBadge>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {/* O voucher abre para quem cuida das inscrições e para quem administra os colaboradores. */}
+                {p.manageGuests || p.manageEmployees ? (
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/painel/participantes/${c.personId}/voucher`} aria-label={`Voucher de ${c.fullName}`}>
+                      <QrCode /> Voucher
+                    </Link>
+                  </Button>
+                ) : null}
+                {!c.checkedIn ? (
+                  <ConfirmActionDialog
+                    trigger={
+                      <Button variant="ghost" size="icon-sm" className="text-fg-muted hover:text-danger" aria-label={`Tirar ${c.fullName} da lista`}>
+                        <Trash />
+                      </Button>
+                    }
+                    title={`Tirar ${c.fullName} da lista?`}
+                    description="O voucher dele(a) é cancelado. Fica no histórico (e em Cortesias, entre os removidos)."
+                    confirmLabel="Tirar da lista"
+                    tone="danger"
+                    onConfirm={() => removeEmployeeAction(c.employeeId)}
+                    successMessage="Convidado(a) tirado(a) da lista."
+                    onDone={onChanged}
+                  />
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {staffGroup.active ? (
+        // No celular, o texto em cima e o botão largo embaixo (lado a lado a partir do tablet).
+        <div className="flex flex-col gap-3 rounded-xl border-2 border-dashed border-line p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-fg-muted sm:max-w-prose">
+            {companions.length ? `Chegou mais alguém com ${first}?` : `${first} trouxe alguém sem direito a kit?`} Cadastre aqui: a pessoa
+            ganha voucher próprio e entra sem kit de consumação.
+          </p>
+          <CompanionDialog
+            hostEmployeeId={staffGroup.employeeId}
+            hostName={view.fullName}
+            personBasePath={personBasePath}
+            canCheckIn={p.checkIn}
+            onDone={onChanged}
+            triggerClassName="w-full shrink-0 sm:w-auto"
+          />
+        </div>
+      ) : companions.length === 0 ? (
+        <p className="text-sm text-fg-muted">Fora da lista de colaboradores: não é possível cadastrar convidado.</p>
+      ) : null}
     </Panel>
   );
 }

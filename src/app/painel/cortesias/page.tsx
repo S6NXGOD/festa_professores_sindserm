@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ConfirmActionDialog } from "@/components/common/confirm-action-dialog";
-import { Gift, Heart, Login, Pencil, Printer, QrCode, Reload, Trash, Warning } from "@/components/icons/pixel";
+import { Gift, Heart, Info, Login, Pencil, Printer, QrCode, Reload, Trash, Warning } from "@/components/icons/pixel";
 import { CATEGORY_AVATAR } from "@/components/staff/category-avatar";
 import { BulkEmployeesDialog, CourtesyDialog, EditEmployeeDialog } from "@/components/staff/employee-dialogs";
 import { ChipFilters, EmptyState, PageHeader, StatTile } from "@/components/staff/panel-ui";
@@ -38,7 +38,8 @@ const NO_INVITER = "Sem indicação";
 /**
  * Cortesias da organização: amigos, familiares e convidados da diretoria, dos
  * funcionários e dos prestadores. Cada pessoa tem voucher próprio e 1 kit (do
- * estoque dos colaboradores), sem convidado. A lista vem agrupada por quem
+ * estoque dos colaboradores) ou só a entrada ("sem kit", como o convidado sem kit
+ * que um(a) colaborador(a) traz), sem convidado. A lista vem agrupada por quem
  * convidou, com um botão para mandar os vouchers do grupo numa mensagem só.
  */
 export default async function CourtesiesPage({ searchParams }: PageProps<"/painel/cortesias">) {
@@ -54,9 +55,11 @@ export default async function CourtesiesPage({ searchParams }: PageProps<"/paine
   const active = all.filter((row) => !row.removedAt);
   const present = active.filter((row) => row.checkedInAt);
   const kitsDelivered = active.filter((row) => row.kitDeliveredAt).length;
-  // O estoque é o mesmo dos colaboradores: a previsão soma todo mundo que tira kit dele.
+  const withKit = active.filter((row) => row.withKit);
+  const withoutKit = active.length - withKit.length;
+  // O estoque é o mesmo dos colaboradores: a previsão soma todo mundo que tira kit dele (cortesia sem kit fica fora).
   const collaborators = everyone.filter((row) => row.category !== "COURTESY" && !row.removedAt);
-  const kitsNeeded = collaborators.length + collaborators.filter((row) => row.guest).length + active.length;
+  const kitsNeeded = collaborators.length + collaborators.filter((row) => row.guest).length + withKit.length;
   const employeePool = stock?.pools.find((pool) => pool.pool === "EMPLOYEE") ?? null;
   const inviters = [...new Set(all.map((row) => row.jobTitle).filter((v): v is string => Boolean(v)))].sort((a, b) => a.localeCompare(b, "pt-BR"));
 
@@ -80,7 +83,7 @@ export default async function CourtesiesPage({ searchParams }: PageProps<"/paine
       <PageHeader
         eyebrow="Convites da organização"
         title="Cortesias"
-        description="Amigos, familiares e convidados da diretoria, dos funcionários e dos prestadores: cada pessoa tem voucher próprio e 1 kit de consumação, que sai junto com a entrada (do estoque dos colaboradores). Cortesia não leva convidado: cadastre cada pessoa."
+        description="Amigos, familiares e convidados da diretoria, dos funcionários e dos prestadores: cada pessoa tem voucher próprio e 1 kit de consumação, que sai junto com a entrada (do estoque dos colaboradores), ou só a entrada, se for cadastrada sem kit. Cortesia não leva convidado: cadastre cada pessoa."
         actions={
           <>
             {canManage ? (
@@ -106,11 +109,22 @@ export default async function CourtesiesPage({ searchParams }: PageProps<"/paine
           value={active.length}
           icon={Heart}
           tone="brand"
-          hint={inviters.length ? plural(inviters.length, "convite", "convites") : undefined}
+          hint={
+            [inviters.length ? plural(inviters.length, "convite", "convites") : null, withoutKit ? `${withoutKit} sem kit` : null]
+              .filter(Boolean)
+              .join(" · ") || undefined
+          }
           testId="stat-courtesies"
         />
         <StatTile label="Já entraram" value={present.length} icon={Login} tone="success" testId="stat-courtesies-present" />
-        <StatTile label="Kits entregues" value={kitsDelivered} icon={Gift} tone="warning" hint={active.length ? `de ${active.length}` : undefined} testId="stat-courtesy-kits" />
+        <StatTile
+          label="Kits entregues"
+          value={kitsDelivered}
+          icon={Gift}
+          tone="warning"
+          hint={withKit.length ? `de ${withKit.length}` : undefined}
+          testId="stat-courtesy-kits"
+        />
         <StatTile
           label="Estoque dos colaboradores"
           value={employeePool?.available ?? 0}
@@ -127,7 +141,7 @@ export default async function CourtesiesPage({ searchParams }: PageProps<"/paine
           <Warning className="mt-0.5 size-4 shrink-0 text-warning" />
           <span>
             {employeePool
-              ? `O estoque dos colaboradores (${employeePool.total}) é menor que os kits previstos: ${plural(active.length, "cortesia", "cortesias")} + colaboradores e convidados deles = ${kitsNeeded}.`
+              ? `O estoque dos colaboradores (${employeePool.total}) é menor que os kits previstos: ${plural(withKit.length, "cortesia com kit", "cortesias com kit")} + colaboradores e convidados deles = ${kitsNeeded}.`
               : `Nenhum kit cadastrado no estoque dos colaboradores: são previstos ${kitsNeeded} (cortesias + colaboradores e convidados deles).`}{" "}
             <Link href="/painel/kits" className="underline underline-offset-4">
               Ajustar em Kits e estoque
@@ -167,7 +181,7 @@ export default async function CourtesiesPage({ searchParams }: PageProps<"/paine
           {groups.map((group) => {
             const shareable = group.rows
               .filter((row) => !row.removedAt && tokens.has(row.personId))
-              .map((row) => ({ fullName: row.fullName, token: tokens.get(row.personId)! }));
+              .map((row) => ({ fullName: row.fullName, token: tokens.get(row.personId)!, withKit: row.withKit }));
             return (
               <section key={group.key} className="space-y-2" data-testid="courtesy-group">
                 <div className="flex flex-wrap items-center gap-2 px-1">
@@ -235,7 +249,12 @@ function CourtesyItem({ row, canManage, inviters }: { row: EmployeeRow; canManag
             <ToneBadge tone="success" icon={Gift}>
               Kit {formatTime(row.kitDeliveredAt)}
             </ToneBadge>
+          ) : !row.withKit ? (
+            <ToneBadge tone="neutral" icon={Info}>
+              Sem kit
+            </ToneBadge>
           ) : null}
+          {row.hostEmployeeId ? <ToneBadge tone="neutral">Veio com colaborador(a)</ToneBadge> : null}
         </div>
       </div>
       {/* No celular, os botões ficam numa linha própria: o nome não espreme. */}
@@ -258,6 +277,7 @@ function CourtesyItem({ row, canManage, inviters }: { row: EmployeeRow; canManag
                   jobTitle: row.jobTitle ?? "",
                   category: row.category,
                   isMinor: row.isMinor,
+                  withKit: row.withKit,
                 }}
                 trigger={
                   <Button variant="ghost" size="icon-sm" aria-label={`Editar ${row.fullName}`}>

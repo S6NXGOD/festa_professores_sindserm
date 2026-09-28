@@ -184,6 +184,7 @@ export const KIT_BLOCK_MESSAGE: Record<KitBlockCode, string> = {
   MEMBER_GOT_GUEST_KIT: "Já recebeu o kit quando entrou como convidado(a).",
   EMPLOYEE_REMOVED: "Fora da lista de colaboradores.",
   EMPLOYEE_NOT_CHECKED_IN: "Sai junto com a entrada.",
+  WITHOUT_KIT: "Sem kit de consumação (combinado no cadastro).",
 };
 
 /** O que a recepção lê quando a pessoa entra sem kit (ela entra do mesmo jeito). */
@@ -193,6 +194,7 @@ export const ENTRY_KIT_MESSAGE: Record<
 > = {
   EMPLOYEE_REMOVED: "Sem kit: fora da lista de colaboradores.",
   EMPLOYEE_NOT_CHECKED_IN: "Sem kit.",
+  WITHOUT_KIT: "Sem kit: cadastro sem kit de consumação.",
   NO_EMPLOYEE_STOCK: "Sem kit: cadastre o estoque de kits dos colaboradores (Kits e estoque).",
   NOT_ACTIVE_MEMBER: "Sem kit: a filiação ainda não foi confirmada.",
   NOT_TEACHER: "Sem kit: não é professor(a).",

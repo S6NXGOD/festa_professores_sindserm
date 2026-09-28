@@ -65,6 +65,7 @@ export function employeeKitInput(
 ): EmployeeKitInput {
   return {
     active: group.active,
+    withKit: group.withKit,
     employeeCheckedIn: Boolean(group.checkIn),
     hasGuest: Boolean(group.guest),
     guestCheckedIn: Boolean(group.guest?.checkIn),

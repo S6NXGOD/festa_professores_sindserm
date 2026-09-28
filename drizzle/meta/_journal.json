@@ -57,6 +57,13 @@
       "when": 1790599696964,
       "tag": "0007_tutorial_primeiro_acesso",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790609613325,
+      "tag": "0008_convidados_sem_kit",
+      "breakpoints": true
     }
   ]
 }

@@ -59,9 +59,11 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
   // Na faixa do kit, só o primeiro nome: o nome completo já está no voucher de cada pessoa.
   const guestFirst = card.guestName ? firstName(card.guestName) : null;
   const kitLine = isEmployee
-    ? guestFirst
-      ? `2 kits de consumação: o seu e o de ${guestFirst}`
-      : "1 kit de consumação"
+    ? card.withoutKit
+      ? "Entrada sem kit de consumação"
+      : guestFirst
+        ? `2 kits de consumação: o seu e o de ${guestFirst}`
+        : "1 kit de consumação"
     : isMember
       ? card.isTeacher
         ? guestFirst
@@ -71,7 +73,9 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
       : `1 kit de consumação, depois que ${card.hostName ? firstName(card.hostName) : "quem te convidou"} chegar`;
   const tag = isEmployee ? metal.tag : isMember ? "PLAYER 1" : "PLAYER 2";
   const subtitle = isEmployee
-    ? employeeTitleLine(category, card.jobTitle)
+    ? card.broughtByName
+      ? `Convidado(a) de ${properName(card.broughtByName)}`
+      : employeeTitleLine(category, card.jobTitle)
     : isMember
       ? card.isTeacher
         ? "Professor(a) filiado(a)"

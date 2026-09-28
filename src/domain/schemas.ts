@@ -403,6 +403,8 @@ const employeeFields = z.object({
   category: z.enum(EMPLOYEE_CATEGORIES).default("STAFF"),
   /** Cortesias costumam incluir crianças: a portaria vê o aviso "menor de 18". */
   isMinor: z.boolean().default(false),
+  /** Só cortesia pode ser "sem kit" (colaborador(a) sempre tem kit). */
+  withKit: z.boolean().default(true),
 });
 
 /** Cadastro do(a) funcionário(a), já com o convidado (opcional). */
@@ -435,7 +437,19 @@ export const bulkEmployeesSchema = z.object({
   category: z.enum(EMPLOYEE_CATEGORIES).default("STAFF"),
   /** Cortesias: quem convidou, para as linhas que não disserem (ex.: a família inteira de alguém). */
   invitedBy: employeeJobTitleField.optional().default(null),
+  /** Cortesias da lista toda com ou sem kit de consumação. */
+  withKit: z.boolean().default(true),
 });
+
+/** Convidado(a) sem kit que chegou com um(a) colaborador(a) (ou foi avisado antes). */
+export const companionSchema = z.object({
+  hostEmployeeId: z.uuid(),
+  fullName: fullNameField("o nome completo do convidado"),
+  cpf: optionalCpfField,
+  isMinor: z.boolean().default(false),
+});
+export type CompanionInput = z.input<typeof companionSchema>;
+export type CompanionData = z.output<typeof companionSchema>;
 export type BulkEmployeesInput = z.input<typeof bulkEmployeesSchema>;
 
 export interface BulkEmployeeLine {

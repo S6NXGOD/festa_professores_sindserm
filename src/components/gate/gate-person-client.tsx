@@ -101,7 +101,7 @@ export function GatePersonClient({
         <Disclosure
           variant="plain"
           title="Mais ações do atendimento"
-          hint={view.employee?.category === "COURTESY" ? "Kit e cadastro" : "Convidado, kits e cadastro"}
+          hint={view.employee?.category === "COURTESY" ? "Kit e cadastro" : view.employee ? "Convidados, kits e cadastro" : "Convidado, kits e cadastro"}
           testId="gate-more-actions"
         >
           {operations}

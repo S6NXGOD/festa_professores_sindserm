@@ -121,6 +121,7 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
       (SELECT count(*) FROM employee WHERE removed_at IS NULL)::int AS employees,
       (SELECT count(*) FROM employee e JOIN active_checkins c ON c.person_id = e.person_id WHERE e.removed_at IS NULL)::int AS employees_present,
       (SELECT count(*) FROM employee WHERE removed_at IS NULL AND category = 'COURTESY')::int AS courtesies,
+      (SELECT count(*) FROM employee WHERE removed_at IS NULL AND with_kit)::int AS employees_with_kit,
       (SELECT count(*) FROM employee e JOIN active_checkins c ON c.person_id = e.person_id
         WHERE e.removed_at IS NULL AND e.category = 'COURTESY')::int AS courtesies_present,
       (SELECT count(*) FROM guest_link gl JOIN employee e ON e.id = gl.employee_id
@@ -155,13 +156,13 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
     kitsOwedMember: Math.max(0, n("entitled_member") - n("delivered_member")),
     kitsOwedGuest: Math.max(0, n("entitled_guest") - n("delivered_guest")),
     // Todo funcionário tem kit; o convidado dele também (os dois do estoque dos funcionários).
-    kitsOwedEmployee: Math.max(0, n("employees") + n("entitled_employee_guest") - n("delivered_employee")),
+    kitsOwedEmployee: Math.max(0, n("employees_with_kit") + n("entitled_employee_guest") - n("delivered_employee")),
     employees: n("employees"),
     employeesPresent: n("employees_present"),
     courtesies: n("courtesies"),
     courtesiesPresent: n("courtesies_present"),
     employeeGuests: n("employee_guests"),
-    kitDemand: { member: n("teachers"), guest: n("demand_guest"), employee: n("employees") + n("entitled_employee_guest") },
+    kitDemand: { member: n("teachers"), guest: n("demand_guest"), employee: n("employees_with_kit") + n("entitled_employee_guest") },
     stock: await getStockOverview(ex),
   };
 }

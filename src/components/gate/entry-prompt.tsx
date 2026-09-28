@@ -10,7 +10,8 @@ import { confirmEntryLabel, KitOnEntryTile } from "./gate-result";
 import { firstName } from "@/lib/text";
 
 /**
- * Logo depois de confirmar a filiação (ou a assinatura da ficha) na portaria:
+ * Logo depois de confirmar a filiação (ou a assinatura da ficha, ou de cadastrar
+ * um(a) convidado(a) sem kit) na portaria:
  * "já pode entrar!" com o botão de registrar a entrada na frente, para a equipe
  * não esquecer esse segundo passo.
  */
@@ -37,7 +38,9 @@ export function EntryPromptDialog({
             </PixelTag>
           </motion.div>
           <DialogTitle>{first} já pode entrar!</DialogTitle>
-          <DialogDescription>A filiação está confirmada. Registre a entrada agora para não ficar pendente.</DialogDescription>
+          <DialogDescription>
+            {view.ownRegistration ? "A filiação está confirmada." : "Cadastro pronto."} Registre a entrada agora para não ficar pendente.
+          </DialogDescription>
         </DialogHeader>
         {/* O mesmo cartão de kit da portaria: quem vai registrar já separa o kit. */}
         {kit ? <KitOnEntryTile kit={kit} deadline={view.kitDeadline} testId="prompt-kit" /> : null}

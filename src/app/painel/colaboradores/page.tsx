@@ -20,7 +20,7 @@ import { initials } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { db } from "@/server/db";
 import { removeEmployeeAction, restoreEmployeeAction } from "@/server/actions/employees";
-import { listEmployees } from "@/server/services/employees";
+import { type EmployeeRow, listEmployees } from "@/server/services/employees";
 import { getStockOverview } from "@/server/services/settings";
 import { requirePageActor } from "@/server/session";
 
@@ -42,14 +42,21 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
   const categoryParam = typeof query.categoria === "string" ? query.categoria : "";
   const category = (COLLABORATOR_CATEGORIES as readonly string[]).includes(categoryParam) ? (categoryParam as CollaboratorCategory) : null;
   const [everyone, stock] = await Promise.all([listEmployees(db, { includeRemoved: true, kind: "all" }), getStockOverview(db)]);
-  // Cortesias têm tela própria, mas tiram kit do mesmo estoque: entram só na conta do estoque.
+  // Cortesias têm tela própria, mas tiram kit do mesmo estoque: entram só na conta do estoque (as sem kit, não).
   const all = everyone.filter((row) => row.category !== "COURTESY");
-  const courtesies = everyone.filter((row) => row.category === "COURTESY" && !row.removedAt).length;
+  const activeCourtesies = everyone.filter((row) => row.category === "COURTESY" && !row.removedAt);
+  const courtesies = activeCourtesies.filter((row) => row.withKit).length;
+  // Convidados sem kit de cada colaborador(a) (cortesias sem kit ligadas a quem trouxe).
+  const companionsOf = new Map<string, EmployeeRow[]>();
+  for (const row of activeCourtesies) {
+    if (row.hostEmployeeId) companionsOf.set(row.hostEmployeeId, [...(companionsOf.get(row.hostEmployeeId) ?? []), row]);
+  }
   const active = all.filter((row) => !row.removedAt);
   const present = active.filter((row) => row.checkedInAt);
   const guests = active.filter((row) => row.guest);
   const guestsPresent = guests.filter((row) => row.guest?.checkedInAt).length;
-  // Todo colaborador tem kit; o convidado dele também; cada cortesia, 1 (tudo do estoque dos colaboradores).
+  const companions = active.reduce((sum, row) => sum + (companionsOf.get(row.employeeId)?.length ?? 0), 0);
+  // Todo colaborador tem kit; o convidado dele também; cada cortesia com kit, 1 (tudo do estoque dos colaboradores).
   const kitsNeeded = active.length + guests.length + courtesies;
   const employeePool = stock?.pools.find((pool) => pool.pool === "EMPLOYEE") ?? null;
   const byCategory = Object.fromEntries(COLLABORATOR_CATEGORIES.map((c) => [c, active.filter((row) => row.category === c).length])) as Record<
@@ -74,7 +81,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
       <PageHeader
         eyebrow="Cadastro interno"
         title="Colaboradores do SINDSERM"
-        description="Diretoria, funcionários e prestadores de serviço liberados para a festa: cada um tem voucher próprio (o passe da casa, com a categoria), 1 kit de consumação e pode levar 1 convidado com kit. Os kits saem do estoque dos colaboradores. Amigos e familiares a mais entram como cortesias."
+        description="Diretoria, funcionários e prestadores de serviço liberados para a festa: cada um tem voucher próprio (o passe da casa, com a categoria), 1 kit de consumação e pode levar 1 convidado com kit. Quem mais vier junto entra como convidado sem kit (na tela da pessoa, também na portaria). Os kits saem do estoque dos colaboradores. Amigos e familiares da organização entram como cortesias."
         actions={
           <>
             {canManage ? (
@@ -104,7 +111,14 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
           hint={guests.length ? `+ ${guestsPresent} de ${plural(guests.length, "convidado", "convidados")}` : undefined}
           testId="stat-employees-present"
         />
-        <StatTile label="Convidados" value={guests.length} icon={Users} tone="brand" testId="stat-employee-guests" />
+        <StatTile
+          label="Convidados"
+          value={guests.length}
+          icon={Users}
+          tone="brand"
+          hint={companions ? `com kit · + ${companions} sem kit` : undefined}
+          testId="stat-employee-guests"
+        />
         <StatTile
           label="Estoque dos colaboradores"
           value={employeePool?.available ?? 0}
@@ -121,7 +135,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
           <Warning className="mt-0.5 size-4 shrink-0 text-warning" />
           <span>
             {employeePool
-              ? `O estoque dos colaboradores (${employeePool.total}) é menor que os kits previstos: ${plural(active.length, "colaborador", "colaboradores")} + ${plural(guests.length, "convidado", "convidados")}${courtesies ? ` + ${plural(courtesies, "cortesia", "cortesias")}` : ""} = ${kitsNeeded}.`
+              ? `O estoque dos colaboradores (${employeePool.total}) é menor que os kits previstos: ${plural(active.length, "colaborador", "colaboradores")} + ${plural(guests.length, "convidado", "convidados")}${courtesies ? ` + ${plural(courtesies, "cortesia com kit", "cortesias com kit")}` : ""} = ${kitsNeeded}.`
               : `Nenhum kit cadastrado no estoque dos colaboradores: são previstos ${kitsNeeded} (colaboradores + convidados${courtesies ? " + cortesias" : ""}).`}{" "}
             <Link href="/painel/kits" className="underline underline-offset-4">
               Ajustar em Kits e estoque
@@ -216,6 +230,22 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
                       </ToneBadge>
                     ) : null}
                   </div>
+                  {!row.removedAt && companionsOf.get(row.employeeId)?.length ? (
+                    <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm" data-testid="employee-companions">
+                      <ToneBadge tone="neutral" icon={Users}>
+                        {companionsOf.get(row.employeeId)!.length} sem kit
+                      </ToneBadge>
+                      {companionsOf.get(row.employeeId)!.map((companion, index, list) => (
+                        <span key={companion.employeeId} className="text-xs text-fg-muted">
+                          <Link href={`/painel/participantes/${companion.personId}`} className="font-semibold text-fg hover:text-red hover:underline">
+                            {companion.fullName}
+                          </Link>
+                          {companion.checkedInAt ? ` (entrou ${formatTime(companion.checkedInAt)})` : ""}
+                          {index < list.length - 1 ? "," : ""}
+                        </span>
+                      ))}
+                    </p>
+                  ) : null}
                   {row.guest ? (
                     <p className="mt-2 flex flex-wrap items-center gap-1.5 text-sm" data-testid="employee-guest">
                       <PlayerTag player={2} className="scale-90" />
@@ -264,9 +294,12 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
                           }
                           title={`Tirar ${row.fullName} da lista?`}
                           description={
-                            row.guest
+                            (row.guest
                               ? `O voucher dele(a) e o convite de ${row.guest.fullName} deixam de valer. O histórico fica guardado e dá para trazer de volta (o convidado é cadastrado de novo).`
-                              : "O voucher deixa de valer na portaria. O histórico fica guardado e dá para trazer de volta."
+                              : "O voucher deixa de valer na portaria. O histórico fica guardado e dá para trazer de volta.") +
+                            (companionsOf.get(row.employeeId)?.length
+                              ? ` Os convidados sem kit dele(a) continuam valendo (ficam em Cortesias; tire lá, se for o caso).`
+                              : "")
                           }
                           confirmLabel="Tirar da lista"
                           tone="danger"

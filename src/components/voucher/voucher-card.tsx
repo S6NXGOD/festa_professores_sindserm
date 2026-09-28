@@ -210,7 +210,7 @@ function EmployeePass({
           {card.fullName}
         </h3>
         <p className={cn("mt-1 text-sm font-semibold print:text-black", metal.text)} data-testid="voucher-job">
-          {employeeTitleLine(category, card.jobTitle)}
+          {card.broughtByName ? `Convidado(a) de ${properName(card.broughtByName)}` : employeeTitleLine(category, card.jobTitle)}
         </p>
       </div>
 
@@ -224,20 +224,26 @@ function EmployeePass({
               Entrada registrada {formatShortDateTime(card.checkedInAt)}
             </Note>
           ) : null}
-          <Note tone="warning" icon={Gift} testId="voucher-employee-kit">
-            <strong className="font-bold">{card.guestName ? "2 kits de consumação" : "1 kit de consumação"}</strong>
-            {card.guestName ? (
-              <>
-                {" "}
-                — o seu e o de <span data-testid="voucher-guest-name">{properName(card.guestName)}</span>
-              </>
-            ) : null}
-            .{" "}
-            {card.guestName
-              ? "O seu sai na recepção, junto com a sua entrada; o do convidado, depois que você chegar."
-              : "Entregue na recepção, junto com a sua entrada."}
-            {event.kitDeadlineLabel ? ` Kits até ${event.kitDeadlineLabel}.` : ""}
-          </Note>
+          {card.withoutKit ? (
+            <Note tone="neutral" icon={Info} testId="voucher-employee-kit">
+              <strong className="font-bold">Entrada sem kit de consumação.</strong> É só mostrar o QR Code na portaria.
+            </Note>
+          ) : (
+            <Note tone="warning" icon={Gift} testId="voucher-employee-kit">
+              <strong className="font-bold">{card.guestName ? "2 kits de consumação" : "1 kit de consumação"}</strong>
+              {card.guestName ? (
+                <>
+                  {" "}
+                  — o seu e o de <span data-testid="voucher-guest-name">{properName(card.guestName)}</span>
+                </>
+              ) : null}
+              .{" "}
+              {card.guestName
+                ? "O seu sai na recepção, junto com a sua entrada; o do convidado, depois que você chegar."
+                : "Entregue na recepção, junto com a sua entrada."}
+              {event.kitDeadlineLabel ? ` Kits até ${event.kitDeadlineLabel}.` : ""}
+            </Note>
+          )}
         </div>
       </div>
 
