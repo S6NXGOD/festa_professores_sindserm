@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AffiliationFormEditor } from "@/components/affiliation/affiliation-form";
 import { FormalizeController } from "@/components/affiliation/formalize-actions";
+import { GovbrApprovedHost, GovbrSigning } from "@/components/affiliation/govbr-signing";
 import { FormDocuments } from "@/components/documents/form-documents";
 import { ArrowLeft, ClipboardNote, Lock, Printer, User } from "@/components/icons/pixel";
 import { PageHeader, Panel } from "@/components/staff/panel-ui";
@@ -14,9 +15,11 @@ import { formatPhone, maskPhoneInput } from "@/lib/phone";
 import { DOCUMENT_KIND_LABEL } from "@/domain/labels";
 import { can } from "@/domain/rules";
 import { db } from "@/server/db";
+import { APP_NAME, getEventInfo } from "@/server/queries/config";
 import { getAffiliationForm } from "@/server/queries/panel";
 import { listFormDocuments } from "@/server/services/documents";
 import { requirePageActor } from "@/server/session";
+import { signingPath } from "@/server/signing-link";
 
 export const metadata: Metadata = { title: "Ficha de filiação" };
 
@@ -26,11 +29,14 @@ export default async function AffiliationFormPage({ params }: PageProps<"/painel
   const actor = await requirePageActor("viewForms");
   const { id } = await params;
   if (!UUID.test(id)) notFound();
-  const [data, documents] = await Promise.all([getAffiliationForm(id), listFormDocuments(db, id)]);
+  const [data, documents, event] = await Promise.all([getAffiliationForm(id), listFormDocuments(db, id), getEventInfo()]);
   if (!data) notFound();
   const { form } = data;
   const files = documents.map((doc) => ({ id: doc.id, kind: doc.kind, isPdf: doc.contentType === "application/pdf" }));
   const missing = (["RG", "PAYSLIP"] as const).filter((kind) => !files.some((file) => file.kind === kind));
+  const signedFiles = files.filter((file) => file.kind === "SIGNED_FORM");
+  // Antes da festa (ou quando o PDF assinado já chegou), a ficha pode ser assinada pelo gov.br.
+  const showGovbr = form.status === "DRAFT" && (!event?.started || signedFiles.length > 0);
   const documentsPanel = (
     <Panel
       title={
@@ -53,6 +59,8 @@ export default async function AffiliationFormPage({ params }: PageProps<"/painel
         files={files}
         canRemove={form.status === "DRAFT" || can(actor.access, "adminCorrections")}
         disabled={form.status === "CANCELLED"}
+        // A ficha assinada pelo gov.br fica no painel do gov.br enquanto a ficha espera; depois, junto com os outros.
+        kinds={showGovbr || signedFiles.length === 0 ? ["RG", "PAYSLIP"] : ["RG", "PAYSLIP", "SIGNED_FORM"]}
       />
     </Panel>
   );
@@ -89,6 +97,8 @@ export default async function AffiliationFormPage({ params }: PageProps<"/painel
         canOpenPerson={can(actor.access, "viewPeople")}
         canCheckIn={can(actor.access, "checkIn")}
       />
+      {/* Mesma ideia: o aviso de "efetivada pelo gov.br" continua aberto quando a página vira "assinada". */}
+      <GovbrApprovedHost fullName={form.fullName} whatsapp={form.whatsapp} eventName={event?.name ?? APP_NAME} />
 
       {form.status === "DRAFT" ? (
         <div className="space-y-5">
@@ -97,9 +107,23 @@ export default async function AffiliationFormPage({ params }: PageProps<"/painel
               Para assinar
             </ToneBadge>
             <p className="mt-2 text-sm text-fg">
-              1) Confira o RG e o contracheque · 2) Imprima a ficha · 3) Colha a assinatura · 4) Toque em “Assinatura colhida”.
+              Na recepção: 1) Confira o RG e o contracheque · 2) Imprima a ficha · 3) Colha a assinatura · 4) Toque em “Assinatura colhida”.
             </p>
+            {showGovbr ? <p className="mt-1.5 text-sm text-fg-muted">Antes da festa, dá para assinar pelo gov.br, no celular (logo abaixo).</p> : null}
           </div>
+          {showGovbr ? (
+            <GovbrSigning
+              formId={form.id}
+              fullName={form.fullName}
+              whatsapp={form.whatsapp}
+              signingPath={signingPath(form.id)}
+              formsWhatsapp={event?.formsWhatsapp ?? null}
+              eventName={event?.name ?? APP_NAME}
+              signedFiles={signedFiles}
+              missingRequired={missing}
+              canEdit={can(actor.access, "newAffiliation")}
+            />
+          ) : null}
           {documentsPanel}
           <AffiliationFormEditor
             formId={form.id}
@@ -149,7 +173,7 @@ export default async function AffiliationFormPage({ params }: PageProps<"/painel
           >
             <p className="text-sm text-fg-muted">
               {form.status === "FORMALIZED"
-                ? `Assinatura registrada ${formatDateTime(form.formalizedAt)}${data.formalizedBy ? ` por ${data.formalizedBy}` : ""}.`
+                ? `${signedFiles.length ? "Assinada pelo gov.br; confirmada" : "Assinatura registrada"} ${formatDateTime(form.formalizedAt)}${data.formalizedBy ? ` por ${data.formalizedBy}` : ""}.`
                 : `Ficha cancelada ${formatDateTime(form.cancelledAt)}.`}
             </p>
           </Panel>

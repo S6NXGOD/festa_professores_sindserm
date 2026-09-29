@@ -8,6 +8,7 @@ import { can } from "@/domain/rules";
 import { MAX_FILES_PER_DOCUMENT } from "@/domain/schemas";
 import type { DocumentKind } from "@/domain/types";
 import { decryptBytes, encryptBytes } from "@/server/crypto";
+import { PAGE_WIDTH, PdfPreviewError, PREVIEW_WIDTH, renderPdfPage } from "@/server/pdf/render";
 import { type Actor, actorUserId, assertPermission } from "./actor";
 import { writeAudit } from "./audit";
 import { DomainError } from "./errors";
@@ -34,9 +35,21 @@ export interface DocumentMeta {
   sizeBytes: number;
   createdAt: Date;
   uploadedBy: string | null;
+  /** PDF: páginas (nulo enquanto a prévia não foi gerada). */
+  pageCount: number | null;
 }
 
 const aadFor = (id: string) => `document:${id}`;
+const previewAadFor = (id: string) => `document-preview:${id}`;
+
+/** Prévia da 1ª página de um PDF (para guardar cifrada). PDF que não abre: sem prévia (a tela mostra o ícone). */
+async function pdfPreview(bytes: Buffer): Promise<{ jpeg: Buffer; pages: number } | null> {
+  try {
+    return await renderPdfPage(bytes, 1, PREVIEW_WIDTH);
+  } catch {
+    return null;
+  }
+}
 
 function isPdf(bytes: Buffer) {
   return bytes.subarray(0, 5).toString("latin1") === "%PDF-";
@@ -88,8 +101,14 @@ export async function storeDocument(
   input: { kind: DocumentKind; bytes: Buffer; type: string; formId?: string | null },
 ): Promise<DocumentMeta> {
   if (input.formId) assertPermission(actor, "newAffiliation");
+  // A ficha assinada pelo gov.br chega no WhatsApp da secretaria: só a equipe anexa, direto na ficha.
+  if (input.kind === "SIGNED_FORM" && !input.formId) throw new DomainError("FORBIDDEN", "A ficha assinada é anexada pela equipe, na ficha.");
   const { data, contentType } = await normalizeDocument(input);
+  if (input.kind === "SIGNED_FORM" && contentType !== "application/pdf") {
+    throw new DomainError("VALIDATION", "A ficha assinada pelo gov.br é um arquivo PDF. Envie o PDF que a pessoa mandou.");
+  }
   const id = randomUUID();
+  const preview = contentType === "application/pdf" ? await pdfPreview(data) : null;
   return withTx(async (tx) => {
     let form: { id: string; fullName: string } | null = null;
     if (input.formId) {
@@ -111,6 +130,8 @@ export async function storeDocument(
         contentType,
         sizeBytes: data.length,
         data: encryptBytes(data, aadFor(id)),
+        preview: preview ? encryptBytes(preview.jpeg, previewAadFor(id)) : null,
+        pageCount: preview?.pages ?? null,
         uploadedByUserId: actorUserId(actor),
       })
       .returning({ createdAt: affiliationDocument.createdAt });
@@ -134,6 +155,7 @@ export async function storeDocument(
       sizeBytes: data.length,
       createdAt: row!.createdAt,
       uploadedBy: actor.kind === "staff" ? actor.name : null,
+      pageCount: preview?.pages ?? null,
     };
   });
 }
@@ -181,12 +203,22 @@ export async function listFormDocuments(ex: Executor, formId: string): Promise<D
       sizeBytes: affiliationDocument.sizeBytes,
       createdAt: affiliationDocument.createdAt,
       uploadedBy: user.name,
+      pageCount: affiliationDocument.pageCount,
     })
     .from(affiliationDocument)
     .leftJoin(user, eq(user.id, affiliationDocument.uploadedByUserId))
     .where(eq(affiliationDocument.formId, formId))
     .orderBy(asc(affiliationDocument.kind), asc(affiliationDocument.createdAt));
   return rows.map((row) => ({ ...row, contentType: row.contentType as StoredContentType }));
+}
+
+/** A ficha tem o PDF assinado pelo gov.br? (exigido para confirmar a assinatura digital) */
+export async function hasSignedForm(ex: Executor, formId: string): Promise<boolean> {
+  const [row] = await ex
+    .select({ total: count() })
+    .from(affiliationDocument)
+    .where(and(eq(affiliationDocument.formId, formId), eq(affiliationDocument.kind, "SIGNED_FORM")));
+  return Number(row?.total ?? 0) > 0;
 }
 
 /** A ficha tem RG e contracheque? (exigido para confirmar a assinatura) */
@@ -201,10 +233,12 @@ export async function missingDocuments(ex: Executor, formId: string): Promise<Do
 }
 
 /**
- * Abre um documento (só a equipe). A abertura do arquivo inteiro fica na
- * auditoria; a miniatura da tela da ficha não.
+ * Abre um documento (só a equipe). A abertura do arquivo inteiro (ou da 1ª
+ * página no visualizador) fica na auditoria; a miniatura da lista e da ficha não.
+ * PDF: `thumbnail` é a 1ª página pequena (guardada depois da primeira vez);
+ * `page` desenha uma página grande para o visualizador.
  */
-export async function readDocument(actor: Actor, id: string, options: { thumbnail?: boolean } = {}) {
+export async function readDocument(actor: Actor, id: string, options: { thumbnail?: boolean; page?: number } = {}) {
   // "Fichas: só ver" inclui ver os documentos (cada abertura fica na auditoria).
   assertPermission(actor, "viewForms");
   const [row] = await db
@@ -214,6 +248,8 @@ export async function readDocument(actor: Actor, id: string, options: { thumbnai
       kind: affiliationDocument.kind,
       contentType: affiliationDocument.contentType,
       data: affiliationDocument.data,
+      preview: affiliationDocument.preview,
+      pageCount: affiliationDocument.pageCount,
       fullName: affiliationForm.fullName,
     })
     .from(affiliationDocument)
@@ -223,12 +259,46 @@ export async function readDocument(actor: Actor, id: string, options: { thumbnai
   // Envio ainda sem ficha só é visto por quem enviou (no próprio aparelho).
   if (!row || !row.formId) throw new DomainError("NOT_FOUND", "Documento não encontrado.");
   const bytes = decryptBytes(row.data, aadFor(row.id));
-  const baseName = `${DOCUMENT_KIND_LABEL[row.kind].toLowerCase()}-${row.id.slice(0, 8)}`;
+  const baseName = `${DOCUMENT_KIND_LABEL[row.kind].toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${row.id.slice(0, 8)}`;
+  const isPdf = row.contentType === "application/pdf";
+  if (options.thumbnail && isPdf) {
+    if (row.preview) {
+      return { bytes: decryptBytes(row.preview, previewAadFor(row.id)), contentType: "image/jpeg", fileName: `${baseName}-mini.jpg`, pages: row.pageCount };
+    }
+    // Enviado antes das prévias existirem: gera agora e guarda para as próximas vezes.
+    const preview = await pdfPreview(bytes);
+    if (!preview) throw new DomainError("NOT_FOUND", "Sem prévia para este PDF.");
+    await db
+      .update(affiliationDocument)
+      .set({ preview: encryptBytes(preview.jpeg, previewAadFor(row.id)), pageCount: preview.pages })
+      .where(eq(affiliationDocument.id, row.id));
+    return { bytes: preview.jpeg, contentType: "image/jpeg", fileName: `${baseName}-mini.jpg`, pages: preview.pages };
+  }
+  if (options.page && isPdf) {
+    let rendered: { jpeg: Buffer; pages: number };
+    try {
+      rendered = await renderPdfPage(bytes, options.page, PAGE_WIDTH);
+    } catch (error) {
+      if (error instanceof PdfPreviewError) throw new DomainError("NOT_FOUND", "Página não encontrada neste PDF.");
+      throw error;
+    }
+    if (options.page === 1) {
+      await withTx((tx) =>
+        writeAudit(tx, actor, {
+          action: "DOCUMENT_VIEWED",
+          entityType: "affiliation_form",
+          entityId: row.formId,
+          summary: `${DOCUMENT_KIND_LABEL[row.kind]} da ficha de ${row.fullName ?? "filiação"} aberto no visualizador.`,
+          after: { documentId: row.id },
+        }),
+      );
+    }
+    return { bytes: rendered.jpeg, contentType: "image/jpeg", fileName: `${baseName}-p${options.page}.jpg`, pages: rendered.pages };
+  }
   if (options.thumbnail) {
-    if (row.contentType !== "image/jpeg") throw new DomainError("NOT_FOUND", "Sem miniatura para PDF.");
     const { default: sharp } = await import("sharp");
     const thumb = await sharp(bytes).resize({ width: THUMB_SIDE, height: THUMB_SIDE, fit: "inside" }).jpeg({ quality: 70 }).toBuffer();
-    return { bytes: thumb, contentType: "image/jpeg", fileName: `${baseName}-mini.jpg` };
+    return { bytes: thumb, contentType: "image/jpeg", fileName: `${baseName}-mini.jpg`, pages: null };
   }
   await withTx((tx) =>
     writeAudit(tx, actor, {
@@ -239,8 +309,8 @@ export async function readDocument(actor: Actor, id: string, options: { thumbnai
       after: { documentId: row.id },
     }),
   );
-  const extension = row.contentType === "application/pdf" ? "pdf" : "jpg";
-  return { bytes, contentType: row.contentType, fileName: `${baseName}.${extension}` };
+  const extension = isPdf ? "pdf" : "jpg";
+  return { bytes, contentType: row.contentType, fileName: `${baseName}.${extension}`, pages: row.pageCount };
 }
 
 /**

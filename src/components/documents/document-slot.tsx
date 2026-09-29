@@ -3,13 +3,14 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Camera, Card, Check, Close, FileText, Loader, type PixelIcon, Receipt, Trash, Upload } from "@/components/icons/pixel";
+import { Camera, Card, Check, ClipboardNote, Close, FileText, Loader, type PixelIcon, Receipt, Trash, Upload } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { MAX_FILES_PER_DOCUMENT } from "@/domain/schemas";
 import type { DocumentKind } from "@/domain/types";
 import { playSound } from "@/lib/sound";
 import { shrinkImage, uploadWithProgress } from "@/lib/upload";
 import { cn } from "@/lib/utils";
+import { DocumentViewerDialog, type ViewerDocument } from "./document-viewer";
 
 /** Um arquivo já enviado, pronto para mostrar. */
 export interface SlotItem {
@@ -40,7 +41,15 @@ const COPY: Record<DocumentKind, { title: string; hint: string; icon: PixelIcon 
     hint: "O mais recente: PDF do portal da prefeitura, print ou foto legível.",
     icon: Receipt,
   },
+  SIGNED_FORM: {
+    title: "Ficha assinada (gov.br)",
+    hint: "O PDF que a pessoa assinou no gov.br e mandou para o WhatsApp da secretaria.",
+    icon: ClipboardNote,
+  },
 };
+
+/** "RG", "Contracheque", "Ficha" (para "RG 1", "Ficha 1"...). */
+const shortTitle = (kind: DocumentKind) => (kind === "SIGNED_FORM" ? "Ficha" : COPY[kind].title.split(" ")[0]!);
 
 /** Prévias locais continuam na tela ao voltar e avançar as etapas do formulário. */
 const previewCache = new Map<string, { url: string | null; isPdf: boolean }>();
@@ -99,6 +108,9 @@ export function DocumentSlot({
   }, [armed]);
   const copy = COPY[kind];
   const Icon = copy.icon;
+  // A ficha do gov.br é sempre PDF: sem câmera, só o arquivo que chegou no WhatsApp.
+  const pdfOnly = kind === "SIGNED_FORM";
+  const [viewing, setViewing] = useState<ViewerDocument | null>(null);
   const count = items.length;
   const full = count + pending.length >= MAX_FILES_PER_DOCUMENT;
   const busy = pending.length > 0;
@@ -146,7 +158,7 @@ export function DocumentSlot({
     if (input) input.value = "";
     if (list.length === 0) return;
     const room = MAX_FILES_PER_DOCUMENT - count - pending.length;
-    if (list.length > room) toast.warning(`No máximo ${MAX_FILES_PER_DOCUMENT} arquivos de ${copy.title.split(" ")[0]}.`);
+    if (list.length > room) toast.warning(`No máximo ${MAX_FILES_PER_DOCUMENT} arquivos de ${shortTitle(kind)}.`);
     playSound("blip");
     for (const file of list.slice(0, Math.max(0, room))) await sendOne(file);
   }
@@ -208,7 +220,11 @@ export function DocumentSlot({
                 transition={{ type: "spring", stiffness: 420, damping: 24 }}
                 className="relative"
               >
-                <Tile item={item} label={`${copy.title.split(" ")[0]} ${index + 1}`} />
+                <Tile
+                  item={item}
+                  label={`${shortTitle(kind)} ${index + 1}`}
+                  onOpen={() => setViewing({ id: item.id, isPdf: item.isPdf, label: `${copy.title} · ${index + 1}` })}
+                />
                 {armed === item.id ? (
                   <span className="pointer-events-none absolute inset-0 flex items-end justify-center rounded-lg bg-danger/75 pb-2 text-xs font-bold text-white">
                     Apagar?
@@ -233,8 +249,8 @@ export function DocumentSlot({
                     )}
                     aria-label={
                       armed === item.id
-                        ? `Confirmar: apagar ${copy.title.split(" ")[0]} ${index + 1}`
-                        : `Apagar ${copy.title.split(" ")[0]} ${index + 1}`
+                        ? `Confirmar: apagar ${shortTitle(kind)} ${index + 1}`
+                        : `Apagar ${shortTitle(kind)} ${index + 1}`
                     }
                   >
                     {removing === item.id ? (
@@ -282,18 +298,20 @@ export function DocumentSlot({
         </ul>
       ) : null}
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button
-          type="button"
-          variant={count > 0 ? "outline" : "default"}
-          onClick={() => camera.current?.click()}
-          disabled={disabled || full}
-          data-testid={testId ? `${testId}-camera` : undefined}
-        >
-          <Camera /> Tirar foto
-        </Button>
-        <Button type="button" variant="outline" onClick={() => picker.current?.click()} disabled={disabled || full}>
-          {busy ? <Loader className="animate-spin-steps" /> : <Upload />} Arquivo
+      <div className={cn("mt-3 grid gap-2", pdfOnly ? "grid-cols-1" : "grid-cols-2")}>
+        {pdfOnly ? null : (
+          <Button
+            type="button"
+            variant={count > 0 ? "outline" : "default"}
+            onClick={() => camera.current?.click()}
+            disabled={disabled || full}
+            data-testid={testId ? `${testId}-camera` : undefined}
+          >
+            <Camera /> Tirar foto
+          </Button>
+        )}
+        <Button type="button" variant={pdfOnly && count === 0 ? "default" : "outline"} onClick={() => picker.current?.click()} disabled={disabled || full}>
+          {busy ? <Loader className="animate-spin-steps" /> : <Upload />} {pdfOnly ? "Anexar o PDF assinado" : "Arquivo"}
         </Button>
       </div>
       <input
@@ -309,7 +327,7 @@ export function DocumentSlot({
       <input
         ref={picker}
         type="file"
-        accept="image/*,application/pdf"
+        accept={pdfOnly ? "application/pdf" : "image/*,application/pdf"}
         multiple
         className="sr-only"
         tabIndex={-1}
@@ -322,14 +340,23 @@ export function DocumentSlot({
           {error}
         </p>
       ) : null}
+      <DocumentViewerDialog doc={viewing} onClose={() => setViewing(null)} />
     </section>
   );
 }
 
-function Tile({ item, label }: { item: SlotItem; label: string }) {
-  const body = item.thumbUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element -- miniatura privada (prévia local ou rota autenticada)
-    <img src={item.thumbUrl} alt={label} className="size-full object-cover" />
+function Tile({ item, label, onOpen }: { item: SlotItem; label: string; onOpen: () => void }) {
+  // PDF que não abre (ou prévia ainda indisponível): volta para o ícone.
+  const [failed, setFailed] = useState(false);
+  const thumb = item.thumbUrl && !failed ? item.thumbUrl : null;
+  const body = thumb ? (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- miniatura privada (prévia local ou rota autenticada) */}
+      <img src={thumb} alt={label} className={cn("size-full object-cover", item.isPdf && "bg-white object-top")} onError={() => setFailed(true)} />
+      {item.isPdf ? (
+        <span className="pixel absolute right-1 bottom-1 rounded-[3px] bg-red px-1 py-0.5 text-[0.42rem] text-white shadow">PDF</span>
+      ) : null}
+    </>
   ) : (
     <span className="flex size-full flex-col items-center justify-center gap-1 text-fg-muted">
       <FileText className="size-8 text-red" />
@@ -338,10 +365,19 @@ function Tile({ item, label }: { item: SlotItem; label: string }) {
   );
   const className =
     "relative block size-[5.5rem] overflow-hidden rounded-lg border-2 border-success/60 bg-ink shadow-[0_0_18px_-8px_var(--success)]";
+  // Com acesso ao arquivo (equipe), o toque abre o visualizador (páginas do PDF ou a foto inteira).
   return item.openUrl ? (
-    <a href={item.openUrl} target="_blank" rel="noopener noreferrer" className={cn(className, "outline-none focus-visible:ring-2 focus-visible:ring-red")} aria-label={`Abrir ${label}`}>
+    <button
+      type="button"
+      onClick={() => {
+        playSound("blip");
+        onOpen();
+      }}
+      className={cn(className, "outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-red active:scale-95")}
+      aria-label={`Ver ${label}`}
+    >
       {body}
-    </a>
+    </button>
   ) : (
     <span className={className}>{body}</span>
   );

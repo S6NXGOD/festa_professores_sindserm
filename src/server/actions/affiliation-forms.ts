@@ -22,10 +22,12 @@ export async function saveAffiliationFormAction(
 
 export async function formalizeAffiliationAction(
   formId: string,
+  method?: string,
 ): Promise<ActionResult<{ registrationId: string; personId: string; accessToken: string | null; hostName: string | null }>> {
   return runAction(async () => {
     const actor = await requireActionActor();
-    const result = await formalizeAffiliation(actor, String(formId));
+    // Valor vindo do navegador: só "GOVBR" muda o caminho; qualquer outro é a assinatura no papel.
+    const result = await formalizeAffiliation(actor, String(formId), method === "GOVBR" ? "GOVBR" : "PAPER");
     revalidatePath("/painel", "layout");
     revalidatePath("/portaria", "layout");
     return {

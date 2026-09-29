@@ -304,7 +304,7 @@ export default async function DashboardPage() {
         <StatTile label="Filiados confirmados" value={stats.confirmed} icon={Check} tone="success" testId="stat-confirmed" />
         <StatTile label="Aguardando conferência" value={stats.pending} icon={Clock} tone="warning" href={canRegistrations ? "/painel/inscricoes?filtro=conferir" : undefined} testId="stat-pending" />
         <StatTile label="Fichas para assinar" value={stats.draftForms} icon={ClipboardNote} tone="warning" href={canForms ? "/painel/filiacoes?filtro=assinar" : undefined} testId="stat-signature" />
-        <StatTile label="Filiaram-se na festa" value={stats.joinedAtEvent} icon={Sparkles} href={canForms ? "/painel/filiacoes?filtro=FORMALIZED" : undefined} testId="stat-joined" />
+        <StatTile label="Fichas assinadas" value={stats.joinedAtEvent} icon={Sparkles} href={canForms ? "/painel/filiacoes?filtro=FORMALIZED" : undefined} testId="stat-joined" />
         <StatTile
           label="Kits a entregar"
           value={stats.kitsOwedMember + stats.kitsOwedGuest + stats.kitsOwedEmployee}

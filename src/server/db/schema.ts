@@ -68,7 +68,8 @@ export const stockModeEnum = pgEnum("stock_mode", ["SINGLE", "SPLIT"]);
 export const stockPoolEnum = pgEnum("stock_pool", ["ALL", "MEMBER", "GUEST", "EMPLOYEE"]);
 export const participantRoleEnum = pgEnum("participant_role", ["MEMBER", "GUEST", "EMPLOYEE"]);
 /** Documentos exigidos na ficha de filiação: cópia do RG e do contracheque. */
-export const affiliationDocumentKindEnum = pgEnum("affiliation_document_kind", ["RG", "PAYSLIP"]);
+/** SIGNED_FORM: a ficha assinada digitalmente pelo gov.br (anexada pela equipe). */
+export const affiliationDocumentKindEnum = pgEnum("affiliation_document_kind", ["RG", "PAYSLIP", "SIGNED_FORM"]);
 export const checkInMethodEnum = pgEnum("check_in_method", ["QR", "SEARCH", "CODE"]);
 export const affiliationFormStatusEnum = pgEnum("affiliation_form_status", [
   "DRAFT",
@@ -191,6 +192,8 @@ export const eventConfig = pgTable(
     venueMapsUrl: text("venue_maps_url"),
     /** WhatsApp da organização para dúvidas (somente dígitos, com DDD). Aparece no botão de ajuda. */
     helpWhatsapp: text("help_whatsapp"),
+    /** WhatsApp da secretaria para receber as fichas assinadas pelo gov.br (vazio = o de ajuda). */
+    formsWhatsapp: text("forms_whatsapp"),
     /** Mensagem de divulgação escrita pela organização. Nula = a mensagem automática, montada com os dados da festa. */
     shareMessage: text("share_message"),
     stockMode: stockModeEnum("stock_mode").notNull(),
@@ -206,6 +209,7 @@ export const eventConfig = pgTable(
     ),
     check("event_config_low_stock_threshold", sql`${t.lowStockThreshold} >= 0`),
     check("event_config_help_whatsapp_digits", sql`${t.helpWhatsapp} IS NULL OR ${t.helpWhatsapp} ~ '^[0-9]{10,13}$'`),
+    check("event_config_forms_whatsapp_digits", sql`${t.formsWhatsapp} IS NULL OR ${t.formsWhatsapp} ~ '^[0-9]{10,13}$'`),
   ],
 );
 
@@ -646,6 +650,10 @@ export const affiliationDocument = pgTable(
     contentType: text("content_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
     data: bytea("data").notNull(),
+    /** PDF: prévia da 1ª página (JPEG, cifrada como o arquivo), gerada no envio ou na primeira vez que alguém olha. */
+    preview: bytea("preview"),
+    /** PDF: número de páginas (para o visualizador). */
+    pageCount: integer("page_count"),
     uploadedByUserId: text("uploaded_by_user_id").references(() => user.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },

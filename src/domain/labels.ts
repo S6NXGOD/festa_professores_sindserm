@@ -16,7 +16,7 @@ export const AFFILIATION_STATUS_LABEL: Record<AffiliationStatus, string> = {
   AWAITING_SIGNATURE: "Ficha aguardando assinatura",
   CONFIRMED: "Filiação confirmada",
   REJECTED: "Filiação não confirmada",
-  JOINED_AT_EVENT: "Filiado(a) na festa",
+  JOINED_AT_EVENT: "Filiado(a) pela ficha",
 };
 
 export const AFFILIATION_STATUS_SHORT: Record<AffiliationStatus, string> = {
@@ -24,7 +24,7 @@ export const AFFILIATION_STATUS_SHORT: Record<AffiliationStatus, string> = {
   AWAITING_SIGNATURE: "Assinar ficha",
   CONFIRMED: "Confirmado",
   REJECTED: "Não confirmado",
-  JOINED_AT_EVENT: "Filiou-se na festa",
+  JOINED_AT_EVENT: "Ficha assinada",
 };
 
 export type StatusTone = "success" | "warning" | "danger" | "info" | "neutral";
@@ -70,6 +70,7 @@ export const STOCK_POOL_LABEL: Record<StockPool, string> = {
 export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   RG: "RG",
   PAYSLIP: "Contracheque",
+  SIGNED_FORM: "Ficha assinada (gov.br)",
 };
 
 /** Colaborador(a) do SINDSERM, quando a categoria não importa. */

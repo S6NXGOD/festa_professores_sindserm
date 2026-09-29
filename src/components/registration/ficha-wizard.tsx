@@ -120,7 +120,7 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
   const errors = formState.errors;
   const fe = errors.ficha;
   const values = useWatch({ control });
-  const [uploading, setUploading] = useState<Record<DocumentKind, boolean>>({ RG: false, PAYSLIP: false });
+  const [uploading, setUploading] = useState<Record<DocumentKind, boolean>>({ RG: false, PAYSLIP: false, SIGNED_FORM: false });
   // CPF recusado por já estar inscrito: oferece abrir os vouchers da inscrição que já existe.
   const [takenCpf, setTakenCpf] = useState<string | null>(null);
   const isTeacher = values.isTeacher === true;

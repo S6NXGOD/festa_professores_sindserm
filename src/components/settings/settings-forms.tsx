@@ -16,12 +16,15 @@ import {
   type HelpSettingsData,
   type HelpSettingsInput,
   helpSettingsSchema,
+  type SigningSettingsData,
+  type SigningSettingsInput,
+  signingSettingsSchema,
   type StockSettingsData,
   type StockSettingsInput,
   stockSettingsSchema,
 } from "@/domain/schemas";
 import { callAction } from "@/lib/call-action";
-import { updateEventSettingsAction, updateHelpSettingsAction, updateStockSettingsAction } from "@/server/actions/setup";
+import { updateEventSettingsAction, updateHelpSettingsAction, updateSigningSettingsAction, updateStockSettingsAction } from "@/server/actions/setup";
 import { EventDetailsFields, KitDeadlineField, RegistrationPeriodFields } from "./event-settings-fields";
 import { StockFields } from "./stock-settings-fields";
 
@@ -106,6 +109,53 @@ export function HelpSettingsForm({ initial }: { initial: string }) {
         />
       </FormField>
       <Button type="submit" disabled={pending} data-testid="save-help">
+        {pending ? <Loader className="animate-spin-steps" /> : <Save />} Salvar
+      </Button>
+    </form>
+  );
+}
+
+/** WhatsApp da secretaria que recebe as fichas assinadas pelo gov.br. */
+export function SigningSettingsForm({ initial, helpFallback }: { initial: string; helpFallback: string | null }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const form = useForm<SigningSettingsInput, unknown, SigningSettingsData>({
+    resolver: zodResolver(signingSettingsSchema),
+    mode: "onTouched",
+    defaultValues: { formsWhatsapp: initial },
+  });
+  const e = form.formState.errors;
+
+  const submit = form.handleSubmit(() => {
+    startTransition(async () => {
+      const values = form.getValues();
+      const result = await callAction(updateSigningSettingsAction(values));
+      if (!result.ok) {
+        toast.error(result.error);
+        for (const [path, message] of Object.entries(result.fieldErrors ?? {})) {
+          form.setError(path as FieldPath<SigningSettingsInput>, { message });
+        }
+        return;
+      }
+      toast.success(values.formsWhatsapp ? "WhatsApp da secretaria salvo." : "Sem número próprio: vale o WhatsApp de ajuda.");
+      form.reset(values);
+      router.refresh();
+    });
+  });
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-end" noValidate>
+      <FormField
+        id="forms-whatsapp"
+        label="WhatsApp da secretaria (com DDD)"
+        optional
+        description={helpFallback ? `Vazio: as fichas vão para o WhatsApp de ajuda (${helpFallback}).` : "Vazio: a pessoa responde a própria conversa com a ficha."}
+        error={e.formsWhatsapp?.message}
+        className="flex-1"
+      >
+        <Controller control={form.control} name="formsWhatsapp" render={({ field }) => <PhoneInput id="forms-whatsapp" {...field} />} />
+      </FormField>
+      <Button type="submit" disabled={pending} data-testid="save-forms-whatsapp">
         {pending ? <Loader className="animate-spin-steps" /> : <Save />} Salvar
       </Button>
     </form>

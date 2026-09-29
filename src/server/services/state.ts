@@ -323,7 +323,7 @@ export async function loadFormFiles(ex: Executor, formId: string): Promise<FormF
 }
 
 export function documentCounts(files: FormFile[]): DocumentCounts {
-  const counts: DocumentCounts = { RG: 0, PAYSLIP: 0 };
+  const counts: DocumentCounts = { RG: 0, PAYSLIP: 0, SIGNED_FORM: 0 };
   for (const file of files) counts[file.kind] += 1;
   return counts;
 }

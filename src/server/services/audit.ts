@@ -43,6 +43,7 @@ export const AUDIT_ACTIONS = {
   VOUCHER_REISSUED: "Voucher reemitido",
   PERSON_CORRECTED: "Cadastro corrigido",
   HELP_CONTACT_UPDATED: "WhatsApp de ajuda alterado",
+  FORMS_CONTACT_UPDATED: "WhatsApp das fichas assinadas alterado",
   SHARE_MESSAGE_UPDATED: "Mensagem de divulgação alterada",
   EMPLOYEE_ADDED: "Colaborador(a) do SINDSERM liberado(a)",
   EMPLOYEE_UPDATED: "Colaborador(a) do SINDSERM alterado(a)",

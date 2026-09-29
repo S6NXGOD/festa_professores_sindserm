@@ -40,7 +40,7 @@ const FILTER_LABEL: Record<Exclude<AffiliationStatus, "PENDING">, string> = {
   AWAITING_SIGNATURE: "Esperando assinatura",
   CONFIRMED: "Confirmadas",
   REJECTED: "Não confirmadas",
-  JOINED_AT_EVENT: "Filiaram-se na festa",
+  JOINED_AT_EVENT: "Fichas assinadas",
 };
 
 /** Nos filtros de decisão, o título do dia conta decisões (não inscrições). */
@@ -138,7 +138,7 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
   ]);
   const data = queue ?? list!;
   const today = statusCounts.today;
-  // "Confirmadas", "Não confirmadas" e "Filiaram-se na festa": a lista segue a hora da decisão (como a Auditoria).
+  // "Confirmadas", "Não confirmadas" e "Fichas assinadas": a lista segue a hora da decisão (como a Auditoria).
   const byDecision = isDecidedStatus(status);
   const todayKey = todayInZone();
   const listTime = (row: { createdAt: Date; statusChangedAt: Date | null }) => (byDecision ? (row.statusChangedAt ?? row.createdAt) : row.createdAt);

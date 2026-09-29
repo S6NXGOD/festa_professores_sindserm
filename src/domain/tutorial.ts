@@ -86,7 +86,12 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
           bullets: [
             "Quem ainda não é filiado(a) preenche a ficha no site; na recepção, é só assinar.",
             "Sem a cópia do RG e do contracheque, a assinatura fica travada.",
-            ...(can(access, "newAffiliation") ? ["Dá para fazer a ficha na hora, pelo botão Nova ficha."] : []),
+            ...(can(access, "newAffiliation")
+              ? [
+                  "Dá para fazer a ficha na hora, pelo botão Nova ficha.",
+                  "Antes da festa, dá para assinar pelo gov.br: na ficha, Mandar no WhatsApp; o PDF assinado volta para a secretaria, você anexa e confirma.",
+                ]
+              : []),
           ],
         }
       : null,

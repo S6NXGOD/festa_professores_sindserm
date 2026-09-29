@@ -80,7 +80,7 @@ export function FormalizeController({
               </Button>
             }
             title="A ficha foi assinada?"
-            description={`Confirme só depois que a ficha impressa estiver assinada. ${name} passa a ser filiado(a) na festa.`}
+            description={`Confirme só depois que a ficha impressa estiver assinada. ${name} passa a ser filiado(a).`}
             confirmLabel="Confirmar assinatura"
             tone="success"
             sound="fanfare"

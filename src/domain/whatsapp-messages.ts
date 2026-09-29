@@ -1,3 +1,4 @@
+import { formatPhone } from "@/lib/phone";
 import { firstName as first } from "@/lib/text";
 import type { AffiliationStatus } from "./types";
 
@@ -42,4 +43,33 @@ export function courtesyClosingLine(people: { fullName: string; withKit: boolean
   const names = withKit.map((person) => first(person.fullName));
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
   return `Na entrada, cada pessoa mostra o próprio QR Code. Kit de consumação: só ${list}, junto com a entrada.`;
+}
+
+/**
+ * A equipe manda a ficha para a pessoa assinar pelo gov.br, sem esperar a festa.
+ * `formsPhone`: o WhatsApp da secretaria que recebe as fichas assinadas.
+ */
+export function govbrSigningMessage(input: { fullName: string; eventName: string; link: string; formsPhone: string | null }): string {
+  const back = input.formsPhone
+    ? `mande o PDF assinado para o WhatsApp da secretaria do SINDSERM: ${formatPhone(input.formsPhone)}`
+    : "responda esta conversa com o PDF assinado";
+  return [
+    `Olá, ${first(input.fullName)}! Aqui é da organização da ${input.eventName}.`,
+    "A sua ficha de filiação ao SINDSERM está pronta. Não precisa esperar a festa: dá para assinar agora, pelo celular, com a conta gov.br.",
+    `Passo a passo e a ficha em PDF: ${input.link}`,
+    `Depois de assinar, ${back}. Assim que conferirmos, a sua filiação fica efetivada e o seu voucher já vale na entrada.`,
+  ].join("\n\n");
+}
+
+/** A pessoa devolve a ficha assinada (botão da página de assinatura): diz de quem é, para a secretaria achar rápido. */
+export function signedFormReturnMessage(input: { fullName: string; reference: string }): string {
+  return `Olá! Segue a minha ficha de filiação ao SINDSERM assinada pelo gov.br (anexo o PDF). Nome: ${input.fullName} · Ficha ${input.reference}.`;
+}
+
+/** Filiação efetivada pela ficha assinada no gov.br: a equipe avisa a pessoa. */
+export function govbrApprovedMessage(input: { fullName: string; eventName: string; vouchersUrl: string | null }): string {
+  const voucher = input.vouchersUrl
+    ? `Os seus vouchers: ${input.vouchersUrl}`
+    : "O seu voucher é o mesmo de antes (se perdeu o link, recupere no site da festa, em Meus vouchers).";
+  return `Olá, ${first(input.fullName)}! Recebemos a sua ficha assinada pelo gov.br: a sua filiação ao SINDSERM está efetivada e o seu voucher já vale na entrada da ${input.eventName}. ${voucher} Até a festa!`;
 }

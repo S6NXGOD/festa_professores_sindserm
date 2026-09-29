@@ -9,6 +9,8 @@ import {
   helpSettingsSchema,
   type SetupInput,
   setupSchema,
+  type SigningSettingsInput,
+  signingSettingsSchema,
   type StockSettingsInput,
   stockSettingsSchema,
   type VenueSettingsInput,
@@ -16,7 +18,14 @@ import {
 } from "@/domain/schemas";
 import type { ActionResult } from "@/lib/action-result";
 import { enforceRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
-import { completeSetup, updateEventSettings, updateHelpSettings, updateStockSettings, updateShareMessage } from "@/server/services/settings";
+import {
+  completeSetup,
+  updateEventSettings,
+  updateHelpSettings,
+  updateShareMessage,
+  updateSigningSettings,
+  updateStockSettings,
+} from "@/server/services/settings";
 import { removeSiteIcon } from "@/server/services/site-icon";
 import { removeEventPhoto, updateVenueSettings } from "@/server/services/venue";
 import { bootstrapFirstAdmin } from "@/server/services/users";
@@ -52,6 +61,14 @@ export async function updateHelpSettingsAction(input: HelpSettingsInput): Promis
   return runAction(async () => {
     const actor = await requireActionActor();
     await updateHelpSettings(actor, helpSettingsSchema.parse(input));
+    revalidatePath("/", "layout");
+  });
+}
+
+export async function updateSigningSettingsAction(input: SigningSettingsInput): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requireActionActor();
+    await updateSigningSettings(actor, signingSettingsSchema.parse(input));
     revalidatePath("/", "layout");
   });
 }

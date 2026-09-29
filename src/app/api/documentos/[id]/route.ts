@@ -3,8 +3,9 @@ import { DomainError } from "@/server/services/errors";
 import { requireActionActor } from "@/server/session";
 
 /*
- * Abre a cópia do RG ou do contracheque (só Atendimento e administradores).
- * `?miniatura=1` devolve uma prévia pequena (foto) para a tela da ficha.
+ * Abre a cópia do RG, do contracheque ou da ficha assinada (só a equipe).
+ * `?miniatura=1` devolve uma prévia pequena (foto, ou a 1ª página do PDF);
+ * `?pagina=N` desenha a página N do PDF para o visualizador (cabeçalho X-Page-Count).
  * O PDF abre no visualizador do navegador: por isso esta rota tem uma política
  * de segurança própria (ver next.config.ts), sem o bloqueio de "object".
  */
@@ -18,8 +19,11 @@ export async function GET(request: Request, context: RouteContext<"/api/document
   if (!UUID.test(id)) return new Response("Documento não encontrado.", { status: 404 });
   try {
     const actor = await requireActionActor();
-    const thumbnail = new URL(request.url).searchParams.get("miniatura") === "1";
-    const document = await readDocument(actor, id, { thumbnail });
+    const search = new URL(request.url).searchParams;
+    const thumbnail = search.get("miniatura") === "1";
+    const pageParam = Number(search.get("pagina") ?? "");
+    const page = Number.isInteger(pageParam) && pageParam >= 1 && pageParam <= 200 ? pageParam : undefined;
+    const document = await readDocument(actor, id, { thumbnail, page });
     return new Response(new Uint8Array(document.bytes), {
       headers: {
         "Content-Type": document.contentType,
@@ -27,6 +31,7 @@ export async function GET(request: Request, context: RouteContext<"/api/document
         // Dado sensível: nada de cache compartilhado nem cópia guardada pelo navegador.
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
+        ...(document.pages ? { "X-Page-Count": String(document.pages) } : {}),
       },
     });
   } catch (error) {

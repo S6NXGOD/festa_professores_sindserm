@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { HelpLine } from "@/components/help/help";
-import { ClipboardNote, Clock, PartyPopper, QrCode, Search, Warning } from "@/components/icons/pixel";
+import { ClipboardNote, Clock, PartyPopper, Pencil, QrCode, Search, Warning } from "@/components/icons/pixel";
 import { Reveal } from "@/components/motion/reveal";
 import { MessageCard } from "@/components/public/message-card";
 import { PublicShell } from "@/components/public/public-shell";
@@ -8,15 +8,17 @@ import { VenueCompact } from "@/components/public/venue";
 import { PixelTag } from "@/components/retro/bits";
 import { ScrollHint } from "@/components/retro/scroll-hint";
 import { AffiliationBadge } from "@/components/status/status-badge";
+import { Button } from "@/components/ui/button";
 import { Celebration } from "@/components/voucher/celebration";
 import { CopyLinkBox } from "@/components/voucher/copy-link-box";
 import { SaveVouchersMission } from "@/components/voucher/save-mission";
 import { VoucherActions } from "@/components/voucher/voucher-actions";
 import { VoucherCard, voucherEventFrom } from "@/components/voucher/voucher-card";
 import { APP_NAME, getEventInfo } from "@/server/queries/config";
-import { loadGroupByAccessToken } from "@/server/queries/vouchers";
+import { findDraftFormId, loadGroupByAccessToken } from "@/server/queries/vouchers";
 import { consumeRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
 import { clientIp } from "@/server/session";
+import { signingPath } from "@/server/signing-link";
 
 export const metadata: Metadata = { title: "Meus vouchers", referrer: "no-referrer" };
 
@@ -58,6 +60,8 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
 
   const cards = [group.member, ...group.guests];
   const awaitingSignature = group.status === "AWAITING_SIGNATURE";
+  // Ainda dá tempo: a ficha pode ser assinada pelo gov.br, sem esperar a festa.
+  const draftFormId = awaitingSignature && !event.started ? await findDraftFormId(group.member.personId) : null;
   const voucherEvent = voucherEventFrom(event);
 
   return (
@@ -89,10 +93,25 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
         {awaitingSignature ? (
           <Reveal delay={0.05} className="mt-6 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning-soft p-4 text-sm text-fg">
             <ClipboardNote className="mt-0.5 size-5 shrink-0 text-warning" />
-            <p data-testid="awaiting-signature-note">
-              <strong>Te esperamos na festa!</strong> A sua ficha de filiação vai estar na recepção, pronta para você assinar. Assinou,
-              entrou!
-            </p>
+            <div className="min-w-0 flex-1">
+              <p data-testid="awaiting-signature-note">
+                <strong>Te esperamos na festa!</strong> A sua ficha de filiação vai estar na recepção, pronta para você assinar. Assinou,
+                entrou!
+              </p>
+              {draftFormId ? (
+                <>
+                  <p className="mt-2">
+                    <strong>Não quer esperar?</strong> Assine agora pelo celular, com a conta gov.br, e mande para a secretaria: a sua entrada
+                    fica liberada antes da festa.
+                  </p>
+                  <Button asChild size="sm" className="mt-3">
+                    <a href={signingPath(draftFormId)} data-testid="sign-with-govbr">
+                      <Pencil /> Assinar agora pelo gov.br
+                    </a>
+                  </Button>
+                </>
+              ) : null}
+            </div>
           </Reveal>
         ) : null}
         {group.status === "PENDING" ? (

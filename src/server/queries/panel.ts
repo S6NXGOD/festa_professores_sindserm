@@ -14,7 +14,7 @@ import {
   registration,
   user,
 } from "@/server/db/schema";
-import type { AffiliationStatus } from "@/domain/types";
+import type { AffiliationStatus, DocumentKind } from "@/domain/types";
 import { todayInZone, zonedLocalToUtc } from "@/lib/datetime";
 import { escapeLike } from "@/lib/text";
 import { personSearchCondition } from "@/server/services/people";
@@ -394,6 +394,9 @@ export async function listAffiliationForms(options: {
         // A assinatura só vale com as cópias do RG e do contracheque anexadas.
         hasRg: sql<boolean>`EXISTS (SELECT 1 FROM ${affiliationDocument} d WHERE d.form_id = ${affiliationForm.id} AND d.kind = 'RG')`,
         hasPayslip: sql<boolean>`EXISTS (SELECT 1 FROM ${affiliationDocument} d WHERE d.form_id = ${affiliationForm.id} AND d.kind = 'PAYSLIP')`,
+        hasSignedForm: sql<boolean>`EXISTS (SELECT 1 FROM ${affiliationDocument} d WHERE d.form_id = ${affiliationForm.id} AND d.kind = 'SIGNED_FORM')`,
+        // Miniaturas da lista: cada arquivo (sem o conteúdo), na ordem RG, contracheque, ficha do gov.br.
+        documents: sql<{ id: string; kind: DocumentKind; isPdf: boolean }[]>`coalesce((SELECT json_agg(json_build_object('id', d.id, 'kind', d.kind, 'isPdf', d.content_type = 'application/pdf') ORDER BY d.kind, d.created_at) FROM ${affiliationDocument} d WHERE d.form_id = ${affiliationForm.id}), '[]'::json)`,
       })
       .from(affiliationForm)
       .leftJoin(user, eq(user.id, affiliationForm.createdByUserId))

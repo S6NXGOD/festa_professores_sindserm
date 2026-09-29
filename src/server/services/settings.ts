@@ -2,7 +2,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import type { Executor } from "@/server/db";
 import { eventConfig, kitDelivery, kitStock } from "@/server/db/schema";
-import type { EventSettingsData, HelpSettingsData, StockSettingsData } from "@/domain/schemas";
+import type { EventSettingsData, HelpSettingsData, SigningSettingsData, StockSettingsData } from "@/domain/schemas";
 import { isLowEmployeeStock, isLowStock, poolsForMode } from "@/domain/rules";
 import type { StockMode, StockPool } from "@/domain/types";
 import { zonedLocalToUtc } from "@/lib/datetime";
@@ -219,6 +219,25 @@ export async function updateHelpSettings(actor: Actor, data: HelpSettingsData) {
       summary: data.helpWhatsapp ? "WhatsApp de ajuda atualizado." : "WhatsApp de ajuda removido.",
       before: { helpWhatsapp: current.helpWhatsapp },
       after: { helpWhatsapp: data.helpWhatsapp },
+    });
+  });
+}
+
+/** WhatsApp da secretaria para receber as fichas assinadas pelo gov.br. Vazio: vale o WhatsApp de ajuda. */
+export async function updateSigningSettings(actor: Actor, data: SigningSettingsData) {
+  assertPermission(actor, "manageSettings");
+  return withTx(async (tx) => {
+    const [current] = await tx.select().from(eventConfig).where(eq(eventConfig.id, 1)).for("update");
+    if (!current) throw new DomainError("INVALID_STATE", "Conclua a configuração inicial primeiro.");
+    if (current.formsWhatsapp === data.formsWhatsapp) return;
+    await tx.update(eventConfig).set({ formsWhatsapp: data.formsWhatsapp }).where(eq(eventConfig.id, 1));
+    await writeAudit(tx, actor, {
+      action: "FORMS_CONTACT_UPDATED",
+      entityType: "event",
+      entityId: "1",
+      summary: data.formsWhatsapp ? "WhatsApp das fichas assinadas atualizado." : "WhatsApp das fichas assinadas removido (vale o de ajuda).",
+      before: { formsWhatsapp: current.formsWhatsapp },
+      after: { formsWhatsapp: data.formsWhatsapp },
     });
   });
 }

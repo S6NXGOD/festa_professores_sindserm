@@ -600,6 +600,13 @@ export const helpSettingsSchema = z.object({
 export type HelpSettingsInput = z.input<typeof helpSettingsSchema>;
 export type HelpSettingsData = z.output<typeof helpSettingsSchema>;
 
+/** WhatsApp da secretaria que recebe as fichas assinadas pelo gov.br (vazio = o WhatsApp de ajuda). */
+export const signingSettingsSchema = z.object({
+  formsWhatsapp: optionalPhoneField,
+});
+export type SigningSettingsInput = z.input<typeof signingSettingsSchema>;
+export type SigningSettingsData = z.output<typeof signingSettingsSchema>;
+
 export const stockSettingsSchema = z
   .object({
     stockMode: z.enum(["SINGLE", "SPLIT"]),

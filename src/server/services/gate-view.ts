@@ -16,7 +16,7 @@ import {
   stockPoolFor,
 } from "@/domain/rules";
 import type { AccessMap } from "@/domain/access";
-import type { AffiliationStatus, CheckInMethod, EmployeeKitType, GroupKitType, ParticipantRole, EmployeeCategory } from "@/domain/types";
+import type { AffiliationStatus, CheckInMethod, DocumentKind, EmployeeKitType, GroupKitType, ParticipantRole, EmployeeCategory } from "@/domain/types";
 import { displayCpf } from "@/lib/cpf";
 import { formatVoucherCode } from "@/server/crypto";
 import { entryDecisionFor } from "./checkin";
@@ -123,9 +123,9 @@ export interface GateView {
     id: string;
     status: "DRAFT" | "FORMALIZED";
     origin: "PUBLIC" | "STAFF";
-    /** Arquivos de RG e contracheque anexados (a assinatura exige os dois). */
-    documents: { RG: number; PAYSLIP: number };
-    files: { id: string; kind: "RG" | "PAYSLIP"; isPdf: boolean }[];
+    /** Arquivos anexados por tipo (a assinatura exige RG e contracheque; a ficha do gov.br vem à parte). */
+    documents: Record<DocumentKind, number>;
+    files: { id: string; kind: DocumentKind; isPdf: boolean }[];
   } | null;
   permissions: {
     checkIn: boolean;

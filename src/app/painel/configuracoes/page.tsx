@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Gift, MapPin, Settings, Star, Whatsapp } from "@/components/icons/pixel";
-import { EventSettingsForm, HelpSettingsForm } from "@/components/settings/settings-forms";
+import { EventSettingsForm, HelpSettingsForm, SigningSettingsForm } from "@/components/settings/settings-forms";
 import { SiteIconField } from "@/components/settings/site-icon-settings";
 import { VenuePhotoField, VenueSettingsForm } from "@/components/settings/venue-settings";
 import { PageHeader, Panel } from "@/components/staff/panel-ui";
 import { Button } from "@/components/ui/button";
 import { APP_TIME_ZONE, utcToZonedLocalInput } from "@/lib/datetime";
-import { maskPhoneInput } from "@/lib/phone";
+import { formatPhone, maskPhoneInput } from "@/lib/phone";
 import { db } from "@/server/db";
 import { getConfig, getSiteIcon } from "@/server/queries/config";
 import { getEventPhotoMeta } from "@/server/services/venue";
@@ -64,6 +64,16 @@ export default async function SettingsPage() {
           vazio para esconder.
         </p>
         <HelpSettingsForm initial={config.helpWhatsapp ? maskPhoneInput(config.helpWhatsapp) : ""} />
+      </Panel>
+      <Panel title="Fichas assinadas pelo gov.br" icon={Whatsapp}>
+        <p className="mb-4 text-sm text-fg-muted">
+          Quem preencheu a ficha pode assinar antes da festa, pelo gov.br, e mandar o PDF assinado para este WhatsApp (o número
+          administrativo da secretaria). Ele aparece na mensagem que a equipe manda e na página de assinatura.
+        </p>
+        <SigningSettingsForm
+          initial={config.formsWhatsapp ? maskPhoneInput(config.formsWhatsapp) : ""}
+          helpFallback={config.helpWhatsapp ? formatPhone(config.helpWhatsapp) : null}
+        />
       </Panel>
       <Panel title="Local da festa" icon={MapPin}>
         <p className="mb-5 text-sm text-fg-muted">

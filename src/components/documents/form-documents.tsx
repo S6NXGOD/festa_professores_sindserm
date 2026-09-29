@@ -18,7 +18,8 @@ function toItem(file: FormFileView): SlotItem {
   return {
     id: file.id,
     isPdf: file.isPdf,
-    thumbUrl: file.isPdf ? null : `/api/documentos/${file.id}?miniatura=1`,
+    // Foto: reduzida; PDF: a 1ª página desenhada no servidor (sem prévia, o ícone de PDF).
+    thumbUrl: `/api/documentos/${file.id}?miniatura=1`,
     openUrl: `/api/documentos/${file.id}`,
   };
 }
@@ -34,6 +35,7 @@ export function FormDocuments({
   onChanged,
   className,
   disabled = false,
+  kinds = ["RG", "PAYSLIP"],
 }: {
   formId: string;
   files: FormFileView[];
@@ -43,6 +45,8 @@ export function FormDocuments({
   className?: string;
   /** Só leitura (ex.: ficha cancelada). */
   disabled?: boolean;
+  /** Espaços mostrados (RG e contracheque; a ficha assinada do gov.br tem o seu, no painel do gov.br). */
+  kinds?: readonly DocumentKind[];
 }) {
   const router = useRouter();
   const refresh = onChanged ?? (() => router.refresh());
@@ -62,7 +66,7 @@ export function FormDocuments({
 
   return (
     <div className={className ?? "grid gap-3 sm:grid-cols-2"}>
-      {(["RG", "PAYSLIP"] as const).map((kind) => {
+      {kinds.map((kind) => {
         const known = new Set(files.map((file) => file.id));
         const items = [
           ...files.filter((file) => file.kind === kind).map(toItem),

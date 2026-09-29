@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Check, Phone, Users, Warning } from "@/components/icons/pixel";
+import { DocumentThumbs } from "@/components/documents/document-thumbs";
+import { Check, Phone, Users } from "@/components/icons/pixel";
 import { WhatsAppButton } from "@/components/staff/whatsapp-button";
 import { PixelTag } from "@/components/retro/bits";
 import { AffiliationDecisionButtons, SignatureButtons } from "@/components/staff/affiliation-decision-buttons";
-import { TeacherBadge, ToneBadge } from "@/components/status/status-badge";
+import { TeacherBadge } from "@/components/status/status-badge";
 import { formatCpf } from "@/lib/cpf";
 import { formatShortDateTime } from "@/lib/datetime";
 import { registrationWhatsappMessage } from "@/domain/whatsapp-messages";
@@ -74,13 +75,6 @@ export function VerificationCard({ row, canDecide, eventName }: { row: Verificat
   );
 }
 
-function DocumentBadge({ ok, label, missing }: { ok: boolean; label: string; missing: string }) {
-  return (
-    <ToneBadge tone={ok ? "success" : "warning"} icon={ok ? Check : Warning}>
-      {ok ? label : missing}
-    </ToneBadge>
-  );
-}
 
 /** Ficha esperando a assinatura na recepção: conferir, imprimir e confirmar. */
 export function SignatureCard({ row, eventName }: { row: AffiliationFormRow; eventName: string }) {
@@ -129,12 +123,15 @@ export function SignatureCard({ row, eventName }: { row: AffiliationFormRow; eve
               {row.origin === "PUBLIC" ? "Preenchida no site" : `Registrada por ${row.createdBy ?? "equipe"}`} {formatShortDateTime(row.createdAt)}
             </span>
           </p>
-          <div className="flex flex-wrap gap-1.5" data-testid="signature-documents">
-            <DocumentBadge ok={row.hasRg} label="RG" missing="Falta o RG" />
-            <DocumentBadge ok={row.hasPayslip} label="Contracheque" missing="Falta o contracheque" />
-          </div>
+          {/* Miniaturas: dá para ver de relance o que foi anexado (e abrir tocando). */}
+          <DocumentThumbs documents={row.documents} testId="signature-documents" />
+          {row.hasSignedForm ? (
+            <p className="inline-flex items-center gap-1.5 rounded-md border border-[#38bdf8]/50 bg-[#0ea5e9]/10 px-2 py-1 text-xs font-bold text-[#7dd3fc]" data-testid="signature-govbr">
+              <Check className="size-3.5" /> Assinada no gov.br: confira e confirme
+            </p>
+          ) : null}
         </div>
-        <SignatureButtons formId={row.id} name={row.fullName} missingDocuments={missingDocuments} />
+        <SignatureButtons formId={row.id} name={row.fullName} missingDocuments={missingDocuments} govbr={row.hasSignedForm} />
       </div>
     </div>
   );

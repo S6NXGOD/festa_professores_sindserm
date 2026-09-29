@@ -61,6 +61,8 @@ export interface EventInfo {
   venue: VenueInfo | null;
   /** WhatsApp da organização para dúvidas (somente dígitos). */
   helpWhatsapp: string | null;
+  /** WhatsApp que recebe as fichas assinadas pelo gov.br (o da secretaria ou, sem ele, o de ajuda). */
+  formsWhatsapp: string | null;
 }
 
 /** Informações do evento usadas na página inicial, vouchers e portaria. */
@@ -96,5 +98,6 @@ export const getEventInfo = cache(async (): Promise<EventInfo | null> => {
         }
       : null,
     helpWhatsapp: config.helpWhatsapp,
+    formsWhatsapp: config.formsWhatsapp ?? config.helpWhatsapp,
   };
 });

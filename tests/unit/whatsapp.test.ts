@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { courtesyClosingLine, personWhatsappMessage, registrationWhatsappMessage } from "@/domain/whatsapp-messages";
+import {
+  courtesyClosingLine,
+  govbrApprovedMessage,
+  govbrSigningMessage,
+  personWhatsappMessage,
+  registrationWhatsappMessage,
+  signedFormReturnMessage,
+} from "@/domain/whatsapp-messages";
 import { samePhone, whatsappLink } from "@/lib/phone";
 
 const eventName = "Festa das Professoras e Professores – SINDSERMTHE 2026";
@@ -58,5 +65,27 @@ describe("mesmo WhatsApp (recuperar vouchers)", () => {
     expect(samePhone("(86) 99999-8888", "(86) 99999-8889")).toBe(false);
     expect(samePhone(null, "86999998888")).toBe(false);
     expect(samePhone("", "")).toBe(false);
+  });
+});
+
+describe("ficha pelo gov.br no WhatsApp", () => {
+  it("a equipe manda o link e o número da secretaria; sem número, a pessoa responde a conversa", () => {
+    const withPhone = govbrSigningMessage({ fullName: "Beatriz Nova Filiada", eventName, link: "https://festa.test/assinar/abc", formsPhone: "86995361455" });
+    expect(withPhone).toMatch(/^Olá, Beatriz! Aqui é da organização da Festa das Professoras e Professores/);
+    expect(withPhone).toContain("Passo a passo e a ficha em PDF: https://festa.test/assinar/abc");
+    expect(withPhone).toContain("WhatsApp da secretaria do SINDSERM: (86) 99536-1455");
+    expect(withPhone).toContain("o seu voucher já vale na entrada");
+    const withoutPhone = govbrSigningMessage({ fullName: "Beatriz Nova Filiada", eventName, link: "https://festa.test/assinar/abc", formsPhone: null });
+    expect(withoutPhone).toContain("responda esta conversa com o PDF assinado");
+  });
+
+  it("a pessoa devolve dizendo de quem é; a equipe avisa quando efetiva (com o link novo, se houver)", () => {
+    expect(signedFormReturnMessage({ fullName: "Beatriz Nova Filiada", reference: "1F58D840" })).toBe(
+      "Olá! Segue a minha ficha de filiação ao SINDSERM assinada pelo gov.br (anexo o PDF). Nome: Beatriz Nova Filiada · Ficha 1F58D840.",
+    );
+    expect(govbrApprovedMessage({ fullName: "Beatriz Nova Filiada", eventName, vouchersUrl: "https://festa.test/vouchers/X" })).toContain(
+      "Os seus vouchers: https://festa.test/vouchers/X",
+    );
+    expect(govbrApprovedMessage({ fullName: "Beatriz Nova Filiada", eventName, vouchersUrl: null })).toContain("em Meus vouchers");
   });
 });

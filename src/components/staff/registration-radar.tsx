@@ -53,7 +53,7 @@ const STATUS_SHORT: Record<AffiliationStatus, string> = {
   AWAITING_SIGNATURE: "ficha: assina na festa",
   CONFIRMED: "confirmada",
   REJECTED: "não confirmada",
-  JOINED_AT_EVENT: "filiou-se na festa",
+  JOINED_AT_EVENT: "assinou a ficha",
 };
 
 function RadarToast({

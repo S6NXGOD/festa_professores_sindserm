@@ -16,7 +16,7 @@ import { generateToken, sha256Hex } from "@/server/crypto";
 import { type Actor, assertPermission } from "./actor";
 import { writeAudit } from "./audit";
 import { convertActiveGuestLink } from "./conversion";
-import { linkDocumentsToForm, missingDocuments } from "./documents";
+import { hasSignedForm, linkDocumentsToForm, missingDocuments } from "./documents";
 import { DomainError, isUniqueViolation } from "./errors";
 import { lockRegistration } from "./locks";
 import { personSearchFields } from "./registration";
@@ -272,7 +272,10 @@ export async function saveAffiliationForm(actor: Actor, rawInput: AffiliationFor
  * JOINED_AT_EVENT com os direitos de filiado(a) (kit e convidado se for
  * professor(a)).
  */
-export async function formalizeAffiliation(actor: Actor, formId: string) {
+/** Como a ficha foi assinada: no papel (na recepção) ou digitalmente, pelo gov.br. */
+export type SignatureMethod = "PAPER" | "GOVBR";
+
+export async function formalizeAffiliation(actor: Actor, formId: string, method: SignatureMethod = "PAPER") {
   assertPermission(actor, "newAffiliation");
   try {
     return await withTx(async (tx) => {
@@ -286,6 +289,10 @@ export async function formalizeAffiliation(actor: Actor, formId: string) {
           "INVALID_STATE",
           `Faltam documentos: ${missing.map((kind) => DOCUMENT_KIND_LABEL[kind]).join(" e ")}. Anexe na ficha antes de confirmar a assinatura.`,
         );
+      }
+      // Pelo gov.br, a prova da assinatura é o PDF assinado que a pessoa mandou.
+      if (method === "GOVBR" && !(await hasSignedForm(tx, form.id))) {
+        throw new DomainError("INVALID_STATE", "Anexe a ficha assinada pelo gov.br (o PDF que a pessoa mandou) antes de confirmar.");
       }
 
       // Ordem de bloqueio: inscrição antes da pessoa.
@@ -317,7 +324,7 @@ export async function formalizeAffiliation(actor: Actor, formId: string) {
         isTeacher: form.isTeacher,
         statusChangedAt: now,
         statusChangedByUserId: actor.userId,
-        statusNote: "Ficha de filiação assinada na festa",
+        statusNote: method === "GOVBR" ? "Ficha de filiação assinada pelo gov.br" : "Ficha de filiação assinada na festa",
       };
       let registrationId: string;
       let accessToken: string | null = null;
@@ -352,9 +359,9 @@ export async function formalizeAffiliation(actor: Actor, formId: string) {
         action: "AFFILIATION_FORMALIZED",
         entityType: "registration",
         entityId: registrationId,
-        summary: `Ficha de filiação de ${form.fullName} assinada na festa.`,
+        summary: `Ficha de filiação de ${form.fullName} assinada ${method === "GOVBR" ? "pelo gov.br" : "na festa"}.`,
         before: { status: previousStatus },
-        after: { status: "JOINED_AT_EVENT", formId: form.id, isTeacher: form.isTeacher, conversion },
+        after: { status: "JOINED_AT_EVENT", formId: form.id, isTeacher: form.isTeacher, conversion, method },
       });
       return { registrationId, personId: target.id, accessToken, conversion };
     });

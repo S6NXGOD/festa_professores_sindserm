@@ -1265,6 +1265,106 @@ test.describe.serial("festa das professoras e professores", () => {
     );
     await context.close();
   });
+
+  test("ficha pelo gov.br: a pessoa baixa e assina antes da festa; a equipe anexa o PDF e efetiva", async ({ browser }) => {
+    test.setTimeout(240_000);
+    const GOV = { name: "Carolina Assina Gov", cpf: "71460283562", registration: "GOVBR-2026" };
+    let fichaPdf: Buffer | null = null;
+
+    await test.step("a pessoa preenche a ficha no site e acha o caminho do gov.br nos vouchers", async () => {
+      const context = await browser.newContext({ ...devices["Pixel 7"], acceptDownloads: true });
+      const page = await context.newPage();
+      await page.goto("/inscricao");
+      await page.getByTestId("answer-member-no").click();
+      await page.getByTestId("choose-ficha").click();
+      await page.fill("#f-name", GOV.name);
+      await page.fill("#f-cpf", GOV.cpf);
+      await page.fill("#f-rg", "7654321");
+      await page.fill("#f-birth", "1988-08-08");
+      await page.fill("#f-mother", "Maria Assina Gov");
+      await page.fill("#f-whatsapp", "86977771234");
+      await page.fill("#f-email", "carolina@exemplo.com");
+      await page.getByTestId("wizard-next").click();
+      await page.fill("#f-address", "Rua do Gov");
+      await page.fill("#f-number", "10");
+      await page.fill("#f-neighborhood", "Centro");
+      await page.fill("#f-workplace", "Escola Municipal Sul");
+      await page.fill("#f-registration", GOV.registration);
+      await page.fill("#f-job", "Professora");
+      await page.fill("#f-admission", "2012-02-01");
+      await page.getByTestId("teacher-yes").click();
+      await page.getByTestId("wizard-next").click();
+      await page.locator("label[for=authorization]").click();
+      await page.getByTestId("wizard-next").click();
+      await page.getByTestId("guest-no").click();
+      await page.getByTestId("wizard-next").click();
+      const side = (background: string) => sharp({ create: { width: 1200, height: 800, channels: 3, background } }).jpeg().toBuffer();
+      await page.getByTestId("doc-rg-input").setInputFiles({ name: "rg.jpg", mimeType: "image/jpeg", buffer: await side("#0369a1") });
+      await page.getByTestId("doc-payslip-input").setInputFiles({ name: "contracheque.jpg", mimeType: "image/jpeg", buffer: await side("#a16207") });
+      await expect(page.getByTestId("doc-payslip")).not.toContainText("Falta");
+      await page.getByTestId("wizard-next").click();
+      await page.locator("label[for=privacy-consent]").click();
+      await page.getByTestId("submit-registration").click();
+      await page.waitForURL("**/vouchers/**");
+
+      // Nos vouchers: não precisa esperar a festa.
+      await page.getByTestId("sign-with-govbr").click();
+      await expect(page).toHaveURL(/\/assinar\/[0-9a-f-]{36}\.[0-9a-z]+\.[A-Za-z0-9_-]+$/);
+      await expect(page.getByRole("heading", { name: "Assine pelo gov.br" })).toBeVisible();
+      await expect(page.getByTestId("signing-steps")).toContainText("Baixe a sua ficha");
+      await expect(page.getByTestId("signing-steps")).toContainText("prata");
+      await expect(page.getByTestId("send-signed-form")).toHaveAttribute("href", /^https:\/\/wa\.me\/55\d+\?text=Ol%C3%A1!%20Segue%20a%20minha%20ficha/);
+      // A ficha vem em PDF, pronta para o assinador.
+      const href = await page.getByTestId("download-ficha").getAttribute("href");
+      const download = await page.request.get(href!);
+      expect(download.status()).toBe(200);
+      expect(download.headers()["content-type"]).toContain("application/pdf");
+      expect(download.headers()["content-disposition"]).toContain("ficha-filiacao-carolina-assina-gov.pdf");
+      fichaPdf = Buffer.from(await download.body());
+      expect(fichaPdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+      // Link alterado não abre nada.
+      const forged = await page.request.get(href!.replace(/.\/ficha$/, (m) => (m.startsWith("A") ? "B/ficha" : "A/ficha")));
+      expect(forged.status()).toBe(404);
+      await context.close();
+    });
+
+    await test.step("a equipe vê as miniaturas, anexa a ficha assinada e efetiva a filiação", async () => {
+      const context = await browser.newContext({ viewport: { width: 412, height: 915 } });
+      const page = await context.newPage();
+      await login(page, ATTENDANT);
+      await page.goto("/painel/filiacoes?filtro=assinar");
+      const item = page.getByTestId("signature-item").filter({ hasText: GOV.name });
+      // Miniaturas dos documentos na fila (tocando, abre o visualizador).
+      await expect(item.getByTestId("signature-documents").getByRole("button", { name: "Ver RG" })).toBeVisible();
+      await item.getByTestId("signature-documents").getByRole("button", { name: "Ver Contracheque" }).click();
+      await expect(page.getByTestId("document-viewer")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await item.getByRole("link", { name: GOV.name, exact: true }).click();
+
+      const panel = page.getByTestId("govbr-signing");
+      await expect(panel).toBeVisible();
+      await expect(panel.getByTestId("govbr-send")).toBeEnabled();
+      await expect(panel.getByTestId("govbr-confirm")).toBeDisabled();
+      await panel.getByTestId("form-doc-signed_form-input").setInputFiles({ name: "ficha-assinada.pdf", mimeType: "application/pdf", buffer: fichaPdf! });
+      await expect(panel.getByTestId("form-doc-signed_form")).not.toContainText("Falta");
+      // A 1ª página do PDF assinado aparece na miniatura e no visualizador.
+      await page.reload();
+      await panel.getByRole("button", { name: /^Ver Ficha 1$/ }).click();
+      await expect(page.getByTestId("viewer-pages").locator("img")).toHaveCount(1);
+      await expect.poll(() => page.getByTestId("viewer-pages").locator("img").first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(500);
+      await page.keyboard.press("Escape");
+
+      await panel.getByTestId("govbr-confirm").click();
+      await page.getByTestId("confirm-dialog-action").click();
+      await expect(page.getByTestId("govbr-approved")).toContainText("Carolina agora é filiado(a)!");
+      await expect(page.getByTestId("govbr-notify")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByText(/Assinada pelo gov\.br; confirmada/)).toBeVisible();
+
+      // Na portaria, já pode entrar (o voucher vale).
+      await openPersonAtGate(page, "Carolina Assina", GOV.name);
+      await expect(page.getByTestId("gate-status-title")).toHaveText("LIBERADO PARA ENTRADA");
+      await context.close();
+    });
+  });
 });
-
-

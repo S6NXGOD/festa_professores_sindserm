@@ -54,7 +54,18 @@ export function AffiliationDecisionButtons({ registrationId, name, isTeacher }: 
  * Sem o RG e o contracheque anexados a assinatura não vale: no lugar do
  * "Assinada" aparece o atalho para anexar na ficha.
  */
-export function SignatureButtons({ formId, name, missingDocuments = false }: { formId: string; name: string; missingDocuments?: boolean }) {
+export function SignatureButtons({
+  formId,
+  name,
+  missingDocuments = false,
+  govbr = false,
+}: {
+  formId: string;
+  name: string;
+  missingDocuments?: boolean;
+  /** O PDF assinado pelo gov.br já chegou: a ação principal é conferir e confirmar. */
+  govbr?: boolean;
+}) {
   const router = useRouter();
   // No celular, a ação principal ocupa a linha de cima; imprimir e cancelar dividem a de baixo.
   const primary = "col-span-2 order-first sm:order-none";
@@ -71,6 +82,22 @@ export function SignatureButtons({ formId, name, missingDocuments = false }: { f
             <Upload /> Anexar documentos
           </Link>
         </Button>
+      ) : govbr ? (
+        <ConfirmActionDialog
+          trigger={
+            <Button variant="success" className={primary} data-testid="queue-govbr">
+              <Pencil /> Confirmar gov.br
+            </Button>
+          }
+          title="A assinatura do gov.br confere?"
+          description={`Abra o PDF assinado (a miniatura "Ficha gov.br") e confira o nome de ${name}. Na dúvida, confira em validar.iti.gov.br. Confirmando, a filiação é efetivada.`}
+          confirmLabel="Confirmar e efetivar"
+          tone="success"
+          sound="fanfare"
+          onConfirm={() => formalizeAffiliationAction(formId, "GOVBR")}
+          successMessage={`${name} agora é filiado(a)!`}
+          onDone={() => router.refresh()}
+        />
       ) : (
         <ConfirmActionDialog
           trigger={
@@ -79,7 +106,7 @@ export function SignatureButtons({ formId, name, missingDocuments = false }: { f
             </Button>
           }
           title="A ficha foi assinada?"
-          description={`Confirme só com a ficha impressa assinada. ${name} passa a ser filiado(a) na festa.`}
+          description={`Confirme só com a ficha impressa assinada. ${name} passa a ser filiado(a).`}
           confirmLabel="Confirmar assinatura"
           tone="success"
           sound="fanfare"

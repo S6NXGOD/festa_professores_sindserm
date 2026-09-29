@@ -6,6 +6,7 @@ import { PixelTag } from "@/components/retro/bits";
 import { AnimatedList } from "@/components/staff/animated-list";
 import { ChipFilters, EmptyState, FilterBar, OrderToggle, PageHeader, Pagination } from "@/components/staff/panel-ui";
 import { SignatureCard } from "@/components/staff/queue-cards";
+import { DocumentThumbs } from "@/components/documents/document-thumbs";
 import { TeacherBadge, ToneBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatShortDateTime } from "@/lib/datetime";
@@ -53,7 +54,7 @@ export default async function AffiliationFormsPage({ searchParams }: PageProps<"
         description={
           inQueue
             ? "Fichas esperando a assinatura na recepção: imprima, colha a assinatura e confirme. Sem RG e contracheque anexados, a assinatura fica travada."
-            : "Fichas preenchidas no site (antes da festa) ou no Atendimento. Assinada = filiado(a) na festa."
+            : "Fichas preenchidas no site (antes da festa) ou no Atendimento. Assinada = filiado(a): no papel, na recepção, ou antes, pelo gov.br."
         }
         actions={
           // Só quem faz fichas vê o botão (quem só vê as fichas cairia numa tela bloqueada).
@@ -115,8 +116,12 @@ export default async function AffiliationFormsPage({ searchParams }: PageProps<"
                     <p className="mt-1 text-xs text-fg-muted">
                       {row.origin === "PUBLIC" ? "Preenchida pelo(a) interessado(a)" : `Registrada por ${row.createdBy ?? "equipe"}`}{" "}
                       {formatShortDateTime(row.createdAt)}
-                      {row.formalizedAt ? ` · assinada ${formatShortDateTime(row.formalizedAt)}` : ""}
+                      {row.formalizedAt ? ` · assinada ${row.hasSignedForm ? "pelo gov.br " : ""}${formatShortDateTime(row.formalizedAt)}` : ""}
                     </p>
+                    <div className="mt-2">
+                      {/* A linha inteira abre a ficha: aqui as miniaturas só mostram (o visualizador fica na ficha). */}
+                      <DocumentThumbs documents={row.documents} interactive={false} />
+                    </div>
                   </div>
                   <ChevronRight className="size-5 text-fg-dim" />
                 </Link>

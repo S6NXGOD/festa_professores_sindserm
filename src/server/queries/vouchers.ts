@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import QRCode from "qrcode";
 import { db } from "@/server/db";
-import { voucher } from "@/server/db/schema";
+import { affiliationForm, voucher } from "@/server/db/schema";
 import { isActiveMember } from "@/domain/rules";
 import type { AffiliationStatus, EmployeeCategory } from "@/domain/types";
 import { formatVoucherCode, qrPayloadFor } from "@/server/crypto";
@@ -137,6 +137,16 @@ export async function loadGroupByAccessToken(accessToken: string) {
     member: cards.find((c) => c.personId === registration.member.id) ?? null,
     guests: cards.filter((c) => c.personId !== registration.member.id),
   };
+}
+
+/** A ficha de filiação da pessoa que ainda espera assinatura (para assinar pelo gov.br a partir dos vouchers). */
+export async function findDraftFormId(personId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ id: affiliationForm.id })
+    .from(affiliationForm)
+    .where(and(eq(affiliationForm.personId, personId), eq(affiliationForm.status, "DRAFT")))
+    .limit(1);
+  return row?.id ?? null;
 }
 
 /** Para a equipe: voucher atual de uma pessoa (reimpressão na portaria). */
