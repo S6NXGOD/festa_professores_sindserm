@@ -491,6 +491,8 @@ export async function recentCheckIns(limit = 8) {
       personId: person.id,
       fullName: person.fullName,
       role: checkIn.role,
+      // Cortesia também entra como EMPLOYEE (mesmo cadastro dos colaboradores): o placar separa.
+      isCourtesy: sql<boolean>`EXISTS (SELECT 1 FROM ${employee} e WHERE e.person_id = ${person.id} AND e.category = 'COURTESY')`,
       checkedInAt: checkIn.checkedInAt,
       byName: user.name,
     })

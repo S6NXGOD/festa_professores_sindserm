@@ -1180,6 +1180,14 @@ test.describe.serial("festa das professoras e professores", () => {
       await admin.goto("/painel/entradas?filtro=cortesias");
       await expect(admin.getByTestId("entry-row")).toHaveCount(2);
       await expect(admin.getByTestId("entry-row").filter({ hasText: "Helena Presidente Costa" })).toHaveCount(1);
+
+      // No placar: o número é o total (como nos outros quadros); quem já entrou vem embaixo.
+      await admin.goto("/painel");
+      await expect(admin.getByTestId("stat-courtesies")).toHaveText("5");
+      await expect(admin.locator("a", { has: admin.getByTestId("stat-courtesies") })).toContainText("2 já entraram");
+      await expect(admin.getByTestId("stat-employees")).toHaveText("3");
+      await expect(admin.getByTestId("expected-breakdown")).toContainText("3 colaboradores · 5 cortesias");
+      await expect(admin.locator("li", { hasText: "Helena Presidente Costa" }).first()).toContainText("Cort. ·");
     });
 
     await context.close();

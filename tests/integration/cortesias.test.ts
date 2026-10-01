@@ -147,11 +147,23 @@ describe("cortesias da organização", () => {
       employees: 3,
       courtesies: 2,
       courtesiesPresent: 1,
+      courtesiesWithKit: 2,
       employeesPresent: 1,
       // Rosa + convidado dela + 2 cortesias.
       kitDemand: { employee: 4 },
       kitsOwedEmployee: 3,
+      // No placar, a parte das cortesias aparece à parte (já contada acima): 1 entregue, 1 a entregar.
+      kitsDeliveredEmployee: 1,
+      kitsDeliveredCourtesy: 1,
+      kitsOwedCourtesy: 1,
     });
+  });
+
+  it("placar: cortesia sem kit conta como cortesia, mas não como kit a entregar", async () => {
+    await createEmployee(admin, courtesy());
+    await createEmployee(admin, courtesy({ fullName: "João Pedro Mendes", withKit: false }));
+    const stats = await getDashboardStats(db);
+    expect(stats).toMatchObject({ courtesies: 2, courtesiesWithKit: 1, kitsOwedCourtesy: 1, kitsOwedEmployee: 1, kitsDeliveredCourtesy: 0 });
   });
 
   it("Entradas separa cortesias de colaboradores", async () => {

@@ -31,6 +31,9 @@ export interface DashboardStats {
   kitsOwedMember: number;
   kitsOwedGuest: number;
   kitsOwedEmployee: number;
+  /** A parte das cortesias, já contada em kitsDeliveredEmployee e kitsOwedEmployee (o estoque é o mesmo). */
+  kitsDeliveredCourtesy: number;
+  kitsOwedCourtesy: number;
   /** Funcionários do SINDSERM na lista, os que já entraram e os convidados deles. */
   /** Todo o cadastro interno (colaboradores + cortesias): é a demanda do estoque dos colaboradores. */
   employees: number;
@@ -38,6 +41,8 @@ export interface DashboardStats {
   /** Só as cortesias da organização (já contadas em `employees`). */
   courtesies: number;
   courtesiesPresent: number;
+  /** Cortesias com kit. As "sem kit" (inclusive o convidado sem kit de um colaborador) ficam de fora. */
+  courtesiesWithKit: number;
   employeeGuests: number;
   /**
    * Previsão de kits com todos os inscritos (inclui quem aguarda conferência ou
@@ -123,6 +128,12 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
       (SELECT count(*) FROM employee e JOIN active_checkins c ON c.person_id = e.person_id WHERE e.removed_at IS NULL)::int AS employees_present,
       (SELECT count(*) FROM employee WHERE removed_at IS NULL AND category = 'COURTESY')::int AS courtesies,
       (SELECT count(*) FROM employee WHERE removed_at IS NULL AND with_kit)::int AS employees_with_kit,
+      (SELECT count(*) FROM employee WHERE removed_at IS NULL AND category = 'COURTESY' AND with_kit)::int AS courtesies_with_kit,
+      (SELECT count(*) FROM kit_delivery kd JOIN employee e ON e.id = kd.employee_id
+        WHERE kd.cancelled_at IS NULL AND e.category = 'COURTESY')::int AS delivered_courtesy,
+      -- Só as entregas a quem ainda tem kit abatem o que falta entregar (como em "Pessoas e kits").
+      (SELECT count(*) FROM kit_delivery kd JOIN employee e ON e.id = kd.employee_id
+        WHERE kd.cancelled_at IS NULL AND e.category = 'COURTESY' AND e.with_kit AND e.removed_at IS NULL)::int AS delivered_courtesy_with_kit,
       (SELECT count(*) FROM employee e JOIN active_checkins c ON c.person_id = e.person_id
         WHERE e.removed_at IS NULL AND e.category = 'COURTESY')::int AS courtesies_present,
       (SELECT count(*) FROM guest_link gl JOIN employee e ON e.id = gl.employee_id
@@ -158,10 +169,13 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
     kitsOwedGuest: Math.max(0, n("entitled_guest") - n("delivered_guest")),
     // Todo funcionário tem kit; o convidado dele também (os dois do estoque dos funcionários).
     kitsOwedEmployee: Math.max(0, n("employees_with_kit") + n("entitled_employee_guest") - n("delivered_employee")),
+    kitsDeliveredCourtesy: n("delivered_courtesy"),
+    kitsOwedCourtesy: Math.max(0, n("courtesies_with_kit") - n("delivered_courtesy_with_kit")),
     employees: n("employees"),
     employeesPresent: n("employees_present"),
     courtesies: n("courtesies"),
     courtesiesPresent: n("courtesies_present"),
+    courtesiesWithKit: n("courtesies_with_kit"),
     employeeGuests: n("employee_guests"),
     kitDemand: { member: n("teachers"), guest: n("demand_guest"), employee: n("employees_with_kit") + n("entitled_employee_guest") },
     stock: await getStockOverview(ex),

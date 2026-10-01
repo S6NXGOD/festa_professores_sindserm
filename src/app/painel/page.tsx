@@ -73,6 +73,24 @@ export default async function DashboardPage() {
     stats.awaitingSignature > 0 ? plural(stats.awaitingSignature, "ficha para assinar", "fichas para assinar") : null,
   ].filter(Boolean);
   const resolveHref = stats.pending > 0 ? "/painel/inscricoes?filtro=conferir" : "/painel/filiacoes?filtro=assinar";
+  // Colaboradores e cortesias são um cadastro só (employee): aqui cada um aparece separado.
+  const employeesOnly = stats.employees - stats.courtesies;
+  const employeesOnlyPresent = stats.employeesPresent - stats.courtesiesPresent;
+  const courtesiesWithoutKit = stats.courtesies - stats.courtesiesWithKit;
+  // Kits dos colaboradores (e dos convidados deles), sem as cortesias, que saem do mesmo estoque.
+  const employeeKitsDelivered = stats.kitsDeliveredEmployee - stats.kitsDeliveredCourtesy;
+  const employeeKitsOwed = Math.max(0, stats.kitsOwedEmployee - stats.kitsOwedCourtesy);
+  const kitParts = (member: number, guest: number, employee: number, courtesy: number) =>
+    [`${member} prof.`, `${guest} conv.`, employee ? `${employee} colab.` : null, courtesy ? `${courtesy} cort.` : null].filter(Boolean).join(" · ");
+  // Quem são os esperados (o total do placar e da portaria): todo mundo que tem voucher.
+  const expectedBreakdown = [
+    plural(stats.teachers + stats.otherMembers, "inscrito", "inscritos"),
+    plural(stats.guests + stats.employeeGuests, "convidado", "convidados"),
+    employeesOnly ? plural(employeesOnly, "colaborador", "colaboradores") : null,
+    stats.courtesies ? plural(stats.courtesies, "cortesia", "cortesias") : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const canSettings = can(actor.access, "manageSettings");
   // As duas filas do Atendimento, na ordem em que a recepção costuma resolver.
   const queue = [
@@ -184,6 +202,11 @@ export default async function DashboardPage() {
               <span className="pixel mb-2 ml-auto text-sm text-red tabular">{readiness}%</span>
             </p>
             <p className="relative mt-1 text-sm font-semibold text-fg">prontos para entrar</p>
+            {stats.expected > 0 ? (
+              <p className="relative mt-0.5 text-xs text-fg-muted" data-testid="expected-breakdown">
+                Os {stats.expected} esperados: {expectedBreakdown}
+              </p>
+            ) : null}
             <SegmentMeter
               className="relative mt-3"
               value={stats.ready}
@@ -224,6 +247,11 @@ export default async function DashboardPage() {
               <span className="display mb-1.5 text-2xl text-fg-muted tabular">/ {stats.expected}</span>
               <span className="pixel mb-2 ml-auto text-sm text-red tabular">{presence}%</span>
             </p>
+            {stats.expected > 0 ? (
+              <p className="relative mt-2 text-xs text-fg-muted" data-testid="expected-breakdown">
+                Os {stats.expected} esperados: {expectedBreakdown}
+              </p>
+            ) : null}
             <SegmentMeter className="relative mt-4" value={stats.present} max={stats.expected} segments={24} label={`${stats.present} de ${stats.expected} presentes`} />
             <p className="relative mt-3 text-xs text-fg-muted">
               {stats.absent === 1 ? "1 esperado ainda não entrou" : `${plural(stats.absent, "esperado", "esperados")} ainda não entraram`} ·{" "}
@@ -251,7 +279,7 @@ export default async function DashboardPage() {
             value={stats.kitsDeliveredMember + stats.kitsDeliveredGuest + stats.kitsDeliveredEmployee}
             icon={Package}
             tone="success"
-            hint={`${stats.kitsDeliveredMember} prof. · ${stats.kitsDeliveredGuest} conv.${stats.kitsDeliveredEmployee ? ` · ${stats.kitsDeliveredEmployee} colab.` : ""}`}
+            hint={kitParts(stats.kitsDeliveredMember, stats.kitsDeliveredGuest, employeeKitsDelivered, stats.kitsDeliveredCourtesy)}
             testId="stat-kits-delivered"
           />
           <div
@@ -291,7 +319,14 @@ export default async function DashboardPage() {
       </section>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatTile label="Inscrições" value={stats.registrations} icon={List} href={canRegistrations ? "/painel/inscricoes?filtro=todas" : undefined} testId="stat-registrations" />
+        <StatTile
+          label="Inscrições"
+          value={stats.registrations}
+          icon={List}
+          href={canRegistrations ? "/painel/inscricoes?filtro=todas" : undefined}
+          hint={stats.rejected ? plural(stats.rejected, "recusada", "recusadas") : undefined}
+          testId="stat-registrations"
+        />
         <StatTile label="Professoras e professores" value={stats.teachers} icon={Teach} href={canRegistrations ? "/painel/inscricoes?filtro=todas" : undefined} testId="stat-teachers" hint={stats.otherMembers ? `+ ${plural(stats.otherMembers, "filiado", "filiados")} sem kit` : undefined} />
         <StatTile
           label="Convidados"
@@ -311,33 +346,44 @@ export default async function DashboardPage() {
           icon={Gift}
           tone="neutral"
           href={canKits ? "/painel/kits#comparativo" : undefined}
-          hint={`${stats.kitsOwedMember} prof. · ${stats.kitsOwedGuest} conv.${stats.kitsOwedEmployee ? ` · ${stats.kitsOwedEmployee} colab.` : ""} · saem na entrada`}
+          hint={`${kitParts(stats.kitsOwedMember, stats.kitsOwedGuest, employeeKitsOwed, stats.kitsOwedCourtesy)} · saem na entrada`}
           testId="stat-kits-owed"
         />
-        {stats.employees - stats.courtesies > 0 || isAdmin ? (
+        {/* Como os outros quadros, o número é o total; quem já entrou aparece embaixo, na festa. */}
+        {employeesOnly > 0 || isAdmin ? (
           <StatTile
             label="Colaboradores"
-            value={stats.employeesPresent - stats.courtesiesPresent}
+            value={employeesOnly}
             icon={Building}
             tone="warning"
             href={canEmployees ? "/painel/colaboradores" : undefined}
             hint={
-              stats.employees - stats.courtesies
-                ? `de ${plural(stats.employees - stats.courtesies, "liberado", "liberados")} já entraram`
-                : "Libere os colaboradores do SINDSERM"
+              !employeesOnly
+                ? "Libere os colaboradores do SINDSERM"
+                : !preEvent
+                  ? plural(employeesOnlyPresent, "já entrou", "já entraram")
+                  : stats.employeeGuests
+                    ? `+ ${plural(stats.employeeGuests, "convidado", "convidados")} · liberados para entrar`
+                    : "Liberados para entrar"
             }
-            testId="stat-employees-present"
+            testId="stat-employees"
           />
         ) : null}
         {stats.courtesies > 0 ? (
           <StatTile
             label="Cortesias"
-            value={stats.courtesiesPresent}
+            value={stats.courtesies}
             icon={Heart}
             tone="brand"
             href={canEmployees ? "/painel/cortesias" : undefined}
-            hint={`de ${plural(stats.courtesies, "cortesia", "cortesias")} já entraram`}
-            testId="stat-courtesies-present"
+            hint={
+              !preEvent
+                ? plural(stats.courtesiesPresent, "já entrou", "já entraram")
+                : [stats.courtesiesWithKit ? `${stats.courtesiesWithKit} com kit` : null, courtesiesWithoutKit ? `${courtesiesWithoutKit} sem kit` : null]
+                    .filter(Boolean)
+                    .join(" · ")
+            }
+            testId="stat-courtesies"
           />
         ) : null}
       </div>
@@ -447,7 +493,7 @@ export default async function DashboardPage() {
                     <span className="min-w-0 flex-1 truncate font-semibold text-fg">{entry.fullName}</span>
                   )}
                   <span className="shrink-0 text-xs text-fg-muted tabular">
-                    {entry.role === "EMPLOYEE" ? "Func. · " : entry.role === "GUEST" ? "P2 · " : "P1 · "}
+                    {entry.role === "EMPLOYEE" ? (entry.isCourtesy ? "Cort. · " : "Colab. · ") : entry.role === "GUEST" ? "P2 · " : "P1 · "}
                     {formatTime(entry.checkedInAt)}
                   </span>
                 </li>
