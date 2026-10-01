@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SessionKeeper } from "@/components/auth/session-keeper";
 import { BrandLockup } from "@/components/brand/brand";
 import { Chart } from "@/components/icons/pixel";
 import { RetroBackdrop } from "@/components/retro/retro-backdrop";
@@ -56,6 +57,7 @@ export default async function GateLayout({ children }: LayoutProps<"/portaria">)
       <main className="relative mx-auto max-w-2xl px-4 pt-5 pb-16 print:p-0">{children}</main>
       <Tutorial steps={tutorialSteps(actor.access, actor.name)} autoOpen={!actor.tutorialSeen} initials={initials(actor.name)} />
       {!actor.tutorialSeen ? <span hidden data-testid="tutorial-pending" /> : null}
+      <SessionKeeper />
     </div>
   );
 }

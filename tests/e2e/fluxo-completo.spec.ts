@@ -1,4 +1,5 @@
 import { chromium, devices, expect, type Page, test } from "@playwright/test";
+import pg from "pg";
 import sharp from "sharp";
 import { E2E } from "./env";
 import { writeQrVideo } from "./helpers/qr-video";
@@ -1366,5 +1367,48 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(page.getByTestId("gate-status-title")).toHaveText("LIBERADO PARA ENTRADA");
       await context.close();
     });
+  });
+
+  test("sessão: a equipe continua conectada até clicar em Sair", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await login(page, ATTENDANT);
+    const sessionCookie = async () => (await context.cookies()).find((cookie) => /^(__Secure-)?better-auth\.session_token$/.test(cookie.name));
+    const daysLeft = (expiresAt: number) => (expiresAt - Date.now()) / 86_400_000;
+
+    await test.step("o login vale 1 ano", async () => {
+      expect(daysLeft((await sessionCookie())!.expires * 1000)).toBeGreaterThan(360);
+    });
+
+    await test.step("sessão quase vencendo: abrir o painel renova o banco e o cookie", async () => {
+      const cookie = (await sessionCookie())!;
+      const token = decodeURIComponent(cookie.value).split(".")[0];
+      const client = new pg.Client({ connectionString: E2E.databaseUrl });
+      await client.connect();
+      try {
+        // Como se o último uso tivesse sido há 363 dias: banco e cookie no fim.
+        await client.query(`UPDATE "session" SET expires_at = now() + interval '2 days' WHERE token = $1`, [token]);
+        await context.addCookies([{ ...cookie, expires: Math.floor(Date.now() / 1000) + 2 * 86_400 }]);
+        expect(daysLeft((await sessionCookie())!.expires * 1000)).toBeLessThan(3);
+
+        const renewed = page.waitForResponse((response) => response.url().endsWith("/api/auth/get-session") && response.request().method() === "POST");
+        await page.goto("/painel");
+        expect((await renewed).status()).toBe(200);
+        await expect.poll(async () => daysLeft((await sessionCookie())!.expires * 1000)).toBeGreaterThan(360);
+        const { rows } = await client.query<{ expires_at: Date }>(`SELECT expires_at FROM "session" WHERE token = $1`, [token]);
+        expect(daysLeft(rows[0]!.expires_at.getTime())).toBeGreaterThan(360);
+      } finally {
+        await client.end();
+      }
+    });
+
+    await test.step("sai só pelo botão Sair", async () => {
+      await page.getByTestId("user-menu").click();
+      await page.getByTestId("sign-out").click();
+      await page.waitForURL((url) => url.pathname === "/entrar");
+      await page.goto("/painel");
+      await expect(page).toHaveURL(/\/entrar/);
+    });
+    await context.close();
   });
 });

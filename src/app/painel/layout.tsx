@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { SessionKeeper } from "@/components/auth/session-keeper";
 import { RetroBackdrop } from "@/components/retro/retro-backdrop";
 import { PanelMobileNav, PanelSidebar } from "@/components/staff/panel-nav";
 import { QuickSearch } from "@/components/staff/quick-search";
@@ -46,6 +47,7 @@ export default async function PanelLayout({ children }: LayoutProps<"/painel">) 
       ) : null}
       <Tutorial steps={tutorialSteps(actor.access, actor.name)} autoOpen={!actor.tutorialSeen} initials={initials(actor.name)} />
       {!actor.tutorialSeen ? <span hidden data-testid="tutorial-pending" /> : null}
+      <SessionKeeper />
     </div>
   );
 }

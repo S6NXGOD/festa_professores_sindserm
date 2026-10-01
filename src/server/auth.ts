@@ -22,6 +22,10 @@ const extraOrigins = [
   ...(isLocalBase ? ["http://localhost:*", "http://127.0.0.1:*"] : []),
 ];
 
+const DAY_SECONDS = 60 * 60 * 24;
+/** Validade da sessão desde o último uso: na prática, só sai quem clica em "Sair". */
+export const SESSION_DAYS = 365;
+
 /**
  * Autenticação apenas da equipe (ADMIN, ATTENDANT, SECURITY). Participantes não
  * têm conta. Não há cadastro público: usuários são criados pelo administrador.
@@ -74,9 +78,15 @@ export const auth = betterAuth({
       active: { type: "boolean", required: false, input: false },
     },
   },
+  // A equipe só sai clicando em "Sair" (ou quando o administrador desativa a pessoa ou
+  // redefine a senha, o que encerra as sessões na hora). A sessão vale 1 ano desde o
+  // último uso. Antes valia 24 h, e quem voltava no dia seguinte caía no login.
   session: {
-    expiresIn: 60 * 60 * 24,
-    updateAge: 60 * 60,
+    expiresIn: SESSION_DAYS * DAY_SECONDS,
+    updateAge: DAY_SECONDS,
+    // As páginas do servidor não conseguem regravar o cookie, então só leem a sessão. Quem
+    // renova é o navegador (SessionKeeper → POST /api/auth/get-session): banco e cookie juntos.
+    deferSessionRefresh: true,
   },
   rateLimit: {
     enabled: process.env.RATE_LIMIT_DISABLED !== "true",
