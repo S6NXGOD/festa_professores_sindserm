@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { QuickModeTabs } from "@/components/gate/quick-mode-tabs";
 import { QuickRegistrationForm } from "@/components/gate/quick-registration";
-import { ArrowLeft, Building, ClipboardNote, Users } from "@/components/icons/pixel";
+import { ArrowLeft, Building, ClipboardNote, Heart, Users } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { can } from "@/domain/rules";
 import { maskCpfInput } from "@/lib/cpf";
@@ -20,6 +21,7 @@ export default async function GateQuickRegistrationPage({ searchParams }: PagePr
   const initialName = typeof query.nome === "string" ? query.nome.trim().slice(0, 120) : "";
   const cpfDigits = typeof query.cpf === "string" ? query.cpf.replace(/\D/g, "").slice(0, 11) : "";
   const canAffiliate = can(actor.access, "newAffiliation");
+  const canCourtesy = can(actor.access, "createCourtesyAtGate");
 
   return (
     <div className="space-y-4 pb-28">
@@ -28,6 +30,7 @@ export default async function GateQuickRegistrationPage({ searchParams }: PagePr
           <ArrowLeft /> Portaria
         </Link>
       </Button>
+      <QuickModeTabs current="registration" canRegister canCourtesy={canCourtesy} name={initialName} />
       <header>
         <p className="pixel text-[0.55rem] text-red">Cadastro rápido</p>
         <h1 className="display mt-1 text-4xl leading-none text-fg sm:text-5xl">Chegou sem inscrição?</h1>
@@ -54,6 +57,23 @@ export default async function GateQuickRegistrationPage({ searchParams }: PagePr
           <span>
             <strong className="text-fg">Veio com um(a) colaborador(a), sem kit:</strong> abra o(a) colaborador(a) e toque em{" "}
             <strong className="text-fg">Convidado sem kit</strong>.
+          </span>
+        </p>
+        <p className="flex items-start gap-2">
+          <Heart className="mt-0.5 size-4 shrink-0 text-[#ff8fd0]" />
+          <span>
+            <strong className="text-fg">A organização mandou entrar (cortesia):</strong>{" "}
+            {canCourtesy ? (
+              <Link
+                href={initialName ? `/portaria/cortesia?nome=${encodeURIComponent(initialName)}` : "/portaria/cortesia"}
+                className="font-semibold text-red underline underline-offset-4"
+              >
+                cadastre como cortesia
+              </Link>
+            ) : (
+              "chame quem é responsável pela portaria para cadastrar a cortesia"
+            )}
+            .
           </span>
         </p>
         <p className="flex items-start gap-2">

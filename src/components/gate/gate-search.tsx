@@ -4,7 +4,7 @@ import { EMPLOYEE_CATEGORY_LABEL, employeeDetail } from "@/domain/labels";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import { Building, ChevronRight, Login, MemberCard, Search, User, UserPlus, Users } from "@/components/icons/pixel";
+import { Building, ChevronRight, Heart, Login, MemberCard, Search, User, UserPlus, Users } from "@/components/icons/pixel";
 import { CategoryChip } from "@/components/staff/employee-category";
 import { AffiliationBadge, ToneBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
@@ -44,12 +44,15 @@ export function GateSearch({
   autoFocus = false,
   requireFullCpf = false,
   registerHref = null,
+  courtesyHref = null,
 }: {
   basePath?: string;
   autoFocus?: boolean;
   requireFullCpf?: boolean;
   /** Cadastro rápido (quem pode cadastrar): "Ninguém encontrado" vira "Cadastrar agora". */
   registerHref?: string | null;
+  /** Cortesia na portaria (quem tem a permissão): "Ninguém encontrado" também oferece "Entrar como cortesia". */
+  courtesyHref?: string | null;
 }) {
   const [mode, setMode] = useState<Mode>("name");
   const [query, setQuery] = useState("");
@@ -129,14 +132,25 @@ export function GateSearch({
           <Search className="size-8 text-fg-dim" />
           <p className="display mt-2 text-xl text-fg">Ninguém encontrado</p>
           <p className="text-sm text-fg-muted">Confira a grafia ou tente pelo CPF.</p>
-          {registerHref ? (
+          {registerHref || courtesyHref ? (
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mt-4 grid w-full max-w-xs gap-1.5">
-              <Button asChild size="lg" data-testid="gate-quick-register">
-                <Link href={quickRegisterHref(registerHref, query)}>
-                  <UserPlus /> Cadastrar agora
-                </Link>
-              </Button>
-              <span className="text-xs text-fg-dim">Cadastro rápido de quem chegou sem inscrição</span>
+              {registerHref ? (
+                <>
+                  <Button asChild size="lg" data-testid="gate-quick-register">
+                    <Link href={quickRegisterHref(registerHref, query)}>
+                      <UserPlus /> Cadastrar agora
+                    </Link>
+                  </Button>
+                  <span className="text-xs text-fg-dim">Cadastro rápido de quem chegou sem inscrição</span>
+                </>
+              ) : null}
+              {courtesyHref ? (
+                <Button asChild size="lg" variant={registerHref ? "outline" : "default"} className={cn(registerHref && "mt-1.5")} data-testid="gate-quick-courtesy">
+                  <Link href={quickRegisterHref(courtesyHref, query)}>
+                    <Heart className="text-[#ff8fd0]" /> Entrar como cortesia
+                  </Link>
+                </Button>
+              ) : null}
             </motion.div>
           ) : (
             <p className="mt-3 text-xs text-fg-dim">Chegou sem inscrição? Chame o Atendimento para o cadastro rápido.</p>

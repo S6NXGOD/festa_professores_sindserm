@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CountUp } from "@/components/count-up";
 import { GateSearch } from "@/components/gate/gate-search";
-import { AlarmClock, Clock, Login, QrCode, Search, UserPlus, Users } from "@/components/icons/pixel";
+import { AlarmClock, Clock, Heart, Login, QrCode, Search, UserPlus, Users } from "@/components/icons/pixel";
 import { Panel } from "@/components/retro/bits";
 import { DeadlineTimer } from "@/components/retro/countdown";
 import { LiveRefresh } from "@/components/retro/live-refresh";
@@ -23,6 +23,8 @@ export default async function GateHomePage() {
   const notStarted = event ? !event.started : false;
   // Cadastro rápido de quem chegou sem inscrição: quem cuida das inscrições (Atendimento).
   const canRegister = can(actor.access, "registerAtEvent");
+  // Cortesia na hora: o(a) responsável pela porta (permissão própria) ou quem cuida de colaboradores e cortesias.
+  const canCourtesy = can(actor.access, "createCourtesyAtGate");
   return (
     <div className="space-y-5">
       {notStarted && event?.startsAt ? (
@@ -84,15 +86,26 @@ export default async function GateHomePage() {
         icon={Search}
         action={
           canRegister ? (
+            // Com as duas permissões, o cadastro rápido tem as abas "Filiado(a)" e "Cortesia".
             <Button asChild variant="outline" size="sm">
               <Link href="/portaria/cadastro" data-testid="open-quick-register">
                 <UserPlus /> Cadastro rápido
               </Link>
             </Button>
+          ) : canCourtesy ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href="/portaria/cortesia" data-testid="open-quick-courtesy">
+                <Heart className="text-[#ff8fd0]" /> Cortesia
+              </Link>
+            </Button>
           ) : null
         }
       >
-        <GateSearch requireFullCpf={!can(actor.access, "viewFullCpf")} registerHref={canRegister ? "/portaria/cadastro" : null} />
+        <GateSearch
+          requireFullCpf={!can(actor.access, "viewFullCpf")}
+          registerHref={canRegister ? "/portaria/cadastro" : null}
+          courtesyHref={canCourtesy ? "/portaria/cortesia" : null}
+        />
       </Panel>
     </div>
   );

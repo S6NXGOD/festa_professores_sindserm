@@ -37,6 +37,7 @@ describe("tutorial do primeiro acesso", () => {
     const viewOnly: AccessMap = {
       modules: Object.fromEntries(ACCESS_MODULES.map((m) => [m, m === "portaria" ? "view" : "none"])) as AccessMap["modules"],
       fullCpf: false,
+      gateCourtesy: false,
     };
     const gate = tutorialSteps(viewOnly, "Vera Lima").find((step) => step.id === "portaria")!;
     expect(gate.bullets.join(" ")).toContain("só para consultar");

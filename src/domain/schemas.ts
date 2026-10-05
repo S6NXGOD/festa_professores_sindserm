@@ -450,6 +450,11 @@ export const companionSchema = z.object({
 });
 export type CompanionInput = z.input<typeof companionSchema>;
 export type CompanionData = z.output<typeof companionSchema>;
+
+/** Cortesia feita na hora, na portaria (cadastro rápido): sempre cortesia, sem convidado. */
+export const gateCourtesySchema = employeeFields.pick({ fullName: true, cpf: true, whatsapp: true, jobTitle: true, isMinor: true, withKit: true });
+export type GateCourtesyInput = z.input<typeof gateCourtesySchema>;
+export type GateCourtesyData = z.output<typeof gateCourtesySchema>;
 export type BulkEmployeesInput = z.input<typeof bulkEmployeesSchema>;
 
 export interface BulkEmployeeLine {
@@ -666,6 +671,8 @@ export const accessMapSchema = z
   .object({
     modules: z.record(z.string(), z.enum(ACCESS_LEVELS)),
     fullCpf: z.boolean(),
+    // Opcional: tela aberta antes de existir a opção manda sem ela (vira "não").
+    gateCourtesy: z.boolean().optional(),
   })
   .transform((value) => sanitizeAccess(value));
 

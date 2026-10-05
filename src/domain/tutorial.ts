@@ -126,6 +126,9 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
             ...(can(access, "registerAtEvent")
               ? ["Chegou sem inscrição? Na busca, toque em Cadastrar agora: o cadastro rápido já vem com o nome digitado."]
               : []),
+            ...(can(access, "createCourtesyAtGate")
+              ? ["A organização mandou entrar alguém que não está na lista? Na busca, toque em Entrar como cortesia (com ou sem kit)."]
+              : []),
             "A tela diz na hora: LIBERADO, ou o motivo do bloqueio e o que fazer.",
             ...(can(access, "checkIn")
               ? [

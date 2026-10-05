@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Check, ClipboardNote, Crown, Eye, Lock, Pencil, type PixelIcon, Reload, Shield } from "@/components/icons/pixel";
+import { Check, ClipboardNote, Crown, Eye, Heart, Lock, Pencil, type PixelIcon, Reload, Shield } from "@/components/icons/pixel";
 import { ToneBadge } from "@/components/status/status-badge";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -45,7 +45,7 @@ function FullAccessCard() {
         </div>
       </div>
       <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Áreas liberadas">
-        {[...ACCESS_GROUPS.flatMap((group) => group.modules.map((module) => MODULE_INFO[module].label)), "CPF completo"].map((label) => (
+        {[...ACCESS_GROUPS.flatMap((group) => group.modules.map((module) => MODULE_INFO[module].label)), "CPF completo", "Cortesia na portaria"].map((label) => (
           <li
             key={label}
             className="inline-flex items-center gap-1 rounded-md border border-success/35 bg-ink/40 px-2 py-1 text-[0.7rem] font-bold text-success-text"
@@ -80,8 +80,14 @@ export function AccessEditor({
 
   function setLevel(module: AccessModule, level: AccessLevel) {
     playSound("blip");
-    onChange({ role, access: { ...access, modules: { ...access.modules, [module]: level } } });
+    // Sem Portaria, a "Cortesia na portaria" não tem onde ser usada: desliga junto.
+    const gateCourtesy = module === "portaria" && level === "none" ? false : access.gateCourtesy;
+    onChange({ role, access: { ...access, gateCourtesy, modules: { ...access.modules, [module]: level } } });
   }
+
+  // Quem edita Colaboradores e cortesias já cadastra cortesia em qualquer lugar (inclusive na portaria).
+  const courtesyByEmployees = access.modules.colaboradores === "edit";
+  const courtesyChanged = access.gateCourtesy !== ROLE_PRESETS[role].gateCourtesy;
 
   function pickRole(option: StaffRole) {
     if (option !== role) playSound(option === "ADMIN" ? "powerup" : "blip");
@@ -183,7 +189,7 @@ export function AccessEditor({
                   const info = MODULE_INFO[module];
                   const level = access.modules[module];
                   const hint = level === "edit" ? info.edit : level === "view" ? info.view : null;
-                  const changed = level !== ROLE_PRESETS[role].modules[module];
+                  const changed = level !== ROLE_PRESETS[role].modules[module] || (module === "portaria" && courtesyChanged);
                   return (
                     <div
                       key={module}
@@ -227,6 +233,34 @@ export function AccessEditor({
                         })}
                       </div>
                       <p className={cn("mt-1.5 text-xs", hint ? "text-fg-muted" : "text-fg-dim")}>{hint ?? "Não aparece no menu."}</p>
+                      {module === "portaria" && level !== "none" ? (
+                        <label
+                          className={cn(
+                            "mt-2.5 flex items-center justify-between gap-3 rounded-lg border bg-surface p-2.5",
+                            courtesyChanged ? "border-red/55" : "border-line",
+                          )}
+                        >
+                          <span className="min-w-0">
+                            <span className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                              <Heart className="size-4 shrink-0 text-[#ff8fd0]" /> Cortesia na portaria
+                            </span>
+                            <span className="block text-xs text-fg-muted">
+                              {courtesyByEmployees
+                                ? "Já incluída em Colaboradores e cortesias: Editar."
+                                : "Cadastrar na hora quem a organização mandou entrar (com ou sem kit). Para quem é responsável pela porta."}
+                            </span>
+                          </span>
+                          <Switch
+                            checked={access.gateCourtesy || courtesyByEmployees}
+                            onCheckedChange={(checked) => {
+                              playSound("blip");
+                              onChange({ role, access: { ...access, gateCourtesy: checked } });
+                            }}
+                            disabled={disabled || courtesyByEmployees}
+                            data-testid="access-gateCourtesy"
+                          />
+                        </label>
+                      ) : null}
                     </div>
                   );
                 })}

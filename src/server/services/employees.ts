@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull, ne, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, type SQL, sql } from "drizzle-orm";
 import type { Executor, Tx } from "@/server/db";
 import { checkIn, employee, guestLink, kitDelivery, person } from "@/server/db/schema";
 import {
@@ -11,6 +11,8 @@ import {
   type EmployeeData,
   type EmployeeInput,
   employeeSchema,
+  type GateCourtesyInput,
+  gateCourtesySchema,
   parseEmployeeLines,
   type UpdateEmployeeInput,
   updateEmployeeSchema,
@@ -159,6 +161,75 @@ export async function createEmployee(actor: Actor, raw: EmployeeInput) {
         },
       });
       return { ...created, guest: addedGuest };
+    });
+  } catch (error) {
+    mapEmployeeError(error);
+  }
+}
+
+/** "Quem convidou" já usados nas cortesias: sugestões no cadastro rápido da portaria. */
+export async function listCourtesyInviters(ex: Executor): Promise<string[]> {
+  const rows = await ex
+    .selectDistinct({ jobTitle: employee.jobTitle })
+    .from(employee)
+    .where(and(eq(employee.category, "COURTESY"), isNull(employee.removedAt)));
+  return rows
+    .map((row) => row.jobTitle)
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+/** Alguém com este nome já está na festa (colaborador(a), cortesia, filiado(a) ou convidado(a))? */
+async function nameAlreadyAtParty(tx: Tx, fullName: string): Promise<boolean> {
+  const result = await tx.execute<{ found: boolean }>(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM ${person} p
+       WHERE p.search_name = ${toSearchText(fullName)}
+         AND (EXISTS (SELECT 1 FROM ${employee} e WHERE e.person_id = p.id AND e.removed_at IS NULL)
+              OR EXISTS (SELECT 1 FROM registration r WHERE r.member_person_id = p.id AND r.status <> 'REJECTED')
+              OR EXISTS (SELECT 1 FROM ${guestLink} gl WHERE gl.guest_person_id = p.id AND gl.status = 'ACTIVE'))
+    ) AS found
+  `);
+  return Boolean(result.rows[0]?.found);
+}
+
+/**
+ * Cortesia feita na hora, na portaria (cadastro rápido): alguém que a organização
+ * mandou entrar e não estava em lista nenhuma. É a mesma cortesia do painel (voucher
+ * próprio, com ou sem kit do estoque dos colaboradores), com a permissão "Cortesia
+ * na portaria". Sem CPF, um nome que já está na festa é barrado: quase sempre é a
+ * mesma pessoa, e a busca da portaria acha. Com CPF, vale o CPF.
+ */
+export async function createCourtesyAtGate(actor: Actor, raw: GateCourtesyInput) {
+  assertPermission(actor, "createCourtesyAtGate");
+  const input: EmployeeFields = { ...gateCourtesySchema.parse(raw), category: "COURTESY" };
+  try {
+    return await withTx(async (tx) => {
+      if (!input.cpf && (await nameAlreadyAtParty(tx, input.fullName))) {
+        throw new DomainError("CONFLICT", "Já tem alguém com este nome na festa: busque pelo nome na portaria. Se for outra pessoa, informe o CPF.", {
+          fullName: "Este nome já está na festa",
+        });
+      }
+      const created = await insertEmployee(tx, actor, input);
+      await writeAudit(tx, actor, {
+        action: "EMPLOYEE_ADDED",
+        entityType: "employee",
+        entityId: created.employeeId,
+        summary:
+          `${input.fullName} liberado(a) na portaria como cortesia${input.jobTitle ? ` (${input.jobTitle})` : ""}` +
+          (input.withKit ? "." : ", sem kit de consumação."),
+        after: {
+          personId: created.personId,
+          cpf: input.cpf ? maskCpf(input.cpf) : "não informado",
+          jobTitle: input.jobTitle,
+          category: EMPLOYEE_CATEGORY_LABEL.COURTESY,
+          withKit: input.withKit,
+          isMinor: input.isMinor,
+          origin: "portaria",
+          restored: created.restored,
+        },
+      });
+      return { employeeId: created.employeeId, personId: created.personId, restored: created.restored };
     });
   } catch (error) {
     mapEmployeeError(error);

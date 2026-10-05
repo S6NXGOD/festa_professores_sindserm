@@ -79,7 +79,7 @@ function SectorField({ error, register }: { error?: string; register: React.Inpu
 const INVITER_SUGGESTIONS = ["Diretoria", "Presidência", "Vice-presidência", "Secretaria-geral", "Tesouraria", "Funcionários", "Prestadores de serviço"];
 
 /** Cortesia: quem convidou (aparece no voucher e agrupa a lista). */
-function InviterField({
+export function InviterField({
   id,
   error,
   register,
@@ -108,7 +108,7 @@ function InviterField({
 }
 
 /** O que cada cortesia ganha. */
-function CourtesyRightsNote({ withKit = true }: { withKit?: boolean }) {
+export function CourtesyRightsNote({ withKit = true }: { withKit?: boolean }) {
   return (
     <p className="flex items-start gap-2.5 rounded-xl border border-[#ff4fb4]/45 bg-[#ff4fb4]/10 p-3 text-sm text-fg">
       <Heart className="mt-0.5 size-4 shrink-0 text-[#ff8fd0]" />
@@ -128,7 +128,7 @@ function CourtesyRightsNote({ withKit = true }: { withKit?: boolean }) {
 }
 
 /** Cortesia com ou sem kit de consumação (ex.: quem vem só para a festa). */
-function KitChoice({ value, onChange }: { value: boolean; onChange: (withKit: boolean) => void }) {
+export function KitChoice({ value, onChange }: { value: boolean; onChange: (withKit: boolean) => void }) {
   const options = [
     { withKit: true, label: "Com kit", hint: "Entrada + 1 kit de consumação", icon: Gift },
     { withKit: false, label: "Sem kit", hint: "Só a entrada", icon: Login },
@@ -612,7 +612,7 @@ export function BulkEmployeesDialog({ courtesy = false, inviters = [] }: { court
 }
 
 /** "Menor de 18 anos": a portaria vê o aviso na hora de liberar a entrada. */
-function MinorCheckbox({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
+export function MinorCheckbox({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
   return (
     <label className="flex items-center gap-3 text-sm font-semibold text-fg">
       <Checkbox checked={checked} onCheckedChange={(v) => onChange(v === true)} data-testid="courtesy-minor" />

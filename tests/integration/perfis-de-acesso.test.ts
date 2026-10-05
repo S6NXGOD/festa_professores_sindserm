@@ -108,6 +108,7 @@ describe("perfis-modelo = regras de antes", () => {
     const reduced: AccessMap = {
       modules: { ...ROLE_PRESETS.ADMIN.modules, usuarios: "none", configuracoes: "none", correcoes: "none" },
       fullCpf: false,
+      gateCourtesy: false,
     };
     expect(isAccessFixed("ADMIN")).toBe(true);
     expect(storedAccess("ADMIN", reduced)).toBeNull();
@@ -294,6 +295,7 @@ describe("usuários: permissões, trava do último administrador e senha provis�
     const reduced: AccessMap = {
       modules: { ...ROLE_PRESETS.ADMIN.modules, usuarios: "none", configuracoes: "none", correcoes: "none" },
       fullCpf: false,
+      gateCourtesy: false,
     };
     const novo = await createStaffUser(admin, {
       name: "Rodrigo Carneiro Admin",

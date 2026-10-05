@@ -31,7 +31,7 @@ function visibleLabels(access: AccessMap) {
 function onlyModule(area: (typeof ACCESS_MODULES)[number]): AccessMap {
   const levels = MODULE_INFO[area].levels;
   const modules = Object.fromEntries(ACCESS_MODULES.map((m) => [m, m === area ? levels[levels.length - 1] : "none"]));
-  return { modules: modules as AccessMap["modules"], fullCpf: false };
+  return { modules: modules as AccessMap["modules"], fullCpf: false, gateCourtesy: false };
 }
 
 describe("menu do painel", () => {

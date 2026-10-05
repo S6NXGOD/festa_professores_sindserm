@@ -1275,6 +1275,74 @@ test.describe.serial("festa das professoras e professores", () => {
     await context.close();
   });
 
+  test("portaria: o(a) responsável cadastra cortesia na hora; sem a opção, ela não aparece", async ({ browser }) => {
+    test.setTimeout(150_000);
+    const NAME = "Bento Cortesia Porta";
+
+    await test.step("Segurança sem a opção: nada de cortesia (nem na tela, nem pelo endereço)", async () => {
+      const context = await browser.newContext({ ...devices["Pixel 7"] });
+      const page = await context.newPage();
+      await login(page, SECURITY);
+      await page.goto("/portaria");
+      await expect(page.getByTestId("open-quick-courtesy")).toHaveCount(0);
+      await page.getByTestId("gate-search-input").fill(NAME);
+      await expect(page.getByText("Ninguém encontrado")).toBeVisible();
+      await expect(page.getByTestId("gate-quick-courtesy")).toHaveCount(0);
+      await page.goto("/portaria/cortesia");
+      await expect(page).not.toHaveURL(/\/portaria\/cortesia/);
+      await context.close();
+    });
+
+    await test.step("o administrador liga a Cortesia na portaria para a pessoa responsável", async () => {
+      const context = await browser.newContext();
+      const admin = await context.newPage();
+      await login(admin, ADMIN);
+      await admin.goto("/painel/usuarios");
+      await admin.getByTestId(`edit-user-${SECURITY.email}`).click();
+      const option = admin.getByTestId("access-editor").getByTestId("access-gateCourtesy");
+      await expect(option).toHaveAttribute("aria-checked", "false");
+      await option.click();
+      await expect(option).toHaveAttribute("aria-checked", "true");
+      await admin.getByTestId("edit-user-submit").click();
+      await expect(admin.getByTestId("user-row").filter({ hasText: SECURITY.email })).toContainText("Permissões ajustadas");
+      // Quem pode os dois cadastros rápidos troca pelas abas.
+      await admin.goto("/portaria/cadastro");
+      await admin.getByTestId("quick-mode-courtesy").click();
+      await expect(admin).toHaveURL(/\/portaria\/cortesia$/);
+      await expect(admin.getByTestId("quick-courtesy")).toBeVisible();
+      await context.close();
+    });
+
+    await test.step("na porta: não achou, entra como cortesia, abre na pessoa e confirma a entrada", async () => {
+      const context = await browser.newContext({ ...devices["Pixel 7"] });
+      const page = await context.newPage();
+      await login(page, SECURITY);
+      await page.goto("/portaria");
+      await page.getByTestId("gate-search-input").fill(NAME);
+      await expect(page.getByText("Ninguém encontrado")).toBeVisible();
+      await page.getByTestId("gate-quick-courtesy").click();
+      await expect(page).toHaveURL(/\/portaria\/cortesia\?nome=Bento/);
+      await expect(page.getByTestId("gate-courtesy-name")).toHaveValue(NAME);
+      await page.getByTestId("gate-courtesy-inviter").fill("Presidência");
+      await page.getByTestId("courtesy-without-kit").click();
+      await page.getByTestId("gate-courtesy-submit").click();
+
+      await expect(page).toHaveURL(/\/portaria\/pessoa\/[0-9a-f-]{36}$/);
+      await expect(page.getByTestId("gate-person-name")).toHaveText(NAME);
+      await expect(page.getByTestId("gate-person-role")).toContainText("Cortesia do SINDSERM · Convite: Presidência");
+      await expect(page.getByTestId("gate-status-title")).toHaveText("LIBERADO PARA ENTRADA");
+      await page.getByTestId("confirm-entry").click();
+      await confirmEarlyEntry(page);
+      await expect(page.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
+
+      // A mesma pessoa de novo (sem CPF): o sistema avisa em vez de duplicar.
+      await page.goto(`/portaria/cortesia?nome=${encodeURIComponent(NAME)}`);
+      await page.getByTestId("gate-courtesy-submit").click();
+      await expect(page.getByText("Este nome já está na festa", { exact: true })).toBeVisible();
+      await context.close();
+    });
+  });
+
   test("ficha pelo gov.br: a pessoa baixa e assina antes da festa; a equipe anexa o PDF e efetiva", async ({ browser }) => {
     test.setTimeout(240_000);
     const GOV = { name: "Carolina Assina Gov", cpf: "71460283562", registration: "GOVBR-2026" };

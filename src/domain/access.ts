@@ -28,6 +28,11 @@ export interface AccessMap {
   modules: Record<AccessModule, AccessLevel>;
   /** CPF completo nas buscas e telas (sem isto, aparece mascarado). */
   fullCpf: boolean;
+  /**
+   * Cadastrar cortesia na portaria (cadastro rápido), para o(a) responsável pela porta.
+   * Quem edita Colaboradores e cortesias já pode, sem precisar disto.
+   */
+  gateCourtesy: boolean;
 }
 
 export const ACCESS_GROUPS = [
@@ -98,7 +103,7 @@ function topLevel(module: AccessModule): AccessLevel {
 
 /** Os perfis de partida: reproduzem exatamente as regras que valiam antes da personalização. */
 export const ROLE_PRESETS: Record<StaffRole, AccessMap> = {
-  ADMIN: { modules: allModules(topLevel), fullCpf: true },
+  ADMIN: { modules: allModules(topLevel), fullCpf: true, gateCourtesy: true },
   ATTENDANT: {
     modules: {
       placar: "view",
@@ -114,8 +119,9 @@ export const ROLE_PRESETS: Record<StaffRole, AccessMap> = {
       configuracoes: "none",
     },
     fullCpf: true,
+    gateCourtesy: false,
   },
-  SECURITY: { modules: allModules((module) => (module === "portaria" ? "edit" : "none")), fullCpf: false },
+  SECURITY: { modules: allModules((module) => (module === "portaria" ? "edit" : "none")), fullCpf: false, gateCourtesy: false },
 };
 
 const RANK: Record<AccessLevel, number> = { none: 0, view: 1, edit: 2 };
@@ -159,6 +165,9 @@ export const PERMISSION_RULES = {
   // Colaboradores do SINDSERM
   viewEmployees: (a: AccessMap) => atLeast(a.modules.colaboradores, "view"),
   manageEmployees: (a: AccessMap) => atLeast(a.modules.colaboradores, "edit"),
+  // Cortesia feita na hora, na portaria (por quem cuida da porta ou de colaboradores e cortesias)
+  createCourtesyAtGate: (a: AccessMap) =>
+    atLeast(a.modules.portaria, "view") && (a.gateCourtesy || atLeast(a.modules.colaboradores, "edit")),
   // Administração
   manageUsers: (a: AccessMap) => atLeast(a.modules.usuarios, "edit"),
   viewAudit: (a: AccessMap) => atLeast(a.modules.auditoria, "view"),
@@ -175,16 +184,18 @@ export function can(access: AccessMap | null | undefined, permission: Permission
 }
 
 /** Mantém só os níveis que cada área aceita (dados de fora não ganham acesso a mais). */
-export function sanitizeAccess(input: { modules?: Partial<Record<string, unknown>>; fullCpf?: unknown }): AccessMap {
+export function sanitizeAccess(input: { modules?: Partial<Record<string, unknown>>; fullCpf?: unknown; gateCourtesy?: unknown }): AccessMap {
   const modules = allModules((module) => {
     const value = input.modules?.[module];
     return typeof value === "string" && (MODULE_INFO[module].levels as readonly string[]).includes(value) ? (value as AccessLevel) : "none";
   });
-  return { modules, fullCpf: input.fullCpf === true };
+  return { modules, fullCpf: input.fullCpf === true, gateCourtesy: input.gateCourtesy === true };
 }
 
 export function sameAccess(a: AccessMap, b: AccessMap): boolean {
-  return a.fullCpf === b.fullCpf && ACCESS_MODULES.every((module) => a.modules[module] === b.modules[module]);
+  return (
+    a.fullCpf === b.fullCpf && a.gateCourtesy === b.gateCourtesy && ACCESS_MODULES.every((module) => a.modules[module] === b.modules[module])
+  );
 }
 
 /**
@@ -202,7 +213,9 @@ export function resolveAccess(role: StaffRole, stored: string | null | undefined
   if (isAccessFixed(role)) return ROLE_PRESETS[role];
   if (stored) {
     try {
-      const parsed = JSON.parse(stored) as { modules?: Record<string, unknown>; fullCpf?: unknown };
+      const parsed = JSON.parse(stored) as { modules?: Record<string, unknown>; fullCpf?: unknown; gateCourtesy?: unknown };
+      // Opção criada depois do ajuste (ex.: Cortesia na portaria): vale o padrão do perfil.
+      if (!("gateCourtesy" in parsed)) parsed.gateCourtesy = ROLE_PRESETS[role].gateCourtesy;
       const saved = parsed.modules ?? {};
       // Área criada depois do ajuste (ex.: Entradas): vale o padrão do perfil até alguém mexer nela.
       const modules: Record<string, unknown> = { ...ROLE_PRESETS[role].modules, ...saved };

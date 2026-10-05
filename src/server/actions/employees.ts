@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { BulkEmployeesInput, CompanionInput, EmployeeInput, UpdateEmployeeInput } from "@/domain/schemas";
+import type { BulkEmployeesInput, CompanionInput, EmployeeInput, GateCourtesyInput, UpdateEmployeeInput } from "@/domain/schemas";
 import type { ActionResult } from "@/lib/action-result";
 import {
   addCompanion,
+  createCourtesyAtGate,
   createEmployee,
   createEmployeesFromList,
   removeEmployee,
@@ -27,6 +28,17 @@ export async function createEmployeeAction(
     const created = await createEmployee(actor, input);
     refresh();
     return { employeeId: created.employeeId, personId: created.personId, restored: created.restored, guestName: created.guest?.name ?? null };
+  });
+}
+
+/** Cortesia feita na hora, na portaria: depois de gravar, a tela da pessoa abre para confirmar a entrada. */
+export async function createCourtesyAtGateAction(input: GateCourtesyInput): Promise<ActionResult<{ personId: string; restored: boolean }>> {
+  return runAction(async () => {
+    const actor = await requireActionActor();
+    // Vindo do formulário: só true conta como true (nada de "sim" virar kit).
+    const created = await createCourtesyAtGate(actor, { ...input, withKit: input.withKit !== false, isMinor: input.isMinor === true });
+    refresh();
+    return { personId: created.personId, restored: created.restored };
   });
 }
 
