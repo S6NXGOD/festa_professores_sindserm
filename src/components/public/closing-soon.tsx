@@ -1,5 +1,6 @@
 "use client";
 
+import { useHelpLink } from "@/components/help/help";
 import { Clock } from "@/components/icons/pixel";
 import { useNowSeconds } from "@/lib/clock";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
  */
 export function ClosingSoon({ closesAt, label }: { closesAt: string | Date; label: string }) {
   const now = useNowSeconds();
+  const help = useHelpLink("tirar uma dúvida sobre a inscrição (as inscrições já encerraram)");
   if (now === null) return null;
   const remaining = Math.floor(new Date(closesAt).getTime() / 1000) - now;
   if (remaining > SHOW_FROM_SECONDS) return null;
@@ -36,7 +38,18 @@ export function ClosingSoon({ closesAt, label }: { closesAt: string | Date; labe
       <p className="min-w-0 flex-1 text-sm leading-snug text-fg">
         {closed ? (
           <>
-            <strong>As inscrições encerraram às {label}.</strong> Um envio agora não é mais aceito.
+            <strong>As inscrições encerraram às {label}.</strong> Um envio agora não é mais aceito. Ficou com dúvida? Fale com o
+            administrativo do SINDSERM
+            {help ? (
+              <>
+                {" "}
+                pelo{" "}
+                <a href={help.href} target="_blank" rel="noopener noreferrer" className="font-bold underline underline-offset-4">
+                  WhatsApp {help.phoneLabel}
+                </a>
+              </>
+            ) : null}
+            .
           </>
         ) : (
           <>

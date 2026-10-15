@@ -53,6 +53,14 @@ describe("formulário público", () => {
       .set({ registrationOpensAt: new Date(Date.now() + 86_400_000), registrationClosesAt: new Date(Date.now() + 2 * 86_400_000) })
       .where(eq(eventConfig.id, 1));
     await expectDomainError(createRegistration(PUBLIC_ACTOR, registrationInput()), "REGISTRATION_CLOSED");
+    // Depois do horário: diz quando fechou e com quem falar.
+    await db
+      .update(eventConfig)
+      .set({ registrationOpensAt: new Date(Date.now() - 2 * 86_400_000), registrationClosesAt: new Date(Date.now() - 60_000) })
+      .where(eq(eventConfig.id, 1));
+    const closed = await expectDomainError(createRegistration(PUBLIC_ACTOR, registrationInput()), "REGISTRATION_CLOSED");
+    expect(closed.message).toMatch(/^As inscrições encerraram em \d{2}\/\d{2}\/\d{4}/);
+    expect(closed.message).toContain("Fale com o administrativo do SINDSERM");
     // O atendimento cadastra na hora mesmo fora do período.
     const staff = await createRegistration(attendant, registrationInput({ guest: true }));
     expect(staff.registrationId).toBeTruthy();

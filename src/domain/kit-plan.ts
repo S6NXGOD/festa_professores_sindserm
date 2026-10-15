@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { toSearchText } from "@/lib/text";
 
 /*
  * Montagem dos kits: o que vem em cada tipo de kit (itens e quantidades, com
@@ -161,6 +162,58 @@ export function kitPlanTotals(plan: KitPlan, counts: KitCounts): KitPlanTotals {
     totalCents: kinds.reduce((sum, kind) => sum + kind.subtotalCents, 0),
     missingPrice,
   };
+}
+
+/** Palavras de bebida alcoólica (sem acento, minúsculas): o kit de menor de 18 deve ficar sem elas. */
+const ALCOHOL_WORDS = new Set([
+  "cerveja",
+  "chop",
+  "chope",
+  "chopp",
+  "vinho",
+  "vodka",
+  "whisky",
+  "uisque",
+  "cachaca",
+  "caipirinha",
+  "caipiroska",
+  "caipifruta",
+  "drink",
+  "gin",
+  "rum",
+  "tequila",
+  "licor",
+  "espumante",
+  "batida",
+]);
+
+/** O nome tem bebida alcoólica? Palavra por palavra ("Arrumadinho" não é rum). */
+function isAlcohol(name: string): boolean {
+  return toSearchText(name)
+    .split(/[^a-z]+/)
+    .some((word) => ALCOHOL_WORDS.has(word) || ALCOHOL_WORDS.has(word.replace(/e?s$/, "")));
+}
+
+/** Itens com bebida alcoólica usados em algum kit (para sugerir o kit de menor de 18). */
+export function alcoholItems(plan: KitPlan): string[] {
+  const used = new Set(KIT_KINDS.flatMap((kind) => linesFor(plan, kind).map((line) => line.itemId)));
+  return plan.items.filter((item) => used.has(item.id) && isAlcohol(item.name)).map((item) => item.name);
+}
+
+/** Tipos de kit com o mesmo conteúdo, juntos: um tíquete para cada kit diferente. */
+export function kitGroups(plan: KitPlan): { kinds: KitKind[]; lines: KitLine[] }[] {
+  const groups: { key: string; kinds: KitKind[]; lines: KitLine[] }[] = [];
+  for (const kind of KIT_KINDS) {
+    const lines = linesFor(plan, kind);
+    const key = lines
+      .map((line) => `${line.itemId}:${line.quantity}`)
+      .sort()
+      .join("|");
+    const group = groups.find((candidate) => candidate.key === key);
+    if (group) group.kinds.push(kind);
+    else groups.push({ key, kinds: [kind], lines });
+  }
+  return groups.map(({ kinds, lines }) => ({ kinds, lines }));
 }
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });

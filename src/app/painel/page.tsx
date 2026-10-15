@@ -35,10 +35,20 @@ import { defaultShareMessage, shareSummary } from "@/server/queries/share";
 import { publicBaseUrl } from "@/server/public-url";
 import { listAffiliationForms, listVerificationQueue, recentCheckIns } from "@/server/queries/panel";
 import { getCheckInTimeline, getDashboardStats } from "@/server/services/stats";
+import { stockBalance } from "@/domain/kit-comparison";
+import type { StockMode, StockPool } from "@/domain/types";
 import { can } from "@/domain/rules";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Placar" };
+
+/** "no estoque geral", "no dos colaboradores": onde falta ou sobra kit. */
+function poolPlace(pool: StockPool, mode: StockMode) {
+  if (pool === "ALL") return mode === "UNIFIED" ? "no estoque único" : "no estoque geral";
+  if (pool === "MEMBER") return "no estoque de professor(a)";
+  if (pool === "GUEST") return "no estoque de convidado";
+  return "no estoque dos colaboradores";
+}
 
 export default async function DashboardPage() {
   const actor = await requirePageActor("viewDashboard");
@@ -92,6 +102,13 @@ export default async function DashboardPage() {
     .filter(Boolean)
     .join(" · ");
   const canSettings = can(actor.access, "manageSettings");
+  // A conta dos kits (cadastrados − previstos): falta antes da festa vira aviso aqui, com o atalho para a conta.
+  const balances = stock ? stockBalance(stock.pools.map((pool) => ({ pool: pool.pool, total: pool.total })), stats.kitDemand, stock.mode) : [];
+  const shortPools = balances.filter((balance) => balance.balance < 0);
+  const plannedKits = stats.kitDemand.member + stats.kitDemand.guest + stats.kitDemand.employee;
+  const stockTotal = balances.reduce((sum, balance) => sum + balance.total, 0);
+  const unifyHelps = stock?.mode !== "UNIFIED" && shortPools.length > 0 && stockTotal >= plannedKits;
+  const kitQueue = stats.kitWaitlist.member + stats.kitWaitlist.guest;
   // As duas filas do Atendimento, na ordem em que a recepção costuma resolver.
   const queue = [
     ...drafts.rows.map((row) => ({
@@ -170,6 +187,32 @@ export default async function DashboardPage() {
               .map(stockAlertText)
               .join(" · ")}
           </p>
+        </div>
+      ) : null}
+
+      {shortPools.length > 0 && stock ? (
+        <div
+          className="flex flex-col gap-3 rounded-xl border border-warning/55 bg-warning-soft p-4 text-sm text-fg sm:flex-row sm:items-start"
+          data-testid="dashboard-kit-shortage"
+        >
+          <p className="flex min-w-0 flex-1 items-start gap-3">
+            <Warning className="mt-0.5 size-5 shrink-0 text-warning" />
+            <span className="min-w-0">
+            <strong>
+              Faltam{" "}
+              {shortPools.map((balance) => `${(-balance.balance).toLocaleString("pt-BR")} kits ${poolPlace(balance.pool, stock.mode)}`).join(" e ")}
+            </strong>{" "}
+            para os kits previstos.{" "}
+            {unifyHelps
+              ? `Somando os estoques, sobram ${(stockTotal - plannedKits).toLocaleString("pt-BR")}: juntando, todo mundo tem kit.`
+              : "Quem se inscrever agora entra na fila do kit."}
+            </span>
+          </p>
+          {canKits ? (
+            <Button asChild variant="outline" size="sm" className="w-full shrink-0 sm:w-auto">
+              <Link href="/painel/kits#conta">Ver a conta dos kits</Link>
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
@@ -285,7 +328,7 @@ export default async function DashboardPage() {
           <div
             className={cn(
               "col-span-2 flex items-center justify-between gap-3 rounded-xl border bg-surface p-4",
-              event?.kitDeadline?.passed ? "border-danger/50" : "border-line",
+              event?.kitDeadline?.passed ? "border-warning/50" : "border-line",
             )}
             data-testid="kit-deadline-card"
           >
@@ -301,6 +344,11 @@ export default async function DashboardPage() {
               {event?.kitDeadline?.passed ? (
                 <p className="mt-0.5 text-xs text-fg-muted">
                   Quem entra agora leva o kit enquanto houver, inclusive quem estava na fila do kit.
+                </p>
+              ) : kitQueue > 0 ? (
+                <p className="mt-0.5 text-xs text-fg-muted" data-testid="dashboard-kit-queue">
+                  <strong className="text-warning">{kitQueue === 1 ? "1 kit na fila" : `${kitQueue} kits na fila`}</strong>: saem se vagar
+                  {event?.kitDeadline ? ` ou, depois das ${event.kitDeadline.label}, se sobrar` : ""}.
                 </p>
               ) : null}
             </div>

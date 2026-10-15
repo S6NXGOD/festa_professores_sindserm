@@ -2,7 +2,9 @@ import "server-only";
 import { eq, inArray, sql } from "drizzle-orm";
 import type { Executor, Tx } from "@/server/db";
 import { eventConfig, kitStock, registration } from "@/server/db/schema";
+import { isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
 import type { KitSupply } from "@/domain/kit-supply";
+import { formatTime } from "@/lib/datetime";
 import { stockPoolFor } from "@/domain/rules";
 import type { GroupKitType, StockMode, StockPool } from "@/domain/types";
 import { type Actor, assertPermission } from "./actor";
@@ -31,9 +33,18 @@ function groupPools(mode: StockMode): GroupPool[] {
   return mode === "SPLIT" ? ["MEMBER", "GUEST"] : ["ALL"];
 }
 
-/** Modo do estoque (único ou separado); nulo antes da configuração da festa. */
-async function getEventConfig(ex: Executor): Promise<{ stockMode: StockMode } | null> {
-  const [row] = await ex.select({ stockMode: eventConfig.stockMode }).from(eventConfig).where(eq(eventConfig.id, 1)).limit(1);
+/** Modo do estoque (único ou separado) e o horário dos kits guardados; nulo antes da configuração da festa. */
+async function getEventConfig(ex: Executor) {
+  const [row] = await ex
+    .select({
+      stockMode: eventConfig.stockMode,
+      eventDate: eventConfig.eventDate,
+      startTime: eventConfig.startTime,
+      kitDeadlineTime: eventConfig.kitDeadlineTime,
+    })
+    .from(eventConfig)
+    .where(eq(eventConfig.id, 1))
+    .limit(1);
   return row ?? null;
 }
 
@@ -128,11 +139,13 @@ export async function getKitSupply(ex: Executor): Promise<KitSupply | null> {
     const balance = balanceOf(kitType);
     return !balance || balance.total <= 0 ? null : Math.max(0, balance.free - balance.waitlist);
   };
+  const deadline = kitDeadlineAt(config);
   return {
     shared: config.stockMode !== "SPLIT",
     member: open("MEMBER"),
     guest: open("GUEST"),
     queue: { member: balanceOf("MEMBER")?.waitlist ?? 0, guest: balanceOf("GUEST")?.waitlist ?? 0 },
+    reservedUntil: deadline ? { label: formatTime(deadline), passed: isKitDeadlinePassed(config) } : null,
   };
 }
 

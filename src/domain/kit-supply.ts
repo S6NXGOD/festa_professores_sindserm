@@ -12,6 +12,8 @@ export interface KitSupply {
   guest: number | null;
   /** Quantos já esperam na fila de cada kit (no estoque único, a mesma fila). */
   queue: { member: number; guest: number };
+  /** Kits guardados até este horário; depois, as sobras saem por ordem de chegada (null = sem horário). */
+  reservedUntil?: { label: string; passed: boolean } | null;
 }
 
 export type KitOutcome = "KIT" | "WAITLIST";

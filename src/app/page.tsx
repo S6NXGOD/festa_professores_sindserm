@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FestaEmblem } from "@/components/brand/brand";
+import { AdminHelp } from "@/components/help/help";
 import {
   ArrowRight,
   Calendar,
@@ -176,6 +177,11 @@ export default async function HomePage() {
               </Button>
             )}
           </Reveal>
+          {window.state === "CLOSED" ? (
+            <Reveal delay={0.21} className="mt-4 max-w-md">
+              <AdminHelp topic="tirar uma dúvida sobre a inscrição (as inscrições já encerraram)" />
+            </Reveal>
+          ) : null}
           <Reveal delay={0.22} className="mt-4">
             <Link
               href="/vouchers"

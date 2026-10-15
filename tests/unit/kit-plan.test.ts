@@ -4,7 +4,17 @@
  */
 import { describe, expect, it } from "vitest";
 import { kitOutlook, kitsSoldOut } from "@/domain/kit-supply";
-import { formatCents, type KitCounts, type KitPlan, kitPlanSchema, kitPlanTotals, parsePrice, shoppingListText } from "@/domain/kit-plan";
+import {
+  alcoholItems,
+  formatCents,
+  type KitCounts,
+  kitGroups,
+  type KitPlan,
+  kitPlanSchema,
+  kitPlanTotals,
+  parsePrice,
+  shoppingListText,
+} from "@/domain/kit-plan";
 
 const counts = (kits: Partial<KitCounts["kits"]>, minors: Partial<KitCounts["minors"]> = {}): KitCounts => ({
   kits: { MEMBER: 0, GUEST: 0, EMPLOYEE: 0, EMPLOYEE_GUEST: 0, COURTESY: 0, ...kits },
@@ -34,6 +44,31 @@ const plan: KitPlan = {
     { itemId: "espeto", quantity: 1 },
   ],
 };
+
+describe("como os kits aparecem na montagem", () => {
+  it("um tíquete para cada kit diferente: os iguais ao da professora e do professor ficam juntos", () => {
+    expect(kitGroups(plan).map((group) => group.kinds)).toEqual([["MEMBER", "GUEST", "EMPLOYEE_GUEST", "COURTESY"], ["EMPLOYEE"]]);
+    const allSame: KitPlan = { ...plan, kits: { ...plan.kits, EMPLOYEE: null } };
+    expect(kitGroups(allSame)).toHaveLength(1);
+  });
+
+  it("bebida alcoólica no kit pede o kit de menor de 18 (palavra inteira: Arrumadinho não é rum)", () => {
+    expect(alcoholItems(plan)).toEqual(["Cerveja"]);
+    const piaui: KitPlan = {
+      items: [
+        { id: "arrumadinho", name: "Arrumadinho", priceCents: null },
+        { id: "refri", name: "Refrigerante", priceCents: null },
+        { id: "chopp", name: "Chopps de vinho", priceCents: null },
+      ],
+      kits: { MEMBER: [{ itemId: "arrumadinho", quantity: 1 }, { itemId: "refri", quantity: 2 }], GUEST: null, EMPLOYEE: null, EMPLOYEE_GUEST: null, COURTESY: null },
+      minor: null,
+    };
+    expect(alcoholItems(piaui)).toEqual([]);
+    // Item cadastrado mas fora de todos os kits não conta.
+    const withChopp: KitPlan = { ...piaui, kits: { ...piaui.kits, MEMBER: [...piaui.kits.MEMBER, { itemId: "chopp", quantity: 1 }] } };
+    expect(alcoholItems(withChopp)).toEqual(["Chopps de vinho"]);
+  });
+});
 
 describe("preço digitado", () => {
   it("aceita vírgula, ponto, milhar e R$; vazio é sem preço; texto estranho é inválido", () => {

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     if (actor.kind === "public") {
       await enforceRateLimit(RATE_LIMITS.documentUpload, await clientIp());
       if (registrationWindow(await getConfig()).state !== "OPEN") {
-        throw new DomainError("VALIDATION", "As inscrições não estão abertas no momento.");
+        throw new DomainError("VALIDATION", "As inscrições não estão abertas no momento. Ficou com dúvida? Fale com o administrativo do SINDSERM.");
       }
     }
     const length = Number(request.headers.get("content-length") ?? 0);

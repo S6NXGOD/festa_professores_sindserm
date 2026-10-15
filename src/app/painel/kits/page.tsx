@@ -73,6 +73,9 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
         mode={stock?.mode}
         summary={summary}
         links={{ registrations: can(actor.access, "viewRegistrations"), employees: can(actor.access, "viewEmployees") }}
+        waitlist={stats.kitWaitlist.member + stats.kitWaitlist.guest}
+        threshold={stock?.threshold ?? 0}
+        canUnify={can(actor.access, "manageSettings")}
       />
       <KitWaitlistPanel queue={queue} shared={supply?.shared ?? true} canPeople={canPeople} canAdvance={can(actor.access, "deliverKits")} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { CountUp } from "@/components/count-up";
-import { Building, Copy, Heart, Human, Login, type PixelIcon, Teach, Users, Warning, Whatsapp } from "@/components/icons/pixel";
+import { Building, Copy, Heart, Human, Login, type PixelIcon, Teach, Users, Whatsapp } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import {
   GROUPS_WITHOUT_KIT,
@@ -14,8 +14,6 @@ import {
   type PeopleGroupRow,
   type PeopleKitComparison,
   peopleGroupDetail,
-  POOL_SHORT_LABEL,
-  stockBalance,
   sumRows,
   toDeliver,
   visibleRows,
@@ -25,6 +23,7 @@ import { copyText } from "@/lib/clipboard";
 import { plural } from "@/lib/plural";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { StockMath } from "./stock-math";
 
 /** Cor e ícone de cada grupo (as mesmas cores da portaria e dos vouchers). */
 const GROUP_STYLE: Record<PeopleGroupId, { icon: PixelIcon; badge: string }> = {
@@ -51,6 +50,9 @@ export function PeopleKits({
   mode,
   summary,
   links,
+  waitlist = 0,
+  threshold = 0,
+  canUnify = false,
 }: {
   comparison: PeopleKitComparison;
   /** Estoque cadastrado de cada tipo (para comparar com a previsão). */
@@ -61,18 +63,18 @@ export function PeopleKits({
   summary: string;
   /** Linhas viram links só para quem pode abrir a lista de destino. */
   links: { registrations: boolean; employees: boolean };
+  /** Kits na fila do kit (fora da previsão). */
+  waitlist?: number;
+  /** Limite de alerta do estoque (mantido ao juntar os estoques). */
+  threshold?: number;
+  /** Pode juntar os estoques com um toque. */
+  canUnify?: boolean;
 }) {
   const registrations = visibleRows(comparison.registrations);
   const house = visibleRows(comparison.house);
   const totals = sumRows([...comparison.registrations, ...comparison.house]);
   const demand = kitDemandOf(comparison);
   const planned = demand.member + demand.guest + demand.employee;
-  const balances = stockBalance(pools, demand, mode);
-  const stockTotal = pools.reduce((sum, pool) => sum + pool.total, 0);
-  const short = balances.filter((b) => b.balance < 0);
-  // Falta num estoque e sobra em outro: somando, dá para todos (o estoque único para todos resolve).
-  const unifiedBalance = stockTotal - planned;
-  const unifyHelps = mode !== "UNIFIED" && short.length > 0 && unifiedBalance >= 0;
   const hrefFor = (id: PeopleGroupId) =>
     id === "TEACHERS" || id === "TEACHER_GUESTS" || id === "OTHER_MEMBERS"
       ? links.registrations
@@ -114,8 +116,8 @@ export function PeopleKits({
         </div>
       </header>
 
-      {/* Placar do comparativo: quem vem, quantos kits isso dá e o estoque cadastrado. */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      {/* Quem vem e quantos kits isso dá; embaixo, a conta com o estoque cadastrado. */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <Headline label="Pessoas" value={totals.people} note="esperadas na festa" testId="people-total" />
         <Headline
           label="Kits previstos"
@@ -123,34 +125,10 @@ export function PeopleKits({
           note={totals.pending ? `${totals.withKit} garantidos + ${totals.pending} a confirmar` : `${plural(totals.withKit, "garantido", "garantidos")}`}
           testId="people-planned"
         />
-        <Headline
-          label="Estoque total"
-          value={stockTotal}
-          note={
-            pools.length === 0 ? (
-              "Estoque não cadastrado"
-            ) : short.length ? (
-              <span className="font-bold text-warning">
-                Faltam {short.map((b) => `${-b.balance} ${POOL_SHORT_LABEL[b.pool]}`).join(" e ")}
-                {unifyHelps ? <span className="block font-semibold text-fg-muted">Somando tudo, sobram {unifiedBalance}</span> : null}
-              </span>
-            ) : (
-              <span className="font-bold text-success-text">Sobram {stockTotal - planned}</span>
-            )
-          }
-          alert={short.length > 0}
-          testId="people-stock"
-        />
       </div>
-      {unifyHelps ? (
-        <p className="mt-3 flex items-start gap-2 rounded-xl border border-warning/50 bg-warning-soft p-3 text-sm text-fg" data-testid="unify-hint">
-          <Warning className="mt-0.5 size-4 shrink-0 text-warning" />
-          <span>
-            Os estoques estão separados: falta kit em um e sobra no outro. Com <strong>um estoque só para todos</strong>, os {stockTotal} kits
-            atendem os {planned} previstos. Para juntar: Kits e estoque → <strong>Quantidades</strong> → “Um estoque só para todos”.
-          </span>
-        </p>
-      ) : null}
+      <div id="conta" className="mt-3 scroll-mt-24">
+        <StockMath pools={pools} demand={demand} mode={mode} waitlist={waitlist} threshold={threshold} canUnify={canUnify} />
+      </div>
 
       <div className="mt-5">
         <div className={cn("hidden border-b border-line pb-2 text-right md:grid", ROW_GRID)} aria-hidden>
@@ -214,25 +192,10 @@ export function PeopleKits({
   );
 }
 
-function Headline({
-  label,
-  value,
-  note,
-  alert = false,
-  testId,
-}: {
-  label: string;
-  value: number;
-  note: React.ReactNode;
-  alert?: boolean;
-  testId: string;
-}) {
+function Headline({ label, value, note, testId }: { label: string; value: number; note: React.ReactNode; testId: string }) {
   return (
-    <div className={cn("min-w-0 rounded-xl border bg-ink/60 p-3 sm:p-4", alert ? "border-warning/60 shadow-[0_0_24px_-14px_var(--color-warning)]" : "border-line")}>
-      <p className="flex items-center gap-1.5 text-[0.62rem] font-bold tracking-[0.1em] text-fg-muted uppercase">
-        {alert ? <Warning className="size-3.5 shrink-0 animate-blink text-warning" /> : null}
-        {label}
-      </p>
+    <div className="min-w-0 rounded-xl border border-line bg-ink/60 p-3 sm:p-4">
+      <p className="flex items-center gap-1.5 text-[0.62rem] font-bold tracking-[0.1em] text-fg-muted uppercase">{label}</p>
       <p className="display mt-1.5 text-[2.1rem] leading-none text-fg tabular sm:text-5xl" data-testid={testId}>
         <CountUp value={value} />
       </p>

@@ -11,7 +11,7 @@ import { kitOutlook } from "@/domain/kit-supply";
 import { ENTRY_KIT_MESSAGE } from "@/domain/labels";
 import { stockSettingsSchema } from "@/domain/schemas";
 import { db } from "@/server/db";
-import { auditLog, kitStock, registration } from "@/server/db/schema";
+import { auditLog, eventConfig, kitStock, registration } from "@/server/db/schema";
 import { PUBLIC_ACTOR, type StaffActor } from "@/server/services/actor";
 import { decideAffiliation } from "@/server/services/affiliation";
 import { createEmployee } from "@/server/services/employees";
@@ -62,6 +62,15 @@ async function stock(totalAll: number) {
 const waitlist = async (registrationId: string) => (await reload(registrationId)).kitWaitlist;
 
 describe("fila do kit: quem se inscreve quando os kits acabaram", () => {
+  it("o formulário sabe até quando os kits ficam guardados (e explica as sobras para quem entra na fila)", async () => {
+    const future = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
+    await configureEvent(admin, { totalAll: 3, lowStockThreshold: 0, eventDate: future, startTime: "19:00", kitDeadlineTime: "22:30" });
+    expect((await getKitSupply(db))?.reservedUntil).toEqual({ label: "22:30", passed: false });
+    // Sem horário: os kits ficam guardados a festa toda.
+    await db.update(eventConfig).set({ kitDeadlineTime: null }).where(eq(eventConfig.id, 1));
+    expect((await getKitSupply(db))?.reservedUntil).toBeNull();
+  });
+
   it("estoque único: os primeiros garantem o kit; quem vem depois entra na fila, na ordem", async () => {
     await configureEvent(admin, { totalAll: 3, lowStockThreshold: 0 });
     const ana = await registerMember({ memberName: "Ana Primeira Silva", guest: true });

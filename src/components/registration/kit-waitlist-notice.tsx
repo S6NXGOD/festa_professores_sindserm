@@ -6,6 +6,18 @@ import type { KitOutlook } from "@/domain/kit-supply";
 import { firstName } from "@/lib/text";
 import { ConsentBox } from "./wizard-parts";
 
+/** Um dos jeitos de o kit sair da fila (numerado, como as fases do jogo). */
+function WayOut({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <span className="pixel inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-warning text-[0.55rem] text-ink shadow-[0_2px_0_0_#a16207]">
+        {n}
+      </span>
+      <span className="min-w-0">{children}</span>
+    </li>
+  );
+}
+
 /** Faixa no começo da inscrição: os kits acabaram, mas a inscrição (e a festa) continuam. */
 export function KitsSoldOutBanner({
   staff = false,
@@ -35,7 +47,7 @@ export function KitsSoldOutBanner({
           : "Os kits de consumação já estão todos com quem se inscreveu antes. Você ainda pode se inscrever e vir à festa: o seu kit entra na fila e, se vagar, é seu (por ordem de inscrição)."}
       </p>
       {deadlineLabel ? (
-        <p className="relative mt-2 flex items-start gap-1.5 text-xs text-fg-muted">
+        <p className="relative mt-2 flex items-start gap-1.5 text-xs text-fg-muted" data-testid="kits-sold-out-leftovers">
           <Clock className="mt-px size-3.5 shrink-0 text-warning" />
           <span>
             Depois das {deadlineLabel}, os kits de quem não veio saem para quem entrar, por ordem de chegada (enquanto houver).
@@ -56,6 +68,7 @@ export function KitWaitlistNotice({
   guestName,
   lateMessage,
   consent,
+  reservedUntil = null,
 }: {
   outlook: KitOutlook;
   staff: boolean;
@@ -63,6 +76,8 @@ export function KitWaitlistNotice({
   /** Os kits acabaram enquanto a pessoa preenchia (resposta do servidor). */
   lateMessage?: string | null;
   consent?: { checked: boolean; onChange: (value: boolean) => void; error?: string };
+  /** Kits guardados até este horário: depois, as sobras saem por ordem de chegada. */
+  reservedUntil?: { label: string; passed: boolean } | null;
 }) {
   const guestFirst = guestName ? firstName(guestName) : "o convidado";
   const memberWaits = outlook.member === "WAITLIST";
@@ -72,6 +87,37 @@ export function KitWaitlistNotice({
   const { member: memberPosition, guest: guestPosition } = outlook.position;
   const places =
     memberPosition && guestPosition ? ` (lugares nº ${memberPosition} e ${guestPosition})` : memberPosition ? ` (nº ${memberPosition})` : "";
+  const after = reservedUntil && !reservedUntil.passed ? reservedUntil.label : null;
+  // "…e só sai se vagar ou se sobrar depois das 22:00" (o fim da frase da confirmação).
+  const unless = reservedUntil?.passed ? "só sai se sobrar kit na festa" : after ? `só sai se vagar ou se sobrar depois das ${after}` : "só sai se vagar ou se sobrar na festa";
+  // Os dois jeitos de o kit sair da fila.
+  const ways = (
+    <ol className="mt-2.5 grid gap-2" data-testid="kit-waitlist-ways">
+      {reservedUntil?.passed ? null : (
+        <WayOut n={1}>
+          <strong>Se vagar antes</strong> (alguém desistir ou o SINDSERM comprar mais): sai na recepção, por ordem de inscrição.{" "}
+          {staff ? "O voucher avisa." : "O seu voucher avisa."}
+        </WayOut>
+      )}
+      <WayOut n={reservedUntil?.passed ? 1 : 2}>
+        {reservedUntil?.passed ? (
+          <>
+            <strong>Sobras da festa:</strong> já passou das {reservedUntil.label}, então os kits que sobraram saem na entrada, por ordem
+            de chegada, enquanto houver.
+          </>
+        ) : after ? (
+          <>
+            <strong>Na festa, depois das {after}:</strong> os kits de quem não veio saem para quem entrar, por ordem de chegada, enquanto
+            houver. {staff ? "Se a pessoa já tiver entrado, é só procurar a recepção depois desse horário." : "Se você já tiver entrado, procure a recepção depois desse horário."}
+          </>
+        ) : (
+          <>
+            <strong>Se sobrar na festa</strong> kit de quem não veio, a organização pode entregar na recepção.
+          </>
+        )}
+      </WayOut>
+    </ol>
+  );
 
   return (
     <div className="space-y-3" data-testid="kit-waitlist-notice">
@@ -89,17 +135,22 @@ export function KitWaitlistNotice({
             <p className="pixel text-[0.5rem] text-warning">Fila do kit</p>
             {lateMessage ? <p className="mt-1 font-bold">{lateMessage}</p> : null}
             {memberWaits ? (
-              <p className="mt-1">
-                <strong>Os kits de consumação acabaram.</strong> {staff ? "A pessoa entra" : "Você entra"} na festa normalmente, e{" "}
-                {guestWaits ? `${ownKit} e o de ${guestFirst} entram` : `${ownKit} entra`} na fila do kit{places}. Se vagar kit (alguém
-                desistir ou o SINDSERM comprar mais), ele sai na recepção, por ordem de inscrição. Depois do horário dos kits guardados, as sobras saem
-                para quem entrar, por ordem de chegada.
-              </p>
+              <div className="mt-1">
+                <p>
+                  <strong>Os kits de consumação acabaram.</strong> {staff ? "A pessoa entra" : "Você entra"} na festa normalmente, e{" "}
+                  {guestWaits ? `${ownKit} e o de ${guestFirst} entram` : `${ownKit} entra`} na fila do kit{places}. O kit sai da fila de
+                  dois jeitos:
+                </p>
+                {ways}
+              </div>
             ) : guestWaits ? (
-              <p className="mt-1">
-                <strong>O último kit ficou com {you}!</strong> O de {guestFirst} entra na fila do kit
-                {guestPosition ? ` (nº ${guestPosition})` : ""}: se vagar, sai na recepção, por ordem de inscrição.
-              </p>
+              <div className="mt-1">
+                <p>
+                  <strong>O último kit ficou com {you}!</strong> O de {guestFirst} entra na fila do kit
+                  {guestPosition ? ` (nº ${guestPosition})` : ""} e sai de dois jeitos:
+                </p>
+                {ways}
+              </div>
             ) : (
               <p className="mt-1">Confirme para continuar: o kit entra na fila e só sai se vagar.</p>
             )}
@@ -112,10 +163,10 @@ export function KitWaitlistNotice({
       {consent ? (
         <ConsentBox id="kit-waitlist-consent" checked={consent.checked} onChange={consent.onChange} error={consent.error} testId="kit-waitlist-consent" icon={Gift}>
           {memberWaits && guestWaits
-            ? "Entendi: os nossos kits entram na fila do kit e só saem se vagar."
+            ? `Entendi: os nossos kits entram na fila do kit (cada um ${unless}).`
             : guestWaits && !memberWaits
-              ? `Entendi: o kit de ${guestFirst} entra na fila do kit e só sai se vagar.`
-              : "Entendi: o meu kit entra na fila do kit e só sai se vagar."}
+              ? `Entendi: o kit de ${guestFirst} entra na fila do kit e ${unless}.`
+              : `Entendi: o meu kit entra na fila do kit e ${unless}.`}
         </ConsentBox>
       ) : null}
     </div>

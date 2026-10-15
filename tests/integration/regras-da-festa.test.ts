@@ -135,21 +135,21 @@ describe("horário dos kits guardados", () => {
 
 describe("entrada só a partir do horário da festa", () => {
   it("antes do início, a portaria só registra com confirmação — e fica anotado", async () => {
-    await configureEvent(admin, { eventDate: "2026-10-15", startTime: "19:00" });
+    await configureEvent(admin, { eventDate: "2030-10-15", startTime: "19:00" });
     const host = await registerMember({ guest: true });
     await decideAffiliation(attendant, { registrationId: host.registrationId, decision: "CONFIRM" });
-    // 19h de 15/10 em São Paulo = 22h UTC.
-    const early = new Date("2026-10-15T21:59:00Z");
-    const onTime = new Date("2026-10-15T22:00:00Z");
+    // 19h de 15/10 em São Paulo = 22h UTC (festa no futuro: o teste não depende do relógio de hoje).
+    const early = new Date("2030-10-15T21:59:00Z");
+    const onTime = new Date("2030-10-15T22:00:00Z");
 
     const view = await loadGateView(db, host.state.member.id, ROLE_PRESETS.SECURITY);
-    expect(view?.eventStart).toMatchObject({ started: false, label: "15/10/2026, às 19h" });
+    expect(view?.eventStart).toMatchObject({ started: false, label: "15/10/2030, às 19h" });
 
     const blocked = await expectDomainError(
       registerCheckIn(security, { personId: host.state.member.id, method: "SEARCH" }, early),
       "EVENT_NOT_STARTED",
     );
-    expect(blocked.message).toContain("15/10/2026, às 19h");
+    expect(blocked.message).toContain("15/10/2030, às 19h");
 
     const confirmed = await registerCheckIn(security, { personId: host.state.member.id, method: "SEARCH", early: true }, early);
     expect(confirmed).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "DELIVERED" } });

@@ -461,7 +461,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.getByTestId("stat-confirmed")).toHaveText("1");
       await expect(admin.getByTestId("stat-teachers")).toHaveText("1");
       await expect(admin.getByTestId("stat-kits-owed")).toHaveText("0");
-      await expect(admin.getByTestId("stock-forecast-all")).toContainText("Previsão com os inscritos: 2 kits");
+      await expect(admin.getByTestId("stock-forecast-all")).toContainText("2 kits previstos para 150 cadastrados");
       // Comparativo: do placar, um toque abre "Pessoas e kits" (quem vem x quem tem kit, grupo por grupo).
       await admin.getByTestId("dashboard-people-kits").click();
       await expect(admin).toHaveURL(/\/painel\/kits#comparativo$/);
@@ -1500,6 +1500,8 @@ test.describe.serial("festa das professoras e professores", () => {
       await admin.fill("#stock-all", String(committed));
       await admin.getByRole("button", { name: "Salvar estoque" }).click();
       await expect(admin.getByText("Estoque atualizado.")).toBeVisible();
+      // A conta dos kits: cadastrados − previstos, estoque por estoque.
+      await expect(admin.getByTestId("stock-math-all")).toContainText("sobram 0");
     });
 
     await test.step("no site: aviso de kits esgotados, confirmação e o voucher com o lugar na fila", async () => {
@@ -1523,6 +1525,9 @@ test.describe.serial("festa das professoras e professores", () => {
       const notice = page.getByTestId("kit-waitlist-notice");
       await expect(notice).toContainText("Os kits de consumação acabaram");
       await expect(notice).toContainText("o seu kit e o de Gustavo entram na fila do kit (lugares nº 1 e 2)");
+      // Os dois jeitos de o kit sair da fila: se vagar antes, ou como sobra depois do horário dos kits guardados.
+      await expect(notice.getByTestId("kit-waitlist-ways")).toContainText("Se vagar antes");
+      await expect(notice.getByTestId("kit-waitlist-ways")).toContainText("Na festa, depois das 22:30");
       await page.locator("label[for=privacy-consent]").click();
       // Sem confirmar o aviso dos kits, não grava.
       await page.getByTestId("submit-registration").click();
@@ -1553,22 +1558,29 @@ test.describe.serial("festa das professoras e professores", () => {
     await test.step("montagem: o que vem no kit e quanto custa, com a lista de compras", async () => {
       await admin.getByTestId("open-kit-plan").click();
       await expect(admin.getByTestId("kit-plan-empty")).toBeVisible();
+      // Fase 1: o que vem no kit (a quantidade e o preço na mesma linha do item).
       await admin.getByRole("button", { name: "+ Cerveja" }).click();
       const editor = admin.getByTestId("kit-editor");
       await editor.getByTestId("kit-item-price").first().fill("5,00");
-      // Professor(a): 2 cervejas.
       await editor.getByTestId("kit-kind-member").getByRole("button", { name: /^Mais/ }).click();
       await expect(editor.getByTestId("kit-kind-member").getByTestId("kit-quantity")).toHaveText("2");
       await expect(editor.getByTestId("kit-kind-member")).toContainText("R$ 10,00 por kit");
-      // Colaborador(a): kit diferente, só 1 cerveja.
-      await editor.getByTestId("kit-same-employee").click();
+      // Fase 2: o dos colaboradores é diferente, só 1 cerveja.
+      await editor.getByTestId("kit-diff-employee").click();
       await editor.getByTestId("kit-kind-employee").getByRole("button", { name: /^Menos/ }).click();
       await expect(editor.getByTestId("kit-kind-employee").getByTestId("kit-quantity")).toHaveText("1");
+      // Fase 3: tem cerveja, então a montagem sugere o kit de menor de 18.
+      await expect(editor.getByTestId("kit-minor-tip")).toContainText("Cerveja");
       await admin.getByTestId("kit-plan-save").click();
       await expect(admin.getByText("Kit montado!")).toBeVisible();
+      // Um tíquete por kit diferente: o de todo mundo e o dos colaboradores.
+      await expect(admin.getByTestId("kit-ticket")).toHaveCount(2);
       await expect(admin.getByTestId("kit-cost-forecast")).toContainText("R$");
       await expect(admin.getByTestId("shopping-list")).toContainText("Cerveja");
+      // Depois de montado, a página abre mostrando o kit; mudar é um toque.
       await admin.reload();
+      await expect(admin.getByTestId("kit-editor")).toHaveCount(0);
+      await admin.getByTestId("kit-plan-edit").click();
       await expect(admin.getByTestId("kit-item-name").first()).toHaveValue("Cerveja");
       await expect(admin.getByTestId("kit-kind-employee").getByTestId("kit-quantity")).toHaveText("1");
     });

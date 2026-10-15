@@ -2,8 +2,10 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { createContext, useContext, useEffect, useState } from "react";
-import { Whatsapp } from "@/components/icons/pixel";
+import { Phone, Whatsapp } from "@/components/icons/pixel";
+import { Button } from "@/components/ui/button";
 import { DEFAULT_EVENT_NAME } from "@/domain/labels";
+import { UNION } from "@/domain/union";
 import { formatPhone, whatsappLink } from "@/lib/phone";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
@@ -60,6 +62,33 @@ export function HelpLine({ topic, className, lead = "Dificuldade?" }: { topic?: 
         Fale com a gente no WhatsApp {link.phoneLabel}
       </a>
     </p>
+  );
+}
+
+/**
+ * "Ficou com dúvida? Fale com o administrativo do SINDSERM": quem chega com as
+ * inscrições fechadas sabe com quem falar (WhatsApp de ajuda, quando há, e o
+ * telefone do sindicato).
+ */
+export function AdminHelp({ topic, className }: { topic?: string; className?: string }) {
+  const link = useHelpLink(topic);
+  return (
+    <div className={cn("rounded-xl border-2 border-success/45 bg-success-soft p-4 text-left", className)} data-testid="admin-help">
+      <p className="text-sm leading-snug text-fg">
+        <strong>Ficou com dúvida?</strong> Fale com o administrativo do {UNION.shortName}.
+      </p>
+      {link ? (
+        <Button asChild variant="success" className="mt-3 w-full">
+          <a href={link.href} target="_blank" rel="noopener noreferrer" onClick={() => playSound("blip")} data-testid="admin-help-whatsapp">
+            <Whatsapp /> Chamar no WhatsApp
+          </a>
+        </Button>
+      ) : null}
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-fg-muted">
+        <Phone className="size-3.5 shrink-0" /> Sindicato: {UNION.phone}
+        {link ? ` · WhatsApp ${link.phoneLabel}` : ""}
+      </p>
+    </div>
   );
 }
 

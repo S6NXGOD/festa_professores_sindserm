@@ -13,7 +13,7 @@ import {
 import { KIT_KIND_LABEL, KIT_KINDS, type KitCounts, type KitKind, type KitPlan, kitPlanTotals, formatCents, linesFor } from "@/domain/kit-plan";
 import { AFFILIATION_STATUS_SHORT, AFFILIATION_STATUS_TONE, CHECK_IN_METHOD_LABEL, EMPLOYEE_CATEGORY_LABEL, KIT_TYPE_LABEL, STOCK_MODE_LABEL, STOCK_POOL_LABEL } from "@/domain/labels";
 import { REPORT_INFO, type ReportType } from "@/domain/reports";
-import type { AffiliationStatus, CollaboratorCategory, GroupKitType, StockMode } from "@/domain/types";
+import type { AffiliationStatus, CollaboratorCategory, GroupKitType, StockMode, StockPool } from "@/domain/types";
 import { maskCpf } from "@/lib/cpf";
 import { formatPlainDate, formatShortDateTime } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
@@ -162,15 +162,31 @@ async function kitsReport(report: ReportPdf, deadline: ReportContext["kitDeadlin
     { label: "Fila do kit", value: n(waiting), tone: waiting ? "warning" : undefined, hint: waiting ? "Saem se vagar kit" : "Ninguém esperando" },
   ]);
 
-  for (const balance of balances) {
-    const label = STOCK_POOL_LABEL[balance.pool].toLowerCase();
-    if (balance.balance < 0) {
-      report.callout(`Faltam ${n(-balance.balance)} kits em ${label}: ${n(balance.total)} cadastrados para ${n(balance.planned)} previstos. Quem se inscrever agora entra na fila do kit.`, "danger");
-    }
-  }
-  if (balances.length && balances.every((balance) => balance.balance >= 0)) {
-    const left = balances.reduce((sum, balance) => sum + balance.balance, 0);
-    report.callout(`O estoque cobre todos os kits previstos${left ? `: sobram ${n(left)}` : " (na conta exata)"}.`, "success");
+  // A conta dos kits: cadastrados − previstos, estoque por estoque, e a soma (a mesma da tela de Kits).
+  const place = (pool: StockPool) =>
+    pool === "ALL"
+      ? stock?.mode === "UNIFIED"
+        ? "no estoque único"
+        : "no estoque geral"
+      : pool === "MEMBER"
+        ? "no estoque de professor(a)"
+        : pool === "GUEST"
+          ? "no estoque de convidado"
+          : "no estoque dos colaboradores";
+  const stockTotal = balances.reduce((sum, balance) => sum + balance.total, 0);
+  const shortPools = balances.filter((balance) => balance.balance < 0);
+  if (shortPools.length) {
+    const unify = stock?.mode !== "UNIFIED" && stockTotal >= planned;
+    report.callout(
+      `Faltam ${shortPools.map((b) => `${n(-b.balance)} kits ${place(b.pool)} (${n(b.total)} cadastrados − ${n(b.planned)} previstos)`).join(" e ")}. ${
+        unify
+          ? `Somando os estoques: ${n(stockTotal)} − ${n(planned)} = sobram ${n(stockTotal - planned)}. Juntando os estoques, todo mundo tem kit.`
+          : "Quem se inscrever agora entra na fila do kit."
+      }`,
+      unify ? "warning" : "danger",
+    );
+  } else if (balances.length) {
+    report.callout(`O estoque cobre todos os kits previstos: ${n(stockTotal)} cadastrados − ${n(planned)} previstos = sobram ${n(stockTotal - planned)}.`, "success");
   }
   if (deadline) {
     report.callout(
@@ -202,7 +218,20 @@ async function kitsReport(report: ReportPdf, deadline: ReportContext["kitDeadlin
         { text: n(pool.available), bold: true },
       ];
     }),
-    { empty: "Estoque não cadastrado (Kits e estoque → Quantidades)." },
+    {
+      empty: "Estoque não cadastrado (Kits e estoque → Quantidades).",
+      total:
+        balances.length > 1
+          ? [
+              "Somando os estoques",
+              n(stockTotal),
+              n(planned),
+              stockTotal - planned >= 0 ? chip(`sobram ${n(stockTotal - planned)}`, "success") : chip(`faltam ${n(planned - stockTotal)}`, "danger"),
+              n((stock?.pools ?? []).reduce((sum, pool) => sum + pool.delivered, 0)),
+              n((stock?.pools ?? []).reduce((sum, pool) => sum + pool.available, 0)),
+            ]
+          : undefined,
+    },
   );
 
   report.section("Pessoas e kits", "Quem vem, quem tem direito a kit, o que já saiu e o que falta sair. Quem aguarda conferência ganha o kit quando a filiação for confirmada.");

@@ -266,7 +266,7 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
                 Qualquer servidor(a) municipal pode se filiar e vir à festa. <strong>O kit de consumação (e o convidado) é só
                 para professoras e professores.</strong>
               </Callout>
-              {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner /> : null}
+              {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner deadlineLabel={kitSupply?.reservedUntil?.passed ? null : (kitSupply?.reservedUntil?.label ?? null)} /> : null}
               <FormField id="f-name" label="Nome completo" error={fe?.fullName?.message}>
                 <Input id="f-name" autoComplete="name" aria-invalid={Boolean(fe?.fullName)} {...register("ficha.fullName")} />
               </FormField>
@@ -521,6 +521,7 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
                       staff={false}
                       guestName={guest?.fullName}
                       lateMessage={lateSellout}
+                      reservedUntil={kitSupply?.reservedUntil ?? null}
                       consent={{ checked: Boolean(field.value), onChange: field.onChange, error: errors.acceptKitWaitlist?.message }}
                     />
                   )}
@@ -530,6 +531,9 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
                   Como professor(a) filiado(a), você terá 1 kit de consumação
                   {guest ? " e mais 1 para o seu convidado" : ""}. Os kits são entregues na recepção
                   {guest ? ": o seu na sua entrada; o do convidado, depois que você chegar." : ", junto com a sua entrada."}
+                  {kitSupply?.reservedUntil && !kitSupply.reservedUntil.passed
+                    ? ` Chegue até as ${kitSupply.reservedUntil.label}: até esse horário, o kit fica guardado.`
+                    : ""}
                 </Callout>
               ) : null}
 

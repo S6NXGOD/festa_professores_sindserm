@@ -90,11 +90,11 @@ function Forecast({ total, demand, pool, waiting = 0 }: { total: number; demand:
       data-testid={`stock-forecast-${pool.toLowerCase()}`}
       title={
         pool === "EMPLOYEE"
-          ? "Colaboradores do SINDSERM liberados (diretoria, funcionários e prestadores) e os convidados deles."
-          : "Professoras e professores inscritos e seus convidados, contando quem ainda aguarda conferência ou assinatura."
+          ? "Colaboradores do SINDSERM liberados (diretoria, funcionários e prestadores), os convidados deles e as cortesias com kit."
+          : "1 kit por pessoa com direito a kit, contando quem ainda aguarda conferência ou assinatura."
       }
     >
-      {pool === "EMPLOYEE" ? "Colaboradores + convidados" : "Previsão com os inscritos"}: {plural(demand, "kit", "kits")} ·{" "}
+      {plural(demand, "kit previsto", "kits previstos")} para {total} cadastrados:{" "}
       {short > 0 ? `faltam ${short} se todos vierem` : `sobram ${total - demand}`}
       {waiting > 0 ? <span className="font-bold text-warning"> · {plural(waiting, "na fila do kit", "na fila do kit")}</span> : null}
     </p>

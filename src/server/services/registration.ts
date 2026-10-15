@@ -118,7 +118,10 @@ async function assertPublicWindowOpen(tx: Tx, actor: Actor, now: Date) {
   // Formulário público só funciona com o setup concluído e dentro do período.
   const window = registrationWindow(await getEventConfig(tx), now);
   if (window.state === "CLOSED") {
-    throw new DomainError("REGISTRATION_CLOSED", `As inscrições encerraram em ${formatDateTime(window.closesAt)}.`);
+    throw new DomainError(
+      "REGISTRATION_CLOSED",
+      `As inscrições encerraram em ${formatDateTime(window.closesAt)}. Ficou com dúvida? Fale com o administrativo do SINDSERM.`,
+    );
   }
   if (window.state !== "OPEN") {
     throw new DomainError("REGISTRATION_CLOSED", "As inscrições não estão abertas no momento.");

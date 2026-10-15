@@ -45,7 +45,7 @@ export default async function GateQuickRegistrationPage({ searchParams }: PagePr
         </p>
       </header>
 
-      {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner staff /> : null}
+      {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner staff deadlineLabel={kitSupply?.reservedUntil?.passed ? null : (kitSupply?.reservedUntil?.label ?? null)} /> : null}
       <QuickRegistrationForm initialName={initialName} initialCpf={cpfDigits ? maskCpfInput(cpfDigits) : ""} />
 
       {/* Os outros casos da porta, cada um no seu caminho (sem inscrição nova). */}

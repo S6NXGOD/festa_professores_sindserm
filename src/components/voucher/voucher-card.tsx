@@ -107,7 +107,11 @@ export function VoucherCard({
           {!isMember && card.kitWaitlist?.self ? (
             <Note tone="warning" icon={Hourglass} testId="voucher-guest-kit">
               <strong className="font-bold">Seu kit está na fila do kit (nº {card.kitWaitlist.self}).</strong> Os kits acabaram antes
-              da sua inscrição: se vagar, ele sai na recepção, por ordem. A entrada está garantida.
+              da sua inscrição: se vagar, ele sai na recepção, por ordem.
+              {event.kitDeadlineLabel
+                ? ` Na festa, depois das ${event.kitDeadlineLabel}, os kits de quem não veio saem por ordem de chegada, enquanto houver.`
+                : ""}{" "}
+              A entrada está garantida.
             </Note>
           ) : !isMember ? (
             <Note tone="red" icon={Gift} testId="voucher-guest-kit">
@@ -342,13 +346,15 @@ function MemberNotes({ card, active, kitDeadline }: { card: VoucherCardData; act
             {card.kitWaitlist.guest ? "Seus kits estão na fila do kit" : "Seu kit está na fila do kit"} (nº {card.kitWaitlist.self}).
           </strong>{" "}
           Os kits acabaram antes da sua inscrição: se vagar kit (alguém desistir ou o SINDSERM comprar mais), ele sai na recepção, por
-          ordem de inscrição. A sua entrada está garantida.
+          ordem de inscrição.
+          {kitDeadline ? ` Na festa, depois das ${kitDeadline}, os kits de quem não veio saem por ordem de chegada, enquanto houver.` : ""} A
+          sua entrada está garantida.
         </Note>
       ) : card.isTeacher && card.kitWaitlist?.guest ? (
         <Note tone="warning" icon={Hourglass} testId="voucher-kits">
           <strong className="font-bold">O seu kit está garantido; o de {card.guestName ? properName(card.guestName) : "seu convidado"} está na fila do kit (nº {card.kitWaitlist.guest}).</strong>{" "}
-          Se vagar, sai na recepção, por ordem de inscrição.
-          {kitDeadline ? ` Seu kit fica guardado até as ${kitDeadline}.` : ""}
+          Se vagar, sai na recepção, por ordem de inscrição
+          {kitDeadline ? `; depois das ${kitDeadline}, se sobrar, por ordem de chegada. O seu fica guardado até as ${kitDeadline}.` : "."}
         </Note>
       ) : card.isTeacher ? (
         <Note tone="red" icon={Gift} testId="voucher-kits">

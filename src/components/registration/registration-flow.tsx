@@ -52,7 +52,7 @@ export function RegistrationFlow({
             <p className="mt-3 text-fg-muted">A inscrição é feita por quem é filiado(a), que também cadastra o seu convidado.</p>
             {kitsSoldOut(kitSupply) ? (
               <div className="mt-6">
-                <KitsSoldOutBanner />
+                <KitsSoldOutBanner deadlineLabel={kitSupply?.reservedUntil?.passed ? null : (kitSupply?.reservedUntil?.label ?? null)} />
               </div>
             ) : null}
             <div className="mt-8 grid gap-3 text-left">

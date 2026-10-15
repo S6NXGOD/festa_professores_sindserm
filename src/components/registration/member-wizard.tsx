@@ -204,7 +204,7 @@ export function MemberWizard({
                     : "Com estes dados o SINDSERM confirma que você é filiado(a). Cada CPF e cada matrícula só podem ser usados uma vez."
                 }
               />
-              {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner staff={staff} /> : null}
+              {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner staff={staff} deadlineLabel={kitSupply?.reservedUntil?.passed ? null : (kitSupply?.reservedUntil?.label ?? null)} /> : null}
               <FormField id="member-name" label="Nome completo" error={errors.member?.fullName?.message}>
                 <Input id="member-name" autoComplete="name" aria-invalid={Boolean(errors.member?.fullName)} {...register("member.fullName")} />
               </FormField>
@@ -322,6 +322,7 @@ export function MemberWizard({
                       staff={staff}
                       guestName={guest?.fullName}
                       lateMessage={lateSellout}
+                      reservedUntil={kitSupply?.reservedUntil ?? null}
                       consent={staff ? undefined : { checked: Boolean(field.value), onChange: field.onChange, error: errors.acceptKitWaitlist?.message }}
                     />
                   )}
@@ -339,6 +340,9 @@ export function MemberWizard({
                     ) : (
                       <>1 kit, entregue na recepção junto com a entrada.</>
                     )}
+                    {kitSupply?.reservedUntil && !kitSupply.reservedUntil.passed ? (
+                      <> {staff ? "O kit fica guardado" : "Chegue até as " + kitSupply.reservedUntil.label + ": até esse horário, o kit fica guardado"}{staff ? ` até as ${kitSupply.reservedUntil.label}` : ""}.</>
+                    ) : null}
                   </>
                 ) : (
                   <>Participação sem kit de consumação (exclusivo para professoras e professores).</>

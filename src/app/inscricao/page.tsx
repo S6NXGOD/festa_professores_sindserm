@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { HelpLine } from "@/components/help/help";
+import { AdminHelp, HelpLine } from "@/components/help/help";
 import { Calendar, Home, QrCode } from "@/components/icons/pixel";
 import { ClosingSoon } from "@/components/public/closing-soon";
 import { PublicShell } from "@/components/public/public-shell";
@@ -50,7 +50,11 @@ export default async function RegistrationPage({ searchParams }: PageProps<"/ins
               <QrCode className="size-4 text-red" /> Já se inscreveu? Recuperar meus vouchers
             </Link>
           ) : null}
-          <HelpLine lead="Dúvidas?" topic="me inscrever na festa" className="mt-3 justify-center" />
+          {window.state === "CLOSED" ? (
+            <AdminHelp topic="tirar uma dúvida sobre a inscrição (as inscrições já encerraram)" className="mt-5" />
+          ) : (
+            <HelpLine lead="Dúvidas?" topic="me inscrever na festa" className="mt-3 justify-center" />
+          )}
           <Button asChild variant="outline" className="mt-6">
             <Link href="/">
               <Home /> Voltar ao início
