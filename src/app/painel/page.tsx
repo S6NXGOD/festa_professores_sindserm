@@ -189,7 +189,7 @@ export default async function DashboardPage() {
               >
                 <Clock className="size-4 text-red" />
                 <span className="pixel text-[0.5rem] text-fg-muted">Começa em</span>
-                <DeadlineTimer deadline={event.startsAt} />
+                <DeadlineTimer deadline={event.startsAt} doneLabel="AGORA" doneClassName="text-success-text" />
               </span>
               {/* No celular o selo não cabe na linha; a atualização automática continua. */}
               <LiveRefresh score={stats.present} className="hidden sm:inline-flex" />
@@ -290,24 +290,24 @@ export default async function DashboardPage() {
             data-testid="kit-deadline-card"
           >
             <div className="min-w-0">
-              <p className="text-[0.7rem] font-bold tracking-[0.1em] text-fg-muted uppercase">Entrega de kits</p>
+              <p className="text-[0.7rem] font-bold tracking-[0.1em] text-fg-muted uppercase">Kits guardados</p>
               <p className="mt-1 text-sm text-fg">
                 {event?.kitDeadline
                   ? event.kitDeadline.passed
-                    ? `Encerrada às ${event.kitDeadline.label}`
+                    ? `Sobras liberadas desde as ${event.kitDeadline.label}`
                     : `Até ${event.kitDeadline.label}`
-                  : "Sem horário limite"}
+                  : "A festa toda (sem horário)"}
               </p>
               {event?.kitDeadline?.passed ? (
                 <p className="mt-0.5 text-xs text-fg-muted">
-                  Quem entra agora fica sem kit.{canSettings ? " Mudando o horário, os kits voltam a sair na hora." : ""}
+                  Quem entra agora leva o kit enquanto houver, inclusive quem estava na fila do kit.
                 </p>
               ) : null}
             </div>
-            {event?.kitDeadline && !(event.kitDeadline.passed && canSettings) ? (
+            {event?.kitDeadline && !event.kitDeadline.passed ? (
               <span className="flex shrink-0 items-center gap-2 rounded-md border border-line-strong bg-ink px-3 py-2">
                 <Clock className="size-4 text-red" />
-                <DeadlineTimer deadline={event.kitDeadline.at} />
+                <DeadlineTimer deadline={event.kitDeadline.at} doneLabel="SOBRAS" doneClassName="text-warning" />
               </span>
             ) : canSettings ? (
               <Link href="/painel/configuracoes#kit-deadline" className="shrink-0 text-xs font-semibold text-red hover:underline">

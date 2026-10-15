@@ -17,12 +17,13 @@ import {
   stockPoolFor,
 } from "@/domain/rules";
 import type { AccessMap } from "@/domain/access";
+import { kitPlanSchema } from "@/domain/kit-plan";
 import type { AffiliationStatus, CheckInMethod, DocumentKind, EmployeeKitType, GroupKitType, ParticipantRole, EmployeeCategory } from "@/domain/types";
 import { displayCpf } from "@/lib/cpf";
 import { formatVoucherCode } from "@/server/crypto";
 import { entryDecisionFor } from "./checkin";
 import { employeeKitInput, kitInput } from "./kits";
-import { type EventConfig, getEventConfig, getStockOverview, type StockOverview } from "./settings";
+import { employeePoolOf, type EventConfig, getEventConfig, getStockOverview, type StockOverview } from "./settings";
 import { type ActiveGuest, type EmployeeGroupState, loadPersonState, type PersonState, type RegistrationState } from "./state";
 import { firstName } from "@/lib/text";
 
@@ -35,7 +36,14 @@ export type KitView =
 /** O que acontece com os kits se a entrada for confirmada agora. */
 export type KitOnEntry =
   /** `label`: a frase inteira ("1 kit de convidado"); `detail`: de quem é o kit, para o cartão da portaria. */
-  | { kind: "WILL_DELIVER"; count: 1 | 2; label: string; detail: string }
+  | {
+      kind: "WILL_DELIVER";
+      count: 1 | 2;
+      label: string;
+      detail: string;
+      /** Quantos destes kits são de menor de 18 (só aparece quando há). */
+      minors?: number;
+    }
   /** Convidado que chega antes de quem convidou: o kit dele sai quando essa pessoa chegar. */
   | { kind: "WAITING"; message: string }
   | { kind: "NONE"; message: string };
@@ -115,8 +123,10 @@ export interface GateView {
     /** O kit de convidado do grupo já saiu para outra pessoa (antes de uma troca). */
     deliveredForOther: boolean;
   };
-  /** Horário limite para entregar kits (nulo = sem limite). */
+  /** Kits guardados até este horário; depois, sobras por ordem de chegada (nulo = guardados a festa toda). */
   kitDeadline: { at: Date; passed: boolean } | null;
+  /** A montagem tem kit próprio para menor de 18 (ex.: sem bebida alcoólica): o cartão diz quando entregar esse. */
+  minorKit: boolean;
   entry: EntryView;
   /** Só quando a entrada está liberada: a recepção já sabe se entrega kit. */
   kitOnEntry: KitOnEntry | null;
@@ -141,12 +151,26 @@ export interface GateView {
   };
 }
 
+/** Kit que sai na entrada; `minors` (quantos são de menor de 18) só entra quando há. */
+function willDeliver(count: 1 | 2, label: string, detail: string, minors: number): KitOnEntry {
+  return minors > 0 ? { kind: "WILL_DELIVER", count, label, detail, minors } : { kind: "WILL_DELIVER", count, label, detail };
+}
+
+const minorCount = (...people: ({ isMinor: boolean } | null)[]) => people.filter((person) => person?.isMinor).length;
+
+/** A montagem tem kit próprio para menor de 18: a portaria avisa qual kit entregar. */
+function hasMinorKit(config: Pick<EventConfig, "kitPlan"> | null): boolean {
+  const parsed = kitPlanSchema.safeParse(config?.kitPlan ?? null);
+  return parsed.success && parsed.data.minor !== null;
+}
+
 /** Antes das entradas, um kit na fila não "sai junto com a entrada": a portaria já vê que ele espera vagar. */
 const BEFORE_ENTRY: readonly KitBlockCode[] = ["MEMBER_NOT_CHECKED_IN", "GUEST_NOT_CHECKED_IN", "HOST_NOT_CHECKED_IN"];
 
 function kitView(reg: RegistrationState, kitType: GroupKitType, deadlinePassed: boolean): KitView {
   const view = toKitView(kitAvailability(kitInput(reg, deadlinePassed), kitType));
-  if (view.kind === "BLOCKED" && reg.kitWaitlist[kitType] && BEFORE_ENTRY.includes(view.code)) {
+  // Depois do horário dos kits guardados, a fila não espera mais: vale o "sai junto com a entrada".
+  if (view.kind === "BLOCKED" && reg.kitWaitlist[kitType] && !deadlinePassed && BEFORE_ENTRY.includes(view.code)) {
     return { ...view, message: "Na fila do kit (inscrição depois que os kits acabaram): só sai se vagar kit." };
   }
   return view;
@@ -188,7 +212,7 @@ function employeeKitPreview(
   deadlinePassed: boolean,
   stock: StockOverview | null,
 ): KitOnEntry {
-  const pool = stock?.pools.find((p) => p.pool === "EMPLOYEE");
+  const pool = employeePoolOf(stock);
   let left = pool?.available ?? 0;
   /** null = o kit sai; texto = por que não sai. */
   const check = (kitType: EmployeeKitType, input: EmployeeKitInput): string | null => {
@@ -210,7 +234,7 @@ function employeeKitPreview(
       return { kind: "WAITING", message: `O kit deste convidado sai quando ${group.person.fullName} chegar.` };
     }
     const reason = check("GUEST", input);
-    return reason ? { kind: "NONE", message: reason } : { kind: "WILL_DELIVER", count: 1, label: "1 kit de convidado", detail: KIT_TYPE_LABEL.GUEST };
+    return reason ? { kind: "NONE", message: reason } : willDeliver(1, "1 kit de convidado", KIT_TYPE_LABEL.GUEST, minorCount(state.person));
   }
 
   const input = employeeKitInput(group, deadlinePassed, { employeeCheckedIn: true });
@@ -220,29 +244,29 @@ function employeeKitPreview(
   const guestOut = waitingGuest ? check("GUEST", input) === null : false;
   if (!ownReason && guestOut) {
     const first = firstName(state.person.fullName);
-    return {
-      kind: "WILL_DELIVER",
-      count: 2,
-      label: `2 kits: o de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
-      detail: `O de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
-    };
+    return willDeliver(
+      2,
+      `2 kits: o de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
+      `O de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
+      minorCount(state.person, waitingGuest),
+    );
   }
   if (!ownReason) {
     const courtesy = group.category === "COURTESY";
-    return {
-      kind: "WILL_DELIVER",
-      count: 1,
-      label: courtesy ? "1 kit da cortesia" : "1 kit de colaborador(a)",
-      detail: courtesy ? "Kit da cortesia" : KIT_TYPE_LABEL.EMPLOYEE,
-    };
+    return willDeliver(
+      1,
+      courtesy ? "1 kit da cortesia" : "1 kit de colaborador(a)",
+      courtesy ? "Kit da cortesia" : KIT_TYPE_LABEL.EMPLOYEE,
+      minorCount(state.person),
+    );
   }
   if (guestOut) {
-    return {
-      kind: "WILL_DELIVER",
-      count: 1,
-      label: `1 kit: o do convidado ${waitingGuest!.fullName}, que já entrou`,
-      detail: `O do convidado ${waitingGuest!.fullName}, que já entrou`,
-    };
+    return willDeliver(
+      1,
+      `1 kit: o do convidado ${waitingGuest!.fullName}, que já entrou`,
+      `O do convidado ${waitingGuest!.fullName}, que já entrou`,
+      minorCount(waitingGuest),
+    );
   }
   return { kind: "NONE", message: ownReason };
 }
@@ -284,7 +308,7 @@ function kitOnEntryPreview(
       return { kind: "WAITING", message: `O kit deste convidado sai quando ${group.member.fullName} chegar.` };
     }
     const reason = check("GUEST", input);
-    return reason ? { kind: "NONE", message: reason } : { kind: "WILL_DELIVER", count: 1, label: "1 kit de convidado", detail: KIT_TYPE_LABEL.GUEST };
+    return reason ? { kind: "NONE", message: reason } : willDeliver(1, "1 kit de convidado", KIT_TYPE_LABEL.GUEST, minorCount(state.person));
   }
 
   const input = kitInput(group, deadlinePassed, { memberCheckedIn: true });
@@ -294,21 +318,21 @@ function kitOnEntryPreview(
   const guestOut = waitingGuest ? check("GUEST", input) === null : false;
   if (!ownReason && guestOut) {
     const first = firstName(state.person.fullName);
-    return {
-      kind: "WILL_DELIVER",
-      count: 2,
-      label: `2 kits: o de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
-      detail: `O de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
-    };
+    return willDeliver(
+      2,
+      `2 kits: o de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
+      `O de ${first} e o do convidado ${waitingGuest!.fullName}, que já entrou`,
+      minorCount(state.person, waitingGuest),
+    );
   }
-  if (!ownReason) return { kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação", detail: KIT_TYPE_LABEL.MEMBER };
+  if (!ownReason) return willDeliver(1, "1 kit de consumação", KIT_TYPE_LABEL.MEMBER, minorCount(state.person));
   if (guestOut) {
-    return {
-      kind: "WILL_DELIVER",
-      count: 1,
-      label: `1 kit: o do convidado ${waitingGuest!.fullName}, que já entrou`,
-      detail: `O do convidado ${waitingGuest!.fullName}, que já entrou`,
-    };
+    return willDeliver(
+      1,
+      `1 kit: o do convidado ${waitingGuest!.fullName}, que já entrou`,
+      `O do convidado ${waitingGuest!.fullName}, que já entrou`,
+      minorCount(waitingGuest),
+    );
   }
   return { kind: "NONE", message: ownReason };
 }
@@ -351,7 +375,7 @@ function hostView(state: PersonState): GateView["host"] {
 export function buildGateView(
   state: PersonState,
   access: AccessMap,
-  config: Pick<EventConfig, "eventDate" | "startTime" | "kitDeadlineTime"> | null,
+  config: Pick<EventConfig, "eventDate" | "startTime" | "kitDeadlineTime" | "kitPlan"> | null,
   now = new Date(),
   stock: StockOverview | null = null,
 ): GateView {
@@ -436,6 +460,7 @@ export function buildGateView(
         }
       : null,
     kitDeadline: deadlineAt ? { at: deadlineAt, passed: deadlinePassed } : null,
+    minorKit: hasMinorKit(config),
     entry,
     kitOnEntry: entry.kind === "ALLOWED" ? kitOnEntryPreview(state, entry.role, deadlinePassed, stock) : null,
     eventStart: config

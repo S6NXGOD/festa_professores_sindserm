@@ -113,7 +113,7 @@ export function VoucherCard({
             <Note tone="red" icon={Gift} testId="voucher-guest-kit">
               <strong className="font-bold">Você tem direito a um kit de consumação.</strong> Ele é entregue na recepção depois que{" "}
               {card.hostName ? properName(card.hostName) : "quem te convidou"} chegar.
-              {event.kitDeadlineLabel ? ` Kits até ${event.kitDeadlineLabel}.` : ""}
+              {event.kitDeadlineLabel ? ` Seu kit fica guardado até as ${event.kitDeadlineLabel}.` : ""}
             </Note>
           ) : null}
         </div>
@@ -246,7 +246,7 @@ function EmployeePass({
               {card.guestName
                 ? "O seu sai na recepção, junto com a sua entrada; o do convidado, depois que você chegar."
                 : "Entregue na recepção, junto com a sua entrada."}
-              {event.kitDeadlineLabel ? ` Kits até ${event.kitDeadlineLabel}.` : ""}
+              {event.kitDeadlineLabel ? ` Seu kit fica guardado até as ${event.kitDeadlineLabel}.` : ""}
             </Note>
           )}
         </div>
@@ -348,7 +348,7 @@ function MemberNotes({ card, active, kitDeadline }: { card: VoucherCardData; act
         <Note tone="warning" icon={Hourglass} testId="voucher-kits">
           <strong className="font-bold">O seu kit está garantido; o de {card.guestName ? properName(card.guestName) : "seu convidado"} está na fila do kit (nº {card.kitWaitlist.guest}).</strong>{" "}
           Se vagar, sai na recepção, por ordem de inscrição.
-          {kitDeadline ? ` Kits até ${kitDeadline}.` : ""}
+          {kitDeadline ? ` Seu kit fica guardado até as ${kitDeadline}.` : ""}
         </Note>
       ) : card.isTeacher ? (
         <Note tone="red" icon={Gift} testId="voucher-kits">
@@ -368,7 +368,7 @@ function MemberNotes({ card, active, kitDeadline }: { card: VoucherCardData; act
           {card.guestName
             ? "O seu sai na recepção, junto com a sua entrada; o do convidado, depois que você chegar."
             : "Entregue na recepção, junto com a sua entrada."}
-          {kitDeadline ? ` Kits até ${kitDeadline}.` : ""}
+          {kitDeadline ? ` Seu kit fica guardado até as ${kitDeadline}.` : ""}
         </Note>
       ) : (
         <Note tone="neutral" icon={Info}>

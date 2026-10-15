@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CountUp } from "@/components/count-up";
 import { GateSearch } from "@/components/gate/gate-search";
-import { AlarmClock, Clock, Heart, Login, QrCode, Search, UserPlus, Users } from "@/components/icons/pixel";
+import { AlarmClock, ArrowRight, Clock, Heart, Login, QrCode, Search, Target, UserPlus, Users } from "@/components/icons/pixel";
 import { Panel } from "@/components/retro/bits";
 import { DeadlineTimer } from "@/components/retro/countdown";
 import { LiveRefresh } from "@/components/retro/live-refresh";
@@ -34,7 +34,7 @@ export default async function GateHomePage() {
             <p className="font-bold text-fg">A festa começa {event.startLabel}</p>
             <p className="text-xs text-fg-muted">Entradas antes disso pedem uma confirmação a mais (e ficam anotadas).</p>
           </div>
-          <DeadlineTimer deadline={event.startsAt} className="shrink-0 text-xs" />
+          <DeadlineTimer deadline={event.startsAt} doneLabel="AGORA" doneClassName="text-success-text" className="shrink-0 text-xs" />
         </div>
       ) : null}
       <Link
@@ -74,9 +74,9 @@ export default async function GateHomePage() {
         {event?.kitDeadline && can(actor.access, "deliverKits") ? (
           <div className="col-span-2 flex items-center justify-between rounded-xl border border-line bg-surface p-4">
             <p className="flex items-center gap-2 text-sm font-semibold text-fg">
-              <Clock className="size-5 text-red" /> Kits até {event.kitDeadline.label}
+              <Clock className="size-5 text-red" /> {event.kitDeadline.passed ? "Sobras liberadas" : `Kits guardados até ${event.kitDeadline.label}`}
             </p>
-            <DeadlineTimer deadline={event.kitDeadline.at} className="text-xs" />
+            <DeadlineTimer deadline={event.kitDeadline.at} doneLabel="SOBRAS" doneClassName="text-warning" className="text-xs" />
           </div>
         ) : null}
       </div>
@@ -107,6 +107,23 @@ export default async function GateHomePage() {
           courtesyHref={canCourtesy ? "/portaria/cortesia" : null}
         />
       </Panel>
+
+      {can(actor.access, "checkIn") ? (
+        <Link
+          href="/portaria/treino"
+          className="group flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 outline-none hover:border-red/50 focus-visible:ring-2 focus-visible:ring-red"
+          data-testid="open-training-card"
+        >
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-red">
+            <Target className="size-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold text-fg">Treino da portaria</span>
+            <span className="block text-xs text-fg-muted">As situações da porta, com a tela de verdade (nada fica gravado)</span>
+          </span>
+          <ArrowRight className="size-5 shrink-0 text-fg-dim transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      ) : null}
     </div>
   );
 }

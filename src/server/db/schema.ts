@@ -60,7 +60,7 @@ export const guestLinkStatusEnum = pgEnum("guest_link_status", ["ACTIVE", "REMOV
  * regras (CHECK) que falam deles comparam o texto (`coluna::text`).
  */
 export const kitTypeEnum = pgEnum("kit_type", ["MEMBER", "GUEST", "EMPLOYEE"]);
-export const stockModeEnum = pgEnum("stock_mode", ["SINGLE", "SPLIT"]);
+export const stockModeEnum = pgEnum("stock_mode", ["SINGLE", "SPLIT", "UNIFIED"]);
 /**
  * EMPLOYEE: estoque dos funcionários do SINDSERM (kit do funcionário e do
  * convidado dele), sempre separado dos kits de professoras, professores e convidados.

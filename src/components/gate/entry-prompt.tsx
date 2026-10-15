@@ -43,7 +43,7 @@ export function EntryPromptDialog({
           </DialogDescription>
         </DialogHeader>
         {/* O mesmo cartão de kit da portaria: quem vai registrar já separa o kit. */}
-        {kit ? <KitOnEntryTile kit={kit} deadline={view.kitDeadline} testId="prompt-kit" /> : null}
+        {kit ? <KitOnEntryTile kit={kit} deadline={view.kitDeadline} minorKit={view.minorKit} testId="prompt-kit" /> : null}
         <DialogFooter className="gap-2">
           <Button type="button" variant="outline" onClick={onClose}>
             Agora não

@@ -114,7 +114,7 @@ export function CourtesyRightsNote({ withKit = true }: { withKit?: boolean }) {
       <Heart className="mt-0.5 size-4 shrink-0 text-[#ff8fd0]" />
       {withKit ? (
         <span>
-          Ganha voucher próprio e <strong>1 kit de consumação</strong>, que sai junto com a entrada (do estoque dos colaboradores). Não
+          Ganha voucher próprio e <strong>1 kit de consumação</strong>, que sai junto com a entrada. Não
           leva convidado: cada pessoa é uma cortesia.
         </span>
       ) : (
@@ -179,7 +179,7 @@ function RightsNote() {
       <Gift className="mt-0.5 size-4 shrink-0 text-warning" />
       <span>
         Ganha voucher próprio, <strong>1 kit de consumação</strong> na entrada e pode levar <strong>1 convidado</strong> (com kit, que
-        sai quando o(a) colaborador(a) chegar). Os kits saem do estoque dos colaboradores.
+        sai quando o(a) colaborador(a) chegar).
       </span>
     </p>
   );

@@ -17,6 +17,7 @@ import { PixelTag, PlayerTag } from "@/components/retro/bits";
 import { LiveRefresh } from "@/components/retro/live-refresh";
 import { CategoryChip } from "@/components/staff/employee-category";
 import { ChipFilters, EmptyState, FilterBar, PageHeader, Pagination, Panel, SelectFilter, StatTile } from "@/components/staff/panel-ui";
+import { ReportButton } from "@/components/staff/report-button";
 import { Button } from "@/components/ui/button";
 import { eventStartAt } from "@/domain/kit-deadline";
 import { employeeTitleLine } from "@/domain/labels";
@@ -162,6 +163,7 @@ export default async function EntriesPage({ searchParams }: PageProps<"/painel/e
                 <Download /> Baixar planilha
               </a>
             </Button>
+            <ReportButton type="entradas" />
           </>
         }
       />

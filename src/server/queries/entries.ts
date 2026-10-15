@@ -196,7 +196,8 @@ export function csvCell(value: string | number | null | undefined): string {
   return /[";\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function entryType(row: EntryRow): string {
+/** "Professor(a)", "Convidado(a)", "Colaborador(a) · Diretoria", "Cortesia". */
+export function entryType(row: EntryRow): string {
   if (row.role === "GUEST") return "Convidado(a)";
   if (row.role === "EMPLOYEE" && row.employeeCategory === "COURTESY") return "Cortesia";
   if (row.role === "EMPLOYEE") return `Colaborador(a) · ${row.employeeCategory ? EMPLOYEE_CATEGORY_LABEL[row.employeeCategory] : "SINDSERM"}`;

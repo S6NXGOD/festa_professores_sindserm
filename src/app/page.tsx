@@ -18,18 +18,25 @@ import { PublicShell } from "@/components/public/public-shell";
 import { StickyCta } from "@/components/public/sticky-cta";
 import { VenueSection } from "@/components/public/venue";
 import { PixelTag, TapeLabel } from "@/components/retro/bits";
-import { Countdown } from "@/components/retro/countdown";
+import { Countdown, DeadlineTimer } from "@/components/retro/countdown";
+import { KitsSoldOutBanner } from "@/components/registration/kit-waitlist-notice";
 import { Marquee } from "@/components/retro/marquee";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/datetime";
 import { splitEventName } from "@/lib/text";
 import { kitsSoldOut } from "@/domain/kit-supply";
 import { db } from "@/server/db";
-import { APP_NAME, getEventInfo, getRegistrationWindow, hasUsers } from "@/server/queries/config";
+import { APP_NAME, getConfig, getEventInfo, getRegistrationWindow, hasUsers } from "@/server/queries/config";
 import { getKitSupply } from "@/server/services/kit-waitlist";
 
 export default async function HomePage() {
-  const [event, window, usersExist, kitSupply] = await Promise.all([getEventInfo(), getRegistrationWindow(), hasUsers(), getKitSupply(db)]);
+  const [event, window, usersExist, kitSupply, config] = await Promise.all([
+    getEventInfo(),
+    getRegistrationWindow(),
+    hasUsers(),
+    getKitSupply(db),
+    getConfig(),
+  ]);
 
   if (!usersExist || !event) {
     return (
@@ -55,6 +62,11 @@ export default async function HomePage() {
 
   const open = window.state === "OPEN";
   const heading = splitEventName(event.name);
+  const soldOut = open && kitsSoldOut(kitSupply);
+  // Poucos kits livres (até o limite de alerta do estoque): o site avisa quantos restam.
+  const freeKits = kitSupply?.member ?? null;
+  const lastKits = open && freeKits !== null && freeKits >= 1 && freeKits <= (config?.lowStockThreshold ?? 0) ? freeKits : null;
+  const closingSoon = window.state === "OPEN" && closesWithinADay(window.closesAt);
   const statusLine =
     window.state === "OPEN"
       ? `Inscrições abertas até ${formatDateTime(window.closesAt)}`
@@ -67,7 +79,7 @@ export default async function HomePage() {
     `${event.dateLabel} · ${event.timeLabel}`,
     statusLine,
     "Cada professor(a) leva 1 convidado",
-    event.kitDeadline ? `Kits até ${event.kitDeadline.label}` : "Kit de consumação para professoras e professores",
+    event.kitDeadline ? `Kit guardado até ${event.kitDeadline.label}` : "Kit de consumação para professoras e professores",
   ];
 
   const levels = [
@@ -84,7 +96,7 @@ export default async function HomePage() {
     {
       icon: Gift,
       title: "Curta a festa",
-      text: "Mostre o QR na entrada. Depois de entrar, retire os kits de consumação.",
+      text: "Mostre o QR na entrada: o seu kit de consumação sai na hora, junto com a entrada.",
     },
   ];
 
@@ -103,6 +115,13 @@ export default async function HomePage() {
               <span className={open ? "size-2 animate-blink rounded-[2px] bg-success shadow-[0_0_8px_var(--success)]" : "size-2 rounded-[2px] bg-fg-dim"} />
               {statusLine}
             </span>
+            {/* Último dia: quanto falta para fechar (depois, o formulário recusa). */}
+            {closingSoon ? (
+              <p className="mt-2 flex items-center gap-2 text-xs font-bold tracking-wide text-warning uppercase" data-testid="home-closing-soon">
+                <Clock className="size-4" /> Fecham em
+                <DeadlineTimer deadline={window.closesAt} doneLabel="AGORA" className="text-xs text-warning" />
+              </p>
+            ) : null}
           </Reveal>
           <Reveal delay={0.05}>
             <h1 className="display mt-5 text-[2.9rem] leading-[0.88] sm:text-6xl">
@@ -121,15 +140,14 @@ export default async function HomePage() {
           <Reveal delay={0.1} className="mt-5 flex flex-wrap gap-2">
             <InfoChip icon={Calendar} text={event.dateLongLabel} />
             <InfoChip icon={Clock} text={event.timeLabel} />
-            {event.kitDeadline ? <InfoChip icon={Gift} text={`Kits até ${event.kitDeadline.label}`} /> : null}
-            {/* Kits esgotados: a inscrição continua, com a fila do kit (o formulário explica). */}
-            {kitsSoldOut(kitSupply) ? (
+            {event.kitDeadline ? <InfoChip icon={Gift} text={`Kit guardado até ${event.kitDeadline.label}`} /> : null}
+            {lastKits ? (
               <span
                 className="inline-flex items-center gap-2 rounded-md border border-warning/60 bg-warning-soft px-3 py-2 text-sm font-semibold text-fg"
-                data-testid="home-kits-sold-out"
+                data-testid="home-last-kits"
               >
-                <Hourglass className="size-4 text-warning" />
-                Kits esgotados · inscrição continua, com fila do kit
+                <Hourglass className="size-4 animate-wiggle text-warning" />
+                {lastKits === 1 ? "Último kit livre: garanta o seu" : `Últimos ${lastKits} kits livres: garanta o seu`}
               </span>
             ) : null}
           </Reveal>
@@ -139,6 +157,12 @@ export default async function HomePage() {
             </Reveal>
           ) : null}
 
+          {/* Kits esgotados: a inscrição continua, com a fila do kit (o formulário explica e pede a confirmação). */}
+          {soldOut ? (
+            <Reveal delay={0.18} className="mt-6 max-w-xl">
+              <KitsSoldOutBanner testId="home-kits-sold-out" deadlineLabel={event.kitDeadline?.label ?? null} />
+            </Reveal>
+          ) : null}
           <Reveal delay={0.2} className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             {open ? (
               <Button asChild size="xl" className="w-full sm:w-auto" data-testid="cta-inscricao">
@@ -206,6 +230,12 @@ export default async function HomePage() {
               seu sai na recepção, junto com a sua entrada; o do convidado, depois que você chegar. Filiados(as) que não são
               professoras ou professores também podem participar, sem kit.
             </p>
+            <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+              Os kits ficam com quem se inscreve primeiro. Se acabarem, a inscrição continua e o kit entra na fila (sai se vagar).
+              {event.kitDeadline
+                ? ` Chegue até as ${event.kitDeadline.label}: até lá o seu kit fica guardado; depois, os que sobrarem saem por ordem de chegada.`
+                : ""}
+            </p>
           </div>
         </Reveal>
         <Reveal delay={0.15}>
@@ -230,6 +260,11 @@ export default async function HomePage() {
       </section>
     </PublicShell>
   );
+}
+
+/** Últimas 24 horas de inscrição: a faixa de status mostra quanto falta. */
+function closesWithinADay(closesAt: Date) {
+  return closesAt.getTime() - Date.now() < 24 * 3600 * 1000;
 }
 
 function InfoChip({ icon: Icon, text }: { icon: typeof Calendar; text: string }) {

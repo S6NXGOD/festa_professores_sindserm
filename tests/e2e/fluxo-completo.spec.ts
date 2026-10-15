@@ -436,7 +436,7 @@ test.describe.serial("festa das professoras e professores", () => {
 
       await openPersonAtGate(page, "Maria Aparecida", MEMBER.name);
       await expect(page.getByTestId("gate-status-title")).toHaveText("ENTRADA JÁ REGISTRADA");
-      await expect(page.getByText("Kits até 22:30")).toBeVisible();
+      await expect(page.getByText("Kits guardados até 22:30")).toBeVisible();
       const gateResult = page.getByTestId("gate-result");
       await expect(gateResult.getByText(/Seu kit: Entregue/)).toBeVisible();
       await expect(gateResult.getByText(/Kit do convidado \(Luiza Souza Lima\): Entregue/)).toBeVisible();
@@ -529,6 +529,12 @@ test.describe.serial("festa das professoras e professores", () => {
       expect(body).toContain("Registrada por");
       expect(body).toContain(MEMBER.name);
       expect(body).toContain(SECURITY.name);
+      // Relatório em PDF da área (abre em outra aba).
+      await expect(admin.getByTestId("report-entradas")).toHaveAttribute("href", "/painel/relatorios/entradas");
+      const pdf = await admin.request.get("/painel/relatorios/entradas");
+      expect(pdf.status()).toBe(200);
+      expect(pdf.headers()["content-type"]).toBe("application/pdf");
+      expect((await pdf.body()).subarray(0, 5).toString("latin1")).toBe("%PDF-");
     });
 
     await adminContext.close();
@@ -858,6 +864,39 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(page.getByTestId("gate-quick-register")).toHaveCount(0);
       await page.goto("/portaria/cadastro");
       await expect(page).toHaveURL(/\/portaria$/);
+      // Relatório em PDF é de quem vê a área no painel.
+      expect((await page.request.get("/painel/relatorios/kits")).status()).toBe(403);
+      await context.close();
+    });
+
+    await test.step("treino da portaria: as situações da porta com a tela de verdade (nada fica gravado)", async () => {
+      const context = await browser.newContext({ ...devices["Pixel 7"] });
+      const page = await context.newPage();
+      await login(page, SECURITY);
+      await page.getByTestId("open-training-card").click();
+      await expect(page).toHaveURL(/\/portaria\/treino$/);
+      await page.getByTestId("training-start").click();
+      const total = Number((await page.getByTestId("training-progress").innerText()).match(/\/(\d+)/)![1]);
+      expect(total).toBeGreaterThanOrEqual(15);
+      // A Segurança não confere filiação: nessas situações, o certo é encaminhar ao Atendimento.
+      let forwards = 0;
+      for (let index = 0; index < total; index++) {
+        await expect(page.getByTestId("training-progress")).toContainText(`${index + 1}/${total}`);
+        const right = page.getByTestId("training-option-right");
+        if ((await right.innerText()).includes("Atendimento")) forwards++;
+        await right.click();
+        await expect(page.getByTestId("training-feedback")).toContainText("Acertou");
+        await page.getByTestId("training-next").click();
+      }
+      expect(forwards).toBeGreaterThanOrEqual(3);
+      await expect(page.getByTestId("training-score")).toHaveText(`${total} de ${total}`);
+      // Errou: a tela mostra o certo e o porquê.
+      await page.getByTestId("training-again").click();
+      await page.getByTestId("training-option-wrong").first().click();
+      await expect(page.getByTestId("training-feedback")).toContainText("O certo:");
+      // Também pelo menu do nome.
+      await page.getByTestId("user-menu").click();
+      await expect(page.getByTestId("open-training")).toBeVisible();
       await context.close();
     });
 
@@ -1532,6 +1571,19 @@ test.describe.serial("festa das professoras e professores", () => {
       await admin.reload();
       await expect(admin.getByTestId("kit-item-name").first()).toHaveValue("Cerveja");
       await expect(admin.getByTestId("kit-kind-employee").getByTestId("kit-quantity")).toHaveText("1");
+    });
+
+    await test.step("relatório em PDF dos kits: estoque, pessoas, montagem e fila", async () => {
+      await admin.goto("/painel/kits");
+      await expect(admin.getByTestId("report-kits")).toBeVisible();
+      const pdf = await admin.request.get("/painel/relatorios/kits");
+      expect(pdf.status()).toBe(200);
+      expect(pdf.headers()["content-type"]).toBe("application/pdf");
+      expect(pdf.headers()["content-disposition"]).toMatch(/^inline; filename="relatorio-kits-\d{4}-\d{2}-\d{2}\.pdf"$/);
+      expect((await pdf.body()).length).toBeGreaterThan(20_000);
+      // Fica na auditoria.
+      await admin.goto("/painel/auditoria");
+      await expect(admin.getByText("Relatório em PDF gerado: kits e estoque.").first()).toBeVisible();
     });
     await adminContext.close();
   });

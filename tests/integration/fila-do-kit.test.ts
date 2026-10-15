@@ -11,9 +11,10 @@ import { kitOutlook } from "@/domain/kit-supply";
 import { ENTRY_KIT_MESSAGE } from "@/domain/labels";
 import { stockSettingsSchema } from "@/domain/schemas";
 import { db } from "@/server/db";
-import { auditLog, registration } from "@/server/db/schema";
+import { auditLog, kitStock, registration } from "@/server/db/schema";
 import { PUBLIC_ACTOR, type StaffActor } from "@/server/services/actor";
 import { decideAffiliation } from "@/server/services/affiliation";
+import { createEmployee } from "@/server/services/employees";
 import { registerCheckIn } from "@/server/services/checkin";
 import { DomainError } from "@/server/services/errors";
 import { loadGateView } from "@/server/services/gate-view";
@@ -188,6 +189,36 @@ describe("a fila anda quando vaga kit", () => {
     // Bia esperava: ganhou o kit; Carla, que chegou agora, entra na fila.
     expect((await waitlist(bia.registrationId)).MEMBER).toBeNull();
     expect((await waitlist(carla.registrationId)).MEMBER).toBeInstanceOf(Date);
+  });
+});
+
+describe("estoque único para todos", () => {
+  it("juntar os estoques faz a fila andar; colaboradores tiram do geral e contam nos garantidos (sem ir para a fila)", async () => {
+    await configureEvent(admin, { totalAll: 1, totalEmployee: 5, lowStockThreshold: 0 });
+    const ana = await registerMember({ memberName: "Ana Primeira Silva" });
+    const bia = await registerMember({ memberName: "Bia Segunda Souza" });
+    expect((await waitlist(bia.registrationId)).MEMBER).toBeInstanceOf(Date);
+    const rosa = await createEmployee(admin, { fullName: "Rosa Financeiro Lima", cpf: "", whatsapp: "", jobTitle: "Financeiro", guest: null });
+
+    // 1 geral + 5 dos colaboradores → um estoque só com 3: Ana + Rosa garantidas, sobra 1 para a Bia.
+    expect(await updateStockSettings(admin, stockSettingsSchema.parse({ stockMode: "UNIFIED", totalAll: 3, lowStockThreshold: 0 }))).toEqual({
+      promoted: 1,
+    });
+    expect((await waitlist(bia.registrationId)).MEMBER).toBeNull();
+    expect(await db.select({ pool: kitStock.pool, total: kitStock.total }).from(kitStock)).toEqual([{ pool: "ALL", total: 3 }]);
+
+    // O kit da colaboradora sai do estoque geral.
+    const entry = await registerCheckIn(security, { personId: rosa.personId, method: "SEARCH" });
+    expect(entry).toMatchObject({ kit: { kind: "DELIVERED", kitType: "EMPLOYEE", pool: "ALL" } });
+
+    // Cheio (Ana, Bia e Rosa): quem chega agora vai para a fila; a lista interna, não.
+    const carla = await registerMember({ memberName: "Carla Terceira Lima" });
+    expect((await waitlist(carla.registrationId)).MEMBER).toBeInstanceOf(Date);
+    expect(await getKitSupply(db)).toMatchObject({ shared: true, member: 0, queue: { member: 1 } });
+    const stats = await getDashboardStats(db);
+    expect(stats.stock?.pools).toEqual([expect.objectContaining({ pool: "ALL", total: 3, delivered: 1 })]);
+    expect(stats.kitDemand).toMatchObject({ member: 2, employee: 1 });
+    void ana;
   });
 });
 

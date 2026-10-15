@@ -204,6 +204,37 @@ function GateScene() {
   );
 }
 
+function TrainingScene() {
+  const loop = useLoop();
+  const bands = [
+    { label: "LIBERADO", tone: "bg-success text-success-foreground", answer: "Confirmar" },
+    { label: "FALTA RESOLVER", tone: "bg-warning text-warning-foreground", answer: "Atendimento" },
+    { label: "PAROU", tone: "bg-danger text-white", answer: "Ler o motivo" },
+  ];
+  return (
+    <div className="flex h-full flex-col justify-center gap-1.5 px-4">
+      {bands.map((band, index) => (
+        <motion.div
+          key={band.label}
+          className="flex items-center gap-2"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.15 + index * 0.3, type: "spring", stiffness: 260, damping: 22 }}
+        >
+          <span className={cn("display w-32 shrink-0 rounded-md px-2 py-1 text-center text-sm leading-none", band.tone)}>{band.label}</span>
+          <motion.span
+            className="flex items-center gap-1 rounded-md border border-line-strong bg-surface-2 px-2 py-1 text-[0.7rem] font-bold text-fg"
+            animate={{ opacity: [0, 0, 1, 1], scale: [0.8, 0.8, 1.06, 1] }}
+            transition={{ duration: 3, delay: index * 0.3, times: [0, 0.35, 0.5, 1], ...loop }}
+          >
+            <Check className="size-3.5 text-success-text" /> {band.answer}
+          </motion.span>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
 function EntriesScene() {
   const rows = [
     { time: "19:02", name: "Ana Lima", how: "QR Code" },
@@ -332,6 +363,8 @@ export function TutorialSceneView({ scene, initials }: { scene: TutorialScene; i
       return <VouchersScene />;
     case "gate":
       return <GateScene />;
+    case "training":
+      return <TrainingScene />;
     case "entries":
       return <EntriesScene />;
     case "house":

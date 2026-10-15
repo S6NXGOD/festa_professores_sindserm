@@ -80,7 +80,7 @@ export function SetupWizard({ timeZone }: { timeZone: string }) {
   useEffect(() => {
     if (stockForm.getFieldState("lowStockThreshold").isDirty) return;
     const total =
-      stockValues.stockMode === "SINGLE"
+      stockValues.stockMode !== "SPLIT"
         ? Number(stockValues.totalAll || 0)
         : Math.min(Number(stockValues.totalMember || 0), Number(stockValues.totalGuest || 0));
     if (total > 0) stockForm.setValue("lowStockThreshold", String(Math.ceil(total * 0.1)));
@@ -178,12 +178,12 @@ export function SetupWizard({ timeZone }: { timeZone: string }) {
                 <Summary
                   label="Quantidade"
                   value={
-                    s.stockMode === "SINGLE"
+                    s.stockMode !== "SPLIT"
                       ? `${String(s.totalAll ?? "")} kits`
                       : `${String(s.totalMember ?? "")} de professor(a) · ${String(s.totalGuest ?? "")} de convidado`
                   }
                 />
-                <Summary label="Kits entregues até" value={e.kitDeadlineTime ? formatClock(e.kitDeadlineTime) : "Sem limite"} />
+                <Summary label="Kits guardados até" value={e.kitDeadlineTime ? formatClock(e.kitDeadlineTime) : "Sem horário (guardados a festa toda)"} />
                 <Summary label="Alerta de estoque baixo" value={`Até ${String(s.lowStockThreshold ?? "")} kits`} />
               </dl>
             </>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { Chart, ChevronDown, Gamepad, Key, Logout, Play, QrCode, Volume, VolumeOff } from "@/components/icons/pixel";
+import { Chart, ChevronDown, Gamepad, Key, Logout, Play, QrCode, Target, Volume, VolumeOff } from "@/components/icons/pixel";
 import { openTutorial } from "@/components/tutorial/tutorial";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +26,7 @@ export function UserMenu({
   role,
   showPanel,
   showGate,
+  showTraining,
   compact = false,
   version,
 }: {
@@ -33,6 +34,8 @@ export function UserMenu({
   role: StaffRole;
   showPanel?: boolean;
   showGate?: boolean;
+  /** Quem registra entradas: atalho para o treino da portaria. */
+  showTraining?: boolean;
   compact?: boolean;
   /** "Versão ae46af8 · no ar desde ...": para conferir que uma mudança já foi publicada. */
   version?: string;
@@ -121,6 +124,13 @@ export function UserMenu({
         <DropdownMenuItem onSelect={() => openTutorial()} data-testid="open-tutorial">
           <Gamepad /> Tutorial do sistema
         </DropdownMenuItem>
+        {showTraining ? (
+          <DropdownMenuItem asChild>
+            <Link href="/portaria/treino" data-testid="open-training">
+              <Target /> Treino da portaria
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem asChild>
           <Link href="/conta">
             <Key /> Trocar senha

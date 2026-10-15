@@ -8,6 +8,7 @@ import { CategoryChip } from "@/components/staff/employee-category";
 import { BulkEmployeesDialog, EditEmployeeDialog, EmployeeDialog } from "@/components/staff/employee-dialogs";
 import { ChipFilters, EmptyState, PageHeader, StatTile } from "@/components/staff/panel-ui";
 import { ToneBadge } from "@/components/status/status-badge";
+import { ReportButton } from "@/components/staff/report-button";
 import { Button } from "@/components/ui/button";
 import { can } from "@/domain/access";
 import { employeeCategoryCount } from "@/domain/labels";
@@ -21,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { db } from "@/server/db";
 import { removeEmployeeAction, restoreEmployeeAction } from "@/server/actions/employees";
 import { type EmployeeRow, listEmployees } from "@/server/services/employees";
-import { getStockOverview } from "@/server/services/settings";
+import { employeePoolOf, getStockOverview } from "@/server/services/settings";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Colaboradores do SINDSERM" };
@@ -58,7 +59,9 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
   const companions = active.reduce((sum, row) => sum + (companionsOf.get(row.employeeId)?.length ?? 0), 0);
   // Todo colaborador tem kit; o convidado dele também; cada cortesia com kit, 1 (tudo do estoque dos colaboradores).
   const kitsNeeded = active.length + guests.length + courtesies;
-  const employeePool = stock?.pools.find((pool) => pool.pool === "EMPLOYEE") ?? null;
+  const employeePool = employeePoolOf(stock);
+  // Estoque único para todos: os kits da casa saem do geral (o aviso de "estoque dos colaboradores menor" não se aplica).
+  const sharedStock = stock?.mode === "UNIFIED";
   const byCategory = Object.fromEntries(COLLABORATOR_CATEGORIES.map((c) => [c, active.filter((row) => row.category === c).length])) as Record<
     CollaboratorCategory,
     number
@@ -81,7 +84,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
       <PageHeader
         eyebrow="Cadastro interno"
         title="Colaboradores do SINDSERM"
-        description="Diretoria, funcionários e prestadores de serviço liberados para a festa: cada um tem voucher próprio (o passe da casa, com a categoria), 1 kit de consumação e pode levar 1 convidado com kit. Quem mais vier junto entra como convidado sem kit (na tela da pessoa, também na portaria). Os kits saem do estoque dos colaboradores. Amigos e familiares da organização entram como cortesias."
+        description={`Diretoria, funcionários e prestadores de serviço liberados para a festa: cada um tem voucher próprio (o passe da casa, com a categoria), 1 kit de consumação e pode levar 1 convidado com kit. Quem mais vier junto entra como convidado sem kit (na tela da pessoa, também na portaria). Os kits saem ${sharedStock ? "do estoque geral (o mesmo de todos)" : "do estoque dos colaboradores"}. Amigos e familiares da organização entram como cortesias.`}
         actions={
           <>
             {canManage ? (
@@ -97,6 +100,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
                 </Link>
               </Button>
             ) : null}
+            <ReportButton type="colaboradores" />
           </>
         }
       />
@@ -120,7 +124,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
           testId="stat-employee-guests"
         />
         <StatTile
-          label="Estoque dos colaboradores"
+          label={sharedStock ? "Estoque geral (de todos)" : "Estoque dos colaboradores"}
           value={employeePool?.available ?? 0}
           icon={Gift}
           tone={!employeePool || employeePool.low ? "danger" : "neutral"}
@@ -130,7 +134,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
         />
       </div>
 
-      {kitsNeeded > 0 && (!employeePool || employeePool.total < kitsNeeded) ? (
+      {kitsNeeded > 0 && !sharedStock && (!employeePool || employeePool.total < kitsNeeded) ? (
         <p className="mb-5 flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft p-3.5 text-sm font-semibold text-fg">
           <Warning className="mt-0.5 size-4 shrink-0 text-warning" />
           <span>

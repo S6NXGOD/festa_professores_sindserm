@@ -6,8 +6,8 @@ const ids = (access: AccessMap) => tutorialSteps(access, "Maria Souza").map((ste
 
 describe("tutorial do primeiro acesso", () => {
   it("cada perfil vê só as fases do que usa", () => {
-    expect(ids(ROLE_PRESETS.SECURITY)).toEqual(["boas-vindas", "portaria", "pronto"]);
-    expect(ids(ROLE_PRESETS.ATTENDANT)).toEqual(["boas-vindas", "placar", "inscricoes", "fichas", "vouchers", "portaria", "na-festa", "pronto"]);
+    expect(ids(ROLE_PRESETS.SECURITY)).toEqual(["boas-vindas", "portaria", "treino", "pronto"]);
+    expect(ids(ROLE_PRESETS.ATTENDANT)).toEqual(["boas-vindas", "placar", "inscricoes", "fichas", "vouchers", "portaria", "treino", "na-festa", "pronto"]);
     expect(ids(ROLE_PRESETS.ADMIN)).toEqual([
       "boas-vindas",
       "placar",
@@ -15,6 +15,7 @@ describe("tutorial do primeiro acesso", () => {
       "fichas",
       "vouchers",
       "portaria",
+      "treino",
       "na-festa",
       "casa",
       "administracao",
@@ -42,6 +43,14 @@ describe("tutorial do primeiro acesso", () => {
     const gate = tutorialSteps(viewOnly, "Vera Lima").find((step) => step.id === "portaria")!;
     expect(gate.bullets.join(" ")).toContain("só para consultar");
     expect(gate.bullets.join(" ")).not.toContain("Confirmar entrada");
+    // Quem só consulta não tem o treino (ele é de quem registra entradas).
+    expect(ids(viewOnly)).not.toContain("treino");
+  });
+
+  it("quem registra entradas ganha a fase do treino, com o botão para treinar", () => {
+    const training = tutorialSteps(ROLE_PRESETS.SECURITY, "Rui Porto").find((step) => step.id === "treino")!;
+    expect(training.action).toEqual({ href: "/portaria/treino", label: "Treinar agora" });
+    expect(training.bullets.join(" ")).toContain("nada fica gravado");
   });
 
   it("toda fase tem título e pelo menos uma explicação", () => {

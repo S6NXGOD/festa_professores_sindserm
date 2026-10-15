@@ -34,7 +34,13 @@ export default async function PanelLayout({ children }: LayoutProps<"/painel">) 
               <div className="flex-1" />
             )}
             <div className="ml-auto">
-              <UserMenu name={actor.name} role={actor.role} showGate={can(actor.access, "viewGate")} version={appVersionLabel()} />
+              <UserMenu
+                name={actor.name}
+                role={actor.role}
+                showGate={can(actor.access, "viewGate")}
+                showTraining={can(actor.access, "checkIn")}
+                version={appVersionLabel()}
+              />
             </div>
           </div>
           <div className="neon-line h-px opacity-60" aria-hidden />

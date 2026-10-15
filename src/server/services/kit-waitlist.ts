@@ -28,7 +28,7 @@ const EXPECTED = sql`('PENDING', 'AWAITING_SIGNATURE', 'CONFIRMED', 'JOINED_AT_E
 type GroupPool = Exclude<StockPool, "EMPLOYEE">;
 
 function groupPools(mode: StockMode): GroupPool[] {
-  return mode === "SINGLE" ? ["ALL"] : ["MEMBER", "GUEST"];
+  return mode === "SPLIT" ? ["MEMBER", "GUEST"] : ["ALL"];
 }
 
 /** Modo do estoque (único ou separado); nulo antes da configuração da festa. */
@@ -69,13 +69,21 @@ async function slotCounts(ex: Executor, excludeRegistrationId: string | null) {
         WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.member_kit_waitlisted_at IS NOT NULL ${exclude})::int AS member_waitlist,
       (SELECT count(*) FROM registration r
         WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL ${exclude}
-          AND EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE'))::int AS guest_waitlist
+          AND EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE'))::int AS guest_waitlist,
+      -- Kits da lista interna (colaboradores com kit, convidados deles e cortesias com kit): no estoque único, tiram do mesmo total.
+      ((SELECT count(*) FROM employee WHERE removed_at IS NULL AND with_kit)
+       + (SELECT count(*) FROM employee e
+           WHERE e.removed_at IS NULL
+             AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.employee_id = e.id AND gl.status = 'ACTIVE')
+                  OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.employee_id = e.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))))::int
+        AS employee_committed
   `);
   const row = result.rows[0] ?? {};
   const n = (key: string) => Number(row[key] ?? 0);
   return {
     MEMBER: { committed: n("member_committed"), waitlist: n("member_waitlist") },
     GUEST: { committed: n("guest_committed"), waitlist: n("guest_waitlist") },
+    EMPLOYEE: { committed: n("employee_committed"), waitlist: 0 },
   };
 }
 
@@ -93,11 +101,13 @@ export async function loadKitBalances(
   ]);
   const member = { committed: counts.MEMBER.committed + (extra.MEMBER ?? 0), waitlist: counts.MEMBER.waitlist };
   const guest = { committed: counts.GUEST.committed + (extra.GUEST ?? 0), waitlist: counts.GUEST.waitlist };
+  // Estoque único para todos: os kits da lista interna também saem do geral (e nunca vão para a fila).
+  const house = mode === "UNIFIED" ? [counts.EMPLOYEE] : [];
   return pools.map((pool) => {
     const row = rows.find((r) => r.pool === pool);
     const total = row?.total ?? 0;
     const delivered = row?.delivered ?? 0;
-    const slots = pool === "ALL" ? [member, guest] : pool === "MEMBER" ? [member] : [guest];
+    const slots = pool === "ALL" ? [member, guest, ...house] : pool === "MEMBER" ? [member] : [guest];
     const committed = slots.reduce((sum, s) => sum + s.committed, 0);
     const waitlist = slots.reduce((sum, s) => sum + s.waitlist, 0);
     return { pool, total, delivered, committed, waitlist, free: Math.max(0, Math.min(total - committed, total - delivered)) };
@@ -119,7 +129,7 @@ export async function getKitSupply(ex: Executor): Promise<KitSupply | null> {
     return !balance || balance.total <= 0 ? null : Math.max(0, balance.free - balance.waitlist);
   };
   return {
-    shared: config.stockMode === "SINGLE",
+    shared: config.stockMode !== "SPLIT",
     member: open("MEMBER"),
     guest: open("GUEST"),
     queue: { member: balanceOf("MEMBER")?.waitlist ?? 0, guest: balanceOf("GUEST")?.waitlist ?? 0 },

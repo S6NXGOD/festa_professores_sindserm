@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { HelpLine } from "@/components/help/help";
-import { Calendar, Home } from "@/components/icons/pixel";
+import { Calendar, Home, QrCode } from "@/components/icons/pixel";
+import { ClosingSoon } from "@/components/public/closing-soon";
 import { PublicShell } from "@/components/public/public-shell";
 import { VenueCompact } from "@/components/public/venue";
 import { RegistrationFlow } from "@/components/registration/registration-flow";
 import { Button } from "@/components/ui/button";
-import { formatDateTime, todayInZone } from "@/lib/datetime";
+import { formatDateTime, formatTime, todayInZone } from "@/lib/datetime";
 import { db } from "@/server/db";
 import { getConfig, getEventInfo, getRegistrationWindow } from "@/server/queries/config";
 import { getKitSupply } from "@/server/services/kit-waitlist";
@@ -36,8 +37,19 @@ export default async function RegistrationPage({ searchParams }: PageProps<"/ins
           <p className="mt-3 text-fg-muted">
             {window.state === "NOT_OPEN"
               ? `As inscrições começam em ${formatDateTime(window.opensAt)}.`
-              : "O período de inscrições terminou."}
+              : window.state === "CLOSED"
+                ? `O período de inscrições terminou em ${formatDateTime(window.closesAt)}.`
+                : "O período de inscrições terminou."}
           </p>
+          {window.state === "CLOSED" ? (
+            <Link
+              href="/vouchers"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-fg underline-offset-4 hover:underline"
+              data-testid="closed-recover-link"
+            >
+              <QrCode className="size-4 text-red" /> Já se inscreveu? Recuperar meus vouchers
+            </Link>
+          ) : null}
           <HelpLine lead="Dúvidas?" topic="me inscrever na festa" className="mt-3 justify-center" />
           <Button asChild variant="outline" className="mt-6">
             <Link href="/">
@@ -51,6 +63,7 @@ export default async function RegistrationPage({ searchParams }: PageProps<"/ins
 
   return (
     <PublicShell eventName={config.name} backdrop="calm" help={{ topic: "fazer a minha inscrição", className: "bottom-28 sm:bottom-6" }}>
+      <ClosingSoon closesAt={window.closesAt} label={formatTime(window.closesAt)} />
       <RegistrationFlow
         initialPath={params.ficha === "1" ? "ficha" : "choose"}
         today={todayInZone()}

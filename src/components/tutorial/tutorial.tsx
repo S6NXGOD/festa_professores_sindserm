@@ -4,7 +4,7 @@ import confetti from "canvas-confetti";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, ChevronRight, Gamepad, PartyPopper } from "@/components/icons/pixel";
+import { ArrowLeft, ArrowRight, ChevronRight, Gamepad, PartyPopper, Target } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { TutorialStep } from "@/domain/tutorial";
@@ -142,6 +142,20 @@ export function Tutorial({ steps, autoOpen, initials }: { steps: TutorialStep[];
                   ))}
                 </ul>
               </DialogDescription>
+              {step.action ? (
+                <Button
+                  variant="success"
+                  className="mt-4 w-full sm:w-auto"
+                  onClick={() => {
+                    // Vai para o treino: o tutorial conta como visto (não abre de novo sozinho).
+                    close(false);
+                    router.push(step.action!.href);
+                  }}
+                  data-testid="tutorial-action"
+                >
+                  <Target /> {step.action.label}
+                </Button>
+              ) : null}
             </div>
           </motion.div>
         </AnimatePresence>

@@ -6,7 +6,16 @@ import type { PixelIcon } from "@/components/icons/pixel";
  * estoque, e o que acontece em cada situação (esgotou, vagou, sobrou, acabou na
  * porta). Para a equipe consultar na hora, sem depender de ninguém.
  */
-export function KitRules({ deadlineLabel, separateStock }: { deadlineLabel: string | null; separateStock: boolean }) {
+export function KitRules({
+  deadlineLabel,
+  separateStock,
+  sharedStock = false,
+}: {
+  deadlineLabel: string | null;
+  separateStock: boolean;
+  /** Estoque único para todos (inclusive colaboradores e cortesias). */
+  sharedStock?: boolean;
+}) {
   const rules: { icon: PixelIcon; title: string; text: string }[] = [
     {
       icon: Teach,
@@ -16,12 +25,12 @@ export function KitRules({ deadlineLabel, separateStock }: { deadlineLabel: stri
     {
       icon: Building,
       title: "Colaboradores e cortesias",
-      text: "Colaborador(a) do SINDSERM: 1 kit e mais 1 para o convidado. Cortesia: com ou sem kit, como foi cadastrada. Os três saem do estoque dos colaboradores.",
+      text: `Colaborador(a) do SINDSERM: 1 kit e mais 1 para o convidado. Cortesia: com ou sem kit, como foi cadastrada. ${sharedStock ? "Todos tiram do mesmo estoque." : "Os três saem do estoque dos colaboradores."}`,
     },
     {
       icon: Clock,
       title: "Quando sai",
-      text: `Na portaria, junto com a entrada${deadlineLabel ? `, até as ${deadlineLabel}. Depois desse horário, quem entra fica sem kit` : ""}.`,
+      text: `Na portaria, junto com a entrada (ninguém registra retirada: entrou, saiu 1 kit).${deadlineLabel ? ` Até as ${deadlineLabel}, cada kit fica guardado para quem se inscreveu; depois, as sobras saem por ordem de chegada, enquanto houver.` : ""}`,
     },
     {
       icon: Package,
@@ -40,8 +49,8 @@ export function KitRules({ deadlineLabel, separateStock }: { deadlineLabel: stri
     },
     {
       icon: Gift,
-      title: "Sobrou kit na festa",
-      text: "Gente que não veio deixa kit guardado. No fim, na portaria, abra quem está na fila (depois da entrada) e toque em Entregar kit de sobra.",
+      title: "Sobras (quem não veio)",
+      text: `Gente que não veio deixa kit guardado.${deadlineLabel ? ` Depois das ${deadlineLabel}, esses kits saem para quem entrar, inclusive da fila.` : ""} Quem da fila já tinha entrado pode receber pelo botão Entregar agora.`,
     },
     {
       icon: Warning,

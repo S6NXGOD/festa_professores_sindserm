@@ -3,7 +3,8 @@ import { eq, sql } from "drizzle-orm";
 import type { Executor } from "@/server/db";
 import { eventConfig, kitDelivery, kitStock } from "@/server/db/schema";
 import type { EventSettingsData, HelpSettingsData, SigningSettingsData, StockSettingsData } from "@/domain/schemas";
-import { isLowEmployeeStock, isLowStock, poolsForMode } from "@/domain/rules";
+import { STOCK_MODE_LABEL } from "@/domain/labels";
+import { employeeStockPool, isLowEmployeeStock, isLowStock, poolsForMode } from "@/domain/rules";
 import type { StockMode, StockPool } from "@/domain/types";
 import { zonedLocalToUtc } from "@/lib/datetime";
 import { type Actor, assertPermission } from "./actor";
@@ -69,6 +70,7 @@ function eventValues(data: EventSettingsData) {
 }
 
 function desiredTotals(stock: StockSettingsData): Partial<Record<StockPool, number>> {
+  if (stock.stockMode === "UNIFIED") return { ALL: stock.totalAll ?? 0 };
   const employees = { EMPLOYEE: stock.totalEmployee ?? 0 };
   return stock.stockMode === "SINGLE"
     ? { ALL: stock.totalAll ?? 0, ...employees }
@@ -163,7 +165,8 @@ export async function updateStockSettings(actor: Actor, stock: StockSettingsData
     const delivered = await deliveredByGroup(tx);
     const totals = desiredTotals(stock);
     const deliveredPerPool: Record<StockPool, number> = {
-      ALL: delivered.MEMBER + delivered.GUEST,
+      // No estoque único para todos, o geral também conta os kits de colaboradores e cortesias.
+      ALL: delivered.MEMBER + delivered.GUEST + (stock.stockMode === "UNIFIED" ? delivered.EMPLOYEE : 0),
       MEMBER: delivered.MEMBER,
       GUEST: delivered.GUEST,
       EMPLOYEE: delivered.EMPLOYEE,
@@ -194,7 +197,7 @@ export async function updateStockSettings(actor: Actor, stock: StockSettingsData
     await writeAudit(tx, actor, {
       action: "STOCK_UPDATED",
       entityType: "stock",
-      summary: `Estoque alterado para ${stock.stockMode === "SINGLE" ? "estoque único" : "estoque separado"}.`,
+      summary: `Estoque alterado: ${STOCK_MODE_LABEL[stock.stockMode].toLowerCase()}.`,
       before: {
         stockMode: config.stockMode,
         lowStockThreshold: config.lowStockThreshold,
@@ -307,6 +310,12 @@ export interface StockOverview {
   totalDelivered: number;
   totalAvailable: number;
   anyLow: boolean;
+}
+
+/** O estoque de onde saem os kits de colaboradores, convidados deles e cortesias (no estoque único, o geral). */
+export function employeePoolOf(stock: StockOverview | null): StockPoolView | null {
+  if (!stock) return null;
+  return stock.pools.find((pool) => pool.pool === employeeStockPool(stock.mode)) ?? null;
 }
 
 export async function getStockOverview(ex: Executor): Promise<StockOverview | null> {

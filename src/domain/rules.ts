@@ -79,7 +79,6 @@ export function decideEntry({ checkIn, ownStatus, hostStatus, employee, employee
 export type KitBlockCode =
   | "NOT_ACTIVE_MEMBER"
   | "NOT_TEACHER"
-  | "DEADLINE_PASSED"
   | "MEMBER_NOT_CHECKED_IN"
   | "NO_GUEST"
   | "HOST_NOT_CHECKED_IN"
@@ -105,7 +104,10 @@ export interface KitRegistrationInput {
   /** O convidado já entrou na festa. */
   guestCheckedIn: boolean;
   deliveries: Deliveries;
-  /** O horário limite para entregar kits já passou. */
+  /**
+   * Passou o horário até quando os kits ficam guardados (decisão da organização):
+   * a fila do kit não espera mais — as sobras saem para quem entrar, enquanto houver.
+   */
   deadlinePassed: boolean;
   /**
    * O(a) filiado(a) já recebeu um kit quando era convidado(a) de outra pessoa
@@ -121,15 +123,15 @@ export interface KitRegistrationInput {
  * convidado. Os kits saem na recepção, junto com as entradas: o do(a)
  * professor(a) na entrada dele(a); o do convidado só quando os dois já chegaram
  * (na entrada do convidado ou, se ele chegou antes, na chegada do(a) professor(a)).
- * Convidado fictício não gera kit. Até o horário limite. Filiados(as) que não
- * são professoras ou professores não têm direito a kit.
+ * Convidado fictício não gera kit. Filiados(as) que não são professoras ou
+ * professores não têm direito a kit. Até o horário dos kits guardados, o kit de
+ * quem está na fila espera; depois dele, as sobras saem por ordem de chegada.
  */
 export function kitAvailability(reg: KitRegistrationInput, kitType: GroupKitType): KitAvailability {
   const delivered = reg.deliveries[kitType];
   if (delivered) return { kind: "DELIVERED", delivery: delivered };
   if (!isActiveMember(reg.status)) return { kind: "BLOCKED", code: "NOT_ACTIVE_MEMBER" };
   if (!reg.isTeacher) return { kind: "BLOCKED", code: "NOT_TEACHER" };
-  if (reg.deadlinePassed) return { kind: "BLOCKED", code: "DEADLINE_PASSED" };
   if (kitType === "MEMBER") {
     if (reg.memberReceivedGuestKit) return { kind: "BLOCKED", code: "MEMBER_GOT_GUEST_KIT" };
     if (!reg.memberCheckedIn) return { kind: "BLOCKED", code: "MEMBER_NOT_CHECKED_IN" };
@@ -141,7 +143,8 @@ export function kitAvailability(reg: KitRegistrationInput, kitType: GroupKitType
     if (!reg.guestCheckedIn) return { kind: "BLOCKED", code: "GUEST_NOT_CHECKED_IN" };
   }
   // Por último: tudo certo, só falta vagar kit (a fila guarda o kit de quem se inscreveu antes).
-  if (reg.waitlisted?.[kitType]) return { kind: "BLOCKED", code: "KIT_WAITLIST" };
+  // Depois do horário dos kits guardados, as sobras saem também para quem está na fila.
+  if (reg.waitlisted?.[kitType] && !reg.deadlinePassed) return { kind: "BLOCKED", code: "KIT_WAITLIST" };
   return { kind: "AVAILABLE" };
 }
 
@@ -155,6 +158,7 @@ export interface EmployeeKitInput {
   /** O convidado do(a) funcionário(a) já entrou na festa. */
   guestCheckedIn: boolean;
   deliveries: EmployeeDeliveries;
+  /** Passou o horário dos kits guardados (o kit do(a) colaborador(a) sai do mesmo jeito, se houver). */
   deadlinePassed: boolean;
 }
 
@@ -168,7 +172,6 @@ export function employeeKitAvailability(input: EmployeeKitInput, kitType: Employ
   if (delivered) return { kind: "DELIVERED", delivery: delivered };
   if (!input.active) return { kind: "BLOCKED", code: "EMPLOYEE_REMOVED" };
   if (kitType === "EMPLOYEE" && input.withKit === false) return { kind: "BLOCKED", code: "WITHOUT_KIT" };
-  if (input.deadlinePassed) return { kind: "BLOCKED", code: "DEADLINE_PASSED" };
   if (kitType === "EMPLOYEE") {
     if (!input.employeeCheckedIn) return { kind: "BLOCKED", code: "EMPLOYEE_NOT_CHECKED_IN" };
   } else {
@@ -185,13 +188,21 @@ export function employeeKitAvailability(input: EmployeeKitInput, kitType: Employ
  * funcionários, separado dos kits de professoras, professores e convidados.
  */
 export function stockPoolFor(mode: StockMode, kitType: KitType, employeeGroup = false): StockPool {
+  // Estoque único para todos: qualquer kit (inclusive de colaboradores e cortesias) sai do mesmo total.
+  if (mode === "UNIFIED") return "ALL";
   if (employeeGroup || kitType === "EMPLOYEE") return "EMPLOYEE";
   if (mode === "SINGLE") return "ALL";
   return kitType === "MEMBER" ? "MEMBER" : "GUEST";
 }
 
 export function poolsForMode(mode: StockMode): StockPool[] {
+  if (mode === "UNIFIED") return ["ALL"];
   return mode === "SINGLE" ? ["ALL", "EMPLOYEE"] : ["MEMBER", "GUEST", "EMPLOYEE"];
+}
+
+/** De qual estoque saem os kits de colaboradores, convidados deles e cortesias. */
+export function employeeStockPool(mode: StockMode): StockPool {
+  return stockPoolFor(mode, "EMPLOYEE", true);
 }
 
 export function isLowStock(available: number, threshold: number): boolean {

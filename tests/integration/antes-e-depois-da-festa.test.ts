@@ -1,12 +1,10 @@
 /**
- * O que muda com o relógio: fim das inscrições pelo site, horário limite dos kits
- * mudado depois de passar e o placar antes da festa começar.
+ * O que muda com o relógio: fim das inscrições pelo site, os kits guardados até o
+ * horário (depois, sobras por ordem de chegada) e o placar antes da festa começar.
  */
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ROLE_PRESETS } from "@/domain/access";
-import { eventSettingsSchema } from "@/domain/schemas";
-import { utcToZonedLocalInput } from "@/lib/datetime";
+import { ENTRY_KIT_MESSAGE } from "@/domain/labels";
 import { db } from "@/server/db";
 import { eventConfig } from "@/server/db/schema";
 import { PUBLIC_ACTOR, type StaffActor } from "@/server/services/actor";
@@ -14,11 +12,8 @@ import { decideAffiliation } from "@/server/services/affiliation";
 import { registerCheckIn } from "@/server/services/checkin";
 import { createEmployee } from "@/server/services/employees";
 import { DomainError } from "@/server/services/errors";
-import { buildGateView } from "@/server/services/gate-view";
-import { deliverKit } from "@/server/services/kits";
 import { createPreAffiliation, createRegistration } from "@/server/services/registration";
-import { getEventConfig, getStockOverview, registrationWindow, updateEventSettings } from "@/server/services/settings";
-import { loadPersonState } from "@/server/services/state";
+import { getEventConfig, registrationWindow } from "@/server/services/settings";
 import { getDashboardStats } from "@/server/services/stats";
 import {
   configureEvent,
@@ -81,44 +76,25 @@ describe("fim das inscrições pelo site", () => {
   });
 });
 
-describe("horário limite dos kits mudado depois de passar", () => {
-  it("vale na hora: quem entrou sem kit recebe pelo 'Entregar agora' e quem chega depois já leva", async () => {
-    const event = { eventDate: "2026-10-15", startTime: "19:00", kitDeadlineTime: "22:00" };
-    await configureEvent(admin, event);
-    const host = await registerMember({ guest: true });
-    await decideAffiliation(attendant, { registrationId: host.registrationId, decision: "CONFIRM" });
+describe("kits guardados até o horário; depois, sobras por ordem de chegada", () => {
+  it("antes do horário a fila espera; depois, quem entra leva o kit enquanto houver (inclusive da fila)", async () => {
+    await configureEvent(admin, { eventDate: "2026-10-15", startTime: "19:00", kitDeadlineTime: "22:00", totalAll: 1, lowStockThreshold: 0 });
+    const ana = await registerMember({ memberName: "Ana Garantida Silva" });
+    const bia = await registerMember({ memberName: "Bia Da Fila Souza" });
+    const carla = await registerMember({ memberName: "Carla Da Fila Lima" });
+    for (const reg of [ana, bia, carla]) await decideAffiliation(attendant, { registrationId: reg.registrationId, decision: "CONFIRM" });
 
-    // 22h de 15/10 em São Paulo = 01h UTC de 16/10. Às 22h30 o horário já passou.
-    const late = new Date("2026-10-16T01:30:00Z");
-    const entry = await registerCheckIn(security, { personId: host.state.member.id, method: "SEARCH" }, late);
-    expect(entry).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "NONE", message: "Sem kit: o horário de entregar kits já passou." } });
-    await expectDomainError(deliverKit(attendant, { personId: host.state.member.id, kitType: "MEMBER" }, late), "KIT_NOT_AVAILABLE");
+    // 21h em São Paulo (00h UTC de 16/10): Carla, da fila, entra sem kit — o kit da Ana está guardado.
+    const early = await registerCheckIn(security, { personId: carla.state.member.id, method: "SEARCH" }, new Date("2026-10-16T00:00:00Z"));
+    expect(early).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "NONE", message: ENTRY_KIT_MESSAGE.KIT_WAITLIST } });
 
-    // O administrador muda para 23h (mesmo formulário de Configurações).
-    const now = Date.now();
-    await updateEventSettings(
-      admin,
-      eventSettingsSchema.parse({
-        name: "Festa das Professoras e Professores",
-        description: "",
-        eventDate: event.eventDate,
-        startTime: event.startTime,
-        endTime: "",
-        registrationOpensAt: utcToZonedLocalInput(new Date(now - 2 * 86_400_000)),
-        registrationClosesAt: utcToZonedLocalInput(new Date(now + 2 * 86_400_000)),
-        kitDeadlineTime: "23:00",
-      }),
-    );
+    // 22h30: passou o horário dos kits guardados. Bia, da fila, leva a sobra (a Ana ainda não veio).
+    const late = await registerCheckIn(security, { personId: bia.state.member.id, method: "SEARCH" }, new Date("2026-10-16T01:30:00Z"));
+    expect(late).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "DELIVERED", kitType: "MEMBER" } });
 
-    // A tela da pessoa volta a oferecer o kit que não saiu...
-    const [state, config, stock] = await Promise.all([loadPersonState(db, host.state.member.id), getEventConfig(db), getStockOverview(db)]);
-    const view = buildGateView(state!, ROLE_PRESETS.ATTENDANT, config, late, stock);
-    expect(view.ownRegistration?.kits.MEMBER).toEqual({ kind: "AVAILABLE" });
-    // ...e o "Entregar agora" funciona.
-    expect(await deliverKit(attendant, { personId: host.state.member.id, kitType: "MEMBER" }, late)).toMatchObject({ kitType: "MEMBER" });
-    // Quem chega depois disso já sai com o kit na entrada.
-    const guest = await registerCheckIn(security, { personId: host.state.guest!.personId, method: "SEARCH" }, late);
-    expect(guest).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "DELIVERED", kitType: "GUEST" } });
+    // 22h40: Ana chega depois do horário e o kit já saiu (sobras por ordem de chegada).
+    const anaLate = await registerCheckIn(security, { personId: ana.state.member.id, method: "SEARCH" }, new Date("2026-10-16T01:40:00Z"));
+    expect(anaLate).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "NONE", message: ENTRY_KIT_MESSAGE.OUT_OF_STOCK } });
   });
 });
 

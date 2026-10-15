@@ -78,6 +78,13 @@
       "when": 1792092885307,
       "tag": "0010_fila_e_montagem_do_kit",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792097715499,
+      "tag": "0011_estoque_unico_para_todos",
+      "breakpoints": true
     }
   ]
 }

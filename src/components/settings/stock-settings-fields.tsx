@@ -2,7 +2,7 @@
 
 import { Controller, type UseFormReturn, useWatch } from "react-hook-form";
 import { FormField } from "@/components/forms/form-field";
-import { Check, Package, Sliders } from "@/components/icons/pixel";
+import { Check, Package, Sliders, Users } from "@/components/icons/pixel";
 import { Input } from "@/components/ui/input";
 import type { StockSettingsData, StockSettingsInput } from "@/domain/schemas";
 import { cn } from "@/lib/utils";
@@ -24,9 +24,22 @@ export function StockFields({
   const mode = useWatch({ control: form.control, name: "stockMode" });
   const e = form.formState.errors;
   const options = [
-    { value: "SINGLE" as const, icon: Package, title: "Estoque único", text: "Um total só, para professoras, professores e convidados." },
-    { value: "SPLIT" as const, icon: Sliders, title: "Estoque separado", text: "Quantidades distintas: professor(a) e convidado." },
+    {
+      value: "UNIFIED" as const,
+      icon: Users,
+      title: "Um estoque só para todos",
+      text: "Professoras, professores, convidados, colaboradores e cortesias tiram do mesmo total.",
+      badge: "Mais simples",
+    },
+    {
+      value: "SINGLE" as const,
+      icon: Package,
+      title: "Geral + colaboradores",
+      text: "Um total para professoras, professores e convidados; outro para colaboradores e cortesias.",
+    },
+    { value: "SPLIT" as const, icon: Sliders, title: "Tudo separado", text: "Professor(a), convidado e colaboradores, cada um com a sua quantidade." },
   ];
+  const deliveredAll = delivered ? delivered.member + delivered.guest + (delivered.employee ?? 0) : 0;
 
   const numberField = (
     name: "totalAll" | "totalMember" | "totalGuest" | "totalEmployee" | "lowStockThreshold",
@@ -61,7 +74,7 @@ export function StockFields({
         control={form.control}
         name="stockMode"
         render={({ field }) => (
-          <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Modo de estoque">
+          <div className="grid gap-3 lg:grid-cols-3" role="radiogroup" aria-label="Modo de estoque">
             {options.map((option) => {
               const selected = field.value === option.value;
               return (
@@ -70,7 +83,17 @@ export function StockFields({
                   type="button"
                   role="radio"
                   aria-checked={selected}
-                  onClick={() => field.onChange(option.value)}
+                  onClick={() => {
+                    // Juntando os estoques, o total já vem somado (geral + colaboradores): ninguém precisa fazer a conta.
+                    if (option.value === "UNIFIED" && field.value !== "UNIFIED") {
+                      const values = form.getValues();
+                      const count = (value: unknown) => Number(value) || 0;
+                      const general = field.value === "SPLIT" ? count(values.totalMember) + count(values.totalGuest) : count(values.totalAll);
+                      form.setValue("totalAll", general + count(values.totalEmployee), { shouldDirty: true });
+                    }
+                    field.onChange(option.value);
+                  }}
+                  data-testid={`stock-mode-${option.value.toLowerCase()}`}
                   className={cn(
                     "flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-[border-color,background-color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-red/50",
                     selected ? "border-red bg-brand-soft shadow-[0_0_24px_-12px_var(--glow)]" : "border-line-strong bg-surface-2 hover:border-[#55555c]",
@@ -80,7 +103,10 @@ export function StockFields({
                     <option.icon className="size-5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-bold text-fg">{option.title}</span>
+                    <span className="block font-bold text-fg">
+                      {option.title}
+                      {"badge" in option ? <span className="pixel ml-2 rounded bg-success/20 px-1.5 py-0.5 align-middle text-[0.45rem] text-success-text">{option.badge}</span> : null}
+                    </span>
                     <span className="block text-sm text-fg-muted">{option.text}</span>
                   </span>
                   {selected ? <Check className="size-5 text-red" /> : null}
@@ -91,7 +117,14 @@ export function StockFields({
         )}
       />
 
-      {mode === "SINGLE" ? (
+      {mode === "UNIFIED" ? (
+        numberField(
+          "totalAll",
+          "stock-all",
+          "Quantidade total de kits (para todos)",
+          `Todos os kits que vocês têm, para professoras, professores, convidados, colaboradores e cortesias.${delivered ? ` Já entregues: ${deliveredAll}.` : ""}`,
+        )
+      ) : mode === "SINGLE" ? (
         numberField("totalAll", "stock-all", "Quantidade total de kits", delivered ? `Já entregues: ${delivered.member + delivered.guest}` : undefined)
       ) : (
         <div className="grid gap-5 sm:grid-cols-2">
@@ -100,6 +133,7 @@ export function StockFields({
         </div>
       )}
 
+      {mode === "UNIFIED" ? null : (
       <div className="rounded-xl border-2 border-warning/40 bg-warning-soft p-4">
         {numberField(
           "totalEmployee",
@@ -110,12 +144,15 @@ export function StockFields({
           }`,
         )}
       </div>
+      )}
 
       {numberField(
         "lowStockThreshold",
         "stock-threshold",
         "Alertar quando restarem até",
-        "Quando o saldo chegar a este número, o painel avisa que o estoque está baixo. Nos kits dos colaboradores, o aviso aparece quando o que resta não dá para os colaboradores e convidados que ainda vão receber.",
+        mode === "UNIFIED"
+          ? "Quando o saldo chegar a este número, o painel avisa que o estoque está baixo."
+          : "Quando o saldo chegar a este número, o painel avisa que o estoque está baixo. Nos kits dos colaboradores, o aviso aparece quando o que resta não dá para os colaboradores e convidados que ainda vão receber.",
       )}
     </div>
   );

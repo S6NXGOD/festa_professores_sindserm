@@ -6,6 +6,7 @@ import { PlayerTag } from "@/components/retro/bits";
 import { AnimatedList } from "@/components/staff/animated-list";
 import { ChipFilters, DayHeading, EmptyState, FilterBar, OrderToggle, PageHeader, Pagination } from "@/components/staff/panel-ui";
 import { VerificationCard } from "@/components/staff/queue-cards";
+import { ReportButton } from "@/components/staff/report-button";
 import { WhatsAppButton } from "@/components/staff/whatsapp-button";
 import { AffiliationBadge, TeacherBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
@@ -161,13 +162,16 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
               : `${plural(statusCounts.total, "inscrição", "inscrições")}${today ? ` · ${today} hoje` : ""}. Cada uma é o(a) professor(a) ou filiado(a) e, se houver, o convidado. A busca acha também o convidado.`
         }
         actions={
-          can(actor.access, "registerAtEvent") ? (
-            <Button asChild>
-              <Link href="/painel/inscricoes/nova">
-                <UserPlus /> Cadastrar na hora
-              </Link>
-            </Button>
-          ) : null
+          <>
+            {can(actor.access, "registerAtEvent") ? (
+              <Button asChild>
+                <Link href="/painel/inscricoes/nova">
+                  <UserPlus /> Cadastrar na hora
+                </Link>
+              </Button>
+            ) : null}
+            <ReportButton type="inscricoes" />
+          </>
         }
       />
       <ChipFilters

@@ -284,11 +284,11 @@ describe("entrada e kits do grupo do funcionário", () => {
     const noStock = await createEmployee(admin, employee({ fullName: "Sem Estoque Silva" }));
     expect((await loadGateView(db, noStock.personId, ROLE_PRESETS.SECURITY))?.kitOnEntry).toEqual({
       kind: "NONE",
-      message: "Sem kit: cadastre o estoque de kits dos colaboradores (Kits e estoque).",
+      message: "Sem kit: falta cadastrar a quantidade de kits (Kits e estoque → Quantidades).",
     });
     expect(await registerCheckIn(security, { personId: noStock.personId, method: "QR" })).toMatchObject({
       outcome: "CHECKED_IN",
-      kit: { kind: "NONE", message: "Sem kit: cadastre o estoque de kits dos colaboradores (Kits e estoque)." },
+      kit: { kind: "NONE", message: "Sem kit: falta cadastrar a quantidade de kits (Kits e estoque → Quantidades)." },
     });
     await expectDomainError(deliverKit(attendant, { personId: noStock.personId, kitType: "EMPLOYEE" }), "OUT_OF_STOCK");
 

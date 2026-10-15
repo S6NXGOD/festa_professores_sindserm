@@ -196,11 +196,14 @@ export function ConfirmEntryButton({
 export function KitOnEntryTile({
   kit,
   deadline,
+  minorKit = false,
   className,
   testId = "kit-on-entry",
 }: {
   kit: KitOnEntry;
   deadline?: GateView["kitDeadline"];
+  /** A montagem tem kit próprio para menor de 18: o cartão diz qual entregar. */
+  minorKit?: boolean;
   className?: string;
   testId?: string;
 }) {
@@ -229,6 +232,15 @@ export function KitOnEntryTile({
             {kit.detail}
             {deadline && !deadline.passed ? <span className="whitespace-nowrap"> · até {formatTime(deadline.at)}</span> : null}
           </p>
+          {minorKit && kit.minors ? (
+            <p
+              className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-warning px-2 py-1 text-xs font-bold text-warning-foreground"
+              data-testid="minor-kit-note"
+            >
+              <Warning className="size-3.5 shrink-0" />
+              {kit.minors === kit.count ? (kit.count === 2 ? "Os 2 são kit de menor de 18" : "Kit de menor de 18") : "1 deles é kit de menor de 18"}
+            </p>
+          ) : null}
         </div>
       </motion.div>
     );
@@ -260,8 +272,8 @@ function EntryKitBanner({ kit, guestKit, courtesy = false }: { kit: EntryKitResu
         ? `Kit de convidado para ${kit.beneficiaryName}.`
         : kit.kitType === "EMPLOYEE"
           ? courtesy
-            ? "Kit da cortesia (estoque dos colaboradores)."
-            : "Kit de colaborador(a) (estoque dos colaboradores)."
+            ? `Kit da cortesia${kit.pool === "EMPLOYEE" ? " (estoque dos colaboradores)" : ""}.`
+            : `Kit de colaborador(a)${kit.pool === "EMPLOYEE" ? " (estoque dos colaboradores)" : ""}.`
           : "Kit de consumação do(a) professor(a).",
     );
   } else {
@@ -318,8 +330,8 @@ function DetailRows({ view }: { view: GateView }) {
   const own = view.ownRegistration;
   const isGuest = view.role === "GUEST";
   const deadline = view.kitDeadline ? (
-    <span className={cn("mt-1.5 block text-xs font-bold", view.kitDeadline.passed ? "text-danger" : "text-fg-muted")}>
-      {view.kitDeadline.passed ? "Horário de entregar kits encerrado" : `Kits até ${formatTime(view.kitDeadline.at)}`}
+    <span className={cn("mt-1.5 block text-xs font-bold", view.kitDeadline.passed ? "text-warning" : "text-fg-muted")}>
+      {view.kitDeadline.passed ? "Sobras liberadas: kit por ordem de chegada" : `Kits guardados até ${formatTime(view.kitDeadline.at)}`}
     </span>
   ) : null;
 
@@ -572,7 +584,7 @@ export function GateResult({
           </p>
         </div>
 
-        {deciding && view.kitOnEntry ? <KitOnEntryTile kit={view.kitOnEntry} deadline={view.kitDeadline} /> : null}
+        {deciding && view.kitOnEntry ? <KitOnEntryTile kit={view.kitOnEntry} deadline={view.kitDeadline} minorKit={view.minorKit} /> : null}
 
         {teacherCheck ? (
           <p

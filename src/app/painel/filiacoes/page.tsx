@@ -8,6 +8,7 @@ import { ChipFilters, EmptyState, FilterBar, OrderToggle, PageHeader, Pagination
 import { SignatureCard } from "@/components/staff/queue-cards";
 import { DocumentThumbs } from "@/components/documents/document-thumbs";
 import { TeacherBadge, ToneBadge } from "@/components/status/status-badge";
+import { ReportButton } from "@/components/staff/report-button";
 import { Button } from "@/components/ui/button";
 import { formatShortDateTime } from "@/lib/datetime";
 import { APP_NAME, getConfig } from "@/server/queries/config";
@@ -57,14 +58,17 @@ export default async function AffiliationFormsPage({ searchParams }: PageProps<"
             : "Fichas preenchidas no site (antes da festa) ou no Atendimento. Assinada = filiado(a): no papel, na recepção, ou antes, pelo gov.br."
         }
         actions={
-          // Só quem faz fichas vê o botão (quem só vê as fichas cairia numa tela bloqueada).
-          can(actor.access, "newAffiliation") ? (
-            <Button asChild>
-              <Link href="/painel/filiacoes/nova">
-                <Plus /> Nova ficha
-              </Link>
-            </Button>
-          ) : null
+          <>
+            {/* Só quem faz fichas vê o botão (quem só vê as fichas cairia numa tela bloqueada). */}
+            {can(actor.access, "newAffiliation") ? (
+              <Button asChild>
+                <Link href="/painel/filiacoes/nova">
+                  <Plus /> Nova ficha
+                </Link>
+              </Button>
+            ) : null}
+            <ReportButton type="fichas" />
+          </>
         }
       />
       <ChipFilters

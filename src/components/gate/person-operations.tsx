@@ -106,7 +106,7 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
         {courtesy.active && p.deliverKits && showKit ? (
           <GroupKitsSection
             view={view}
-            intro="O kit sai sozinho com a entrada, do estoque dos colaboradores."
+            intro="O kit sai sozinho com a entrada."
             cards={[{ type: "EMPLOYEE", label: "Kit da cortesia", detail: `Para ${view.fullName}, na entrada dele(a)`, state: courtesy.kits.EMPLOYEE }]}
             onChanged={onChanged}
           />
@@ -124,7 +124,7 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
         {staffGroup.active && p.deliverKits ? (
           <GroupKitsSection
             view={view}
-            intro="Os kits saem sozinhos com as entradas, do estoque dos colaboradores. O do convidado só sai depois que o(a) colaborador(a) chegar: se o convidado chegou antes, o kit dele sai junto com a entrada do(a) colaborador(a)."
+            intro="Os kits saem sozinhos com as entradas. O do convidado só sai depois que o(a) colaborador(a) chegar: se o convidado chegou antes, o kit dele sai junto com a entrada do(a) colaborador(a)."
             cards={[
               { type: "EMPLOYEE", label: KIT_TYPE_LABEL.EMPLOYEE, detail: `Para ${view.fullName}, na entrada dele(a)`, state: staffGroup.kits.EMPLOYEE },
               {
@@ -527,11 +527,11 @@ function GroupKitsSection({
           <span
             className={cn(
               "flex items-center gap-2 rounded-md border px-2.5 py-1.5",
-              view.kitDeadline.passed ? "border-danger/50" : "border-line-strong",
+              view.kitDeadline.passed ? "border-warning/50" : "border-line-strong",
             )}
           >
             <Clock className="size-4 text-red" />
-            <DeadlineTimer deadline={view.kitDeadline.at} />
+            <DeadlineTimer deadline={view.kitDeadline.at} doneLabel="SOBRAS" doneClassName="text-warning" />
           </span>
         ) : null
       }
@@ -595,7 +595,7 @@ function GroupKitsSection({
                     </Button>
                   }
                   title="Entregar um kit de sobra?"
-                  description={`${kit.type === "GUEST" ? `O convidado ${kit.guestName ?? ""}` : view.fullName} está na fila do kit: a inscrição foi feita depois que os kits acabaram. Use quando sobrar kit (por exemplo, no fim da festa, de quem não veio). O kit sai do estoque agora e fica na auditoria.`}
+                  description={`${kit.type === "GUEST" ? `O convidado ${kit.guestName ?? ""}` : view.fullName} está na fila do kit: a inscrição foi feita depois que os kits acabaram. Use só quando sobrar kit de quem não veio (até o horário dos kits guardados, cada kit é de quem se inscreveu). O kit sai do estoque agora e fica na auditoria.`}
                   confirmLabel="Entregar a sobra"
                   tone="success"
                   sound="powerup"
@@ -1122,7 +1122,7 @@ function AdminSection({ view, onChanged }: { view: GateView; onChanged?: () => v
             title={`Estornar ${kitName(type).toLowerCase()}?`}
             description={
               staffGroup
-                ? "A entrega é cancelada e o kit volta ao estoque dos colaboradores."
+                ? "A entrega é cancelada e o kit volta ao estoque."
                 : "A entrega é cancelada e o kit volta ao estoque."
             }
             confirmLabel="Estornar entrega"

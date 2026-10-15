@@ -1,6 +1,6 @@
 import { plural } from "@/lib/plural";
 import { employeeCategoryCount } from "./labels";
-import { COLLABORATOR_CATEGORIES, type CollaboratorCategory, type StockPool } from "./types";
+import { COLLABORATOR_CATEGORIES, type CollaboratorCategory, type StockMode, type StockPool } from "./types";
 
 /*
  * Quadro "Pessoas e kits": cada grupo de quem vem à festa lado a lado — quantas
@@ -68,7 +68,7 @@ export function peopleGroupDetail(row: PeopleGroupRow, comparison: PeopleKitComp
       return parts.length ? parts.join(" · ") : "Diretoria, funcionários e prestadores";
     }
     case "EMPLOYEE_GUESTS":
-      return "1 kit cada, do estoque dos colaboradores";
+      return "1 kit cada";
     case "COURTESIES":
       return "Amigos e familiares da organização, 1 kit cada";
     case "WITHOUT_KIT":
@@ -125,8 +125,8 @@ export function kitDemandOf(comparison: PeopleKitComparison): Required<KitDemand
 }
 
 /** Quantos kits a previsão tira de cada estoque. */
-export function poolDemand(pool: StockPool, demand: KitDemand): number {
-  if (pool === "ALL") return demand.member + demand.guest;
+export function poolDemand(pool: StockPool, demand: KitDemand, mode?: StockMode): number {
+  if (pool === "ALL") return demand.member + demand.guest + (mode === "UNIFIED" ? (demand.employee ?? 0) : 0);
   if (pool === "EMPLOYEE") return demand.employee ?? 0;
   return pool === "MEMBER" ? demand.member : demand.guest;
 }
@@ -139,9 +139,9 @@ export const POOL_SHORT_LABEL: Record<StockPool, string> = {
 };
 
 /** Previsão x estoque cadastrado, por estoque: quanto sobra (positivo) ou falta (negativo). */
-export function stockBalance(pools: { pool: StockPool; total: number }[], demand: KitDemand) {
+export function stockBalance(pools: { pool: StockPool; total: number }[], demand: KitDemand, mode?: StockMode) {
   return pools.map((pool) => {
-    const planned = poolDemand(pool.pool, demand);
+    const planned = poolDemand(pool.pool, demand, mode);
     return { pool: pool.pool, total: pool.total, planned, balance: pool.total - planned };
   });
 }
@@ -152,6 +152,7 @@ export function peopleKitsSummary(input: {
   when: string;
   comparison: PeopleKitComparison;
   pools: { pool: StockPool; total: number }[];
+  mode?: StockMode;
 }): string {
   const { comparison } = input;
   const line = (row: PeopleGroupRow) => {
@@ -163,7 +164,7 @@ export function peopleKitsSummary(input: {
   const registrations = visibleRows(comparison.registrations);
   const house = visibleRows(comparison.house);
   const totals = sumRows([...comparison.registrations, ...comparison.house]);
-  const balances = stockBalance(input.pools, kitDemandOf(comparison));
+  const balances = stockBalance(input.pools, kitDemandOf(comparison), input.mode);
   const stockLine = balances.length
     ? "Estoque: " +
       balances

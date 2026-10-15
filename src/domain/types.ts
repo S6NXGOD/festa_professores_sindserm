@@ -27,7 +27,8 @@ export type KitType = "MEMBER" | "GUEST" | "EMPLOYEE";
 export type GroupKitType = Exclude<KitType, "EMPLOYEE">;
 /** Kits do grupo de um(a) funcionário(a): o dele(a) e o do convidado (os dois do estoque dos funcionários). */
 export type EmployeeKitType = Exclude<KitType, "MEMBER">;
-export type StockMode = "SINGLE" | "SPLIT";
+/** UNIFIED: um estoque só para todos (professoras, professores, convidados, colaboradores e cortesias). */
+export type StockMode = "SINGLE" | "SPLIT" | "UNIFIED";
 export type StockPool = "ALL" | "MEMBER" | "GUEST" | "EMPLOYEE";
 export type ParticipantRole = "MEMBER" | "GUEST" | "EMPLOYEE";
 export type CheckInMethod = "QR" | "SEARCH" | "CODE";

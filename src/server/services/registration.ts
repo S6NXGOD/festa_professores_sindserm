@@ -14,7 +14,7 @@ import {
 } from "@/domain/schemas";
 import { maskCpf } from "@/lib/cpf";
 import { samePhone } from "@/lib/phone";
-import { todayInZone } from "@/lib/datetime";
+import { formatDateTime, todayInZone } from "@/lib/datetime";
 import { toSearchText } from "@/lib/text";
 import { generateToken, isWellFormedToken, sha256Hex } from "@/server/crypto";
 import { type Actor, actorUserId, assertPermission, PUBLIC_ACTOR } from "./actor";
@@ -117,6 +117,9 @@ async function assertPublicWindowOpen(tx: Tx, actor: Actor, now: Date) {
   if (actor.kind !== "public") return;
   // Formulário público só funciona com o setup concluído e dentro do período.
   const window = registrationWindow(await getEventConfig(tx), now);
+  if (window.state === "CLOSED") {
+    throw new DomainError("REGISTRATION_CLOSED", `As inscrições encerraram em ${formatDateTime(window.closesAt)}.`);
+  }
   if (window.state !== "OPEN") {
     throw new DomainError("REGISTRATION_CLOSED", "As inscrições não estão abertas no momento.");
   }

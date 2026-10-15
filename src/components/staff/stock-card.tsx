@@ -54,7 +54,7 @@ export function StockCard({
           {demand ? (
             <Forecast
               total={pool.total}
-              demand={poolDemand(pool.pool, demand)}
+              demand={poolDemand(pool.pool, demand, stock.mode)}
               pool={pool.pool}
               waiting={waitlist ? (pool.pool === "ALL" ? waitlist.member + waitlist.guest : pool.pool === "MEMBER" ? waitlist.member : pool.pool === "GUEST" ? waitlist.guest : 0) : 0}
             />

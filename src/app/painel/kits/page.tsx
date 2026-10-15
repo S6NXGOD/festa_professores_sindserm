@@ -8,6 +8,7 @@ import { EmptyState, PageHeader, Pagination, Panel } from "@/components/staff/pa
 import { KitRules } from "@/components/staff/kit-rules";
 import { KitWaitlistPanel } from "@/components/staff/kit-waitlist-panel";
 import { PeopleKits } from "@/components/staff/people-kits";
+import { ReportButton } from "@/components/staff/report-button";
 import { StockCard } from "@/components/staff/stock-card";
 import { ToneBadge } from "@/components/status/status-badge";
 import { peopleKitsSummary } from "@/domain/kit-comparison";
@@ -40,7 +41,7 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
   const stock = stats.stock;
   const byPool = Object.fromEntries((stock?.pools ?? []).map((p) => [p.pool, p.total]));
   const pools = (stock?.pools ?? []).map((p) => ({ pool: p.pool, total: p.total }));
-  const summary = peopleKitsSummary({ eventName: config?.name ?? APP_NAME, when: formatShortDateTime(new Date()), comparison, pools });
+  const summary = peopleKitsSummary({ eventName: config?.name ?? APP_NAME, when: formatShortDateTime(new Date()), comparison, pools, mode: stock?.mode });
 
   return (
     <div className="space-y-6">
@@ -55,10 +56,11 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
                 <Coins /> Montagem e custo
               </Link>
             </Button>
+            <ReportButton type="kits" />
             {event?.kitDeadline ? (
               <span className="flex items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm font-semibold text-fg">
-                <Clock className="size-4 text-red" /> Kits até {event.kitDeadline.label}
-                <DeadlineTimer deadline={event.kitDeadline.at} />
+                <Clock className="size-4 text-red" /> {event.kitDeadline.passed ? "Sobras liberadas" : `Kits guardados até ${event.kitDeadline.label}`}
+                <DeadlineTimer deadline={event.kitDeadline.at} doneLabel="SOBRAS" doneClassName="text-warning" />
               </span>
             ) : null}
           </>
@@ -68,6 +70,7 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
       <PeopleKits
         comparison={comparison}
         pools={pools}
+        mode={stock?.mode}
         summary={summary}
         links={{ registrations: can(actor.access, "viewRegistrations"), employees: can(actor.access, "viewEmployees") }}
       />
@@ -93,7 +96,7 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
         ) : null}
       </div>
 
-      <KitRules deadlineLabel={event?.kitDeadline?.label ?? null} separateStock={stock?.mode === "SPLIT"} />
+      <KitRules deadlineLabel={event?.kitDeadline?.label ?? null} separateStock={stock?.mode === "SPLIT"} sharedStock={stock?.mode === "UNIFIED"} />
 
       <Panel title="Entregas registradas" icon={Package}>
         {deliveries.rows.length === 0 ? (
@@ -131,7 +134,7 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
                         ) : (
                           <span className="font-semibold text-fg">{row.memberName}</span>
                         )}
-                        {row.employeeGroup ? " (colaborador(a), estoque dos colaboradores)" : null}
+                        {row.employeeGroup ? " (colaborador(a) do SINDSERM)" : null}
                       </>
                     ) : null}
                     {row.cancelReason ? ` · motivo do estorno: ${row.cancelReason}` : ""}

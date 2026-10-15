@@ -56,12 +56,13 @@ export const KIT_TYPE_LABEL: Record<KitType, string> = {
 };
 
 export const STOCK_MODE_LABEL: Record<StockMode, string> = {
-  SINGLE: "Estoque único",
-  SPLIT: "Estoque separado (professoras e professores / convidados)",
+  UNIFIED: "Estoque único para todos",
+  SINGLE: "Estoque geral + estoque dos colaboradores",
+  SPLIT: "Estoque separado (professoras e professores / convidados / colaboradores)",
 };
 
 export const STOCK_POOL_LABEL: Record<StockPool, string> = {
-  ALL: "Kits (estoque único)",
+  ALL: "Kits (estoque geral)",
   MEMBER: "Kits de professor(a)",
   GUEST: "Kits de convidado",
   EMPLOYEE: "Kits dos colaboradores",
@@ -177,7 +178,6 @@ export const ENTRY_BLOCK_MESSAGE: Record<EntryBlockCode, { title: string; detail
 export const KIT_BLOCK_MESSAGE: Record<KitBlockCode, string> = {
   NOT_ACTIVE_MEMBER: "Sai na entrada, depois que a filiação for confirmada.",
   NOT_TEACHER: "Kit de consumação é exclusivo para professoras e professores.",
-  DEADLINE_PASSED: "Prazo para entregar kits encerrado.",
   MEMBER_NOT_CHECKED_IN: "Sai junto com a entrada.",
   NO_GUEST: "Nenhum convidado cadastrado.",
   HOST_NOT_CHECKED_IN: "Sai depois que quem convidou chegar.",
@@ -186,7 +186,7 @@ export const KIT_BLOCK_MESSAGE: Record<KitBlockCode, string> = {
   EMPLOYEE_REMOVED: "Fora da lista de colaboradores.",
   EMPLOYEE_NOT_CHECKED_IN: "Sai junto com a entrada.",
   WITHOUT_KIT: "Sem kit de consumação (combinado no cadastro).",
-  KIT_WAITLIST: "Na fila do kit: a inscrição foi feita depois que os kits acabaram.",
+  KIT_WAITLIST: "Na fila do kit: a inscrição foi feita depois que os kits acabaram. Depois do horário dos kits guardados, se sobrar, sai.",
 };
 
 /** O que a recepção lê quando a pessoa entra sem kit (ela entra do mesmo jeito). */
@@ -197,11 +197,10 @@ export const ENTRY_KIT_MESSAGE: Record<
   EMPLOYEE_REMOVED: "Sem kit: fora da lista de colaboradores.",
   EMPLOYEE_NOT_CHECKED_IN: "Sem kit.",
   WITHOUT_KIT: "Sem kit: cadastro sem kit de consumação.",
-  KIT_WAITLIST: "Sem kit: está na fila do kit (inscrição depois que os kits acabaram). Sobrou kit? Entregue pelo cadastro.",
-  NO_EMPLOYEE_STOCK: "Sem kit: cadastre o estoque de kits dos colaboradores (Kits e estoque).",
+  KIT_WAITLIST: "Sem kit agora: está na fila do kit. Depois do horário dos kits guardados, as sobras saem por ordem de chegada.",
+  NO_EMPLOYEE_STOCK: "Sem kit: falta cadastrar a quantidade de kits (Kits e estoque → Quantidades).",
   NOT_ACTIVE_MEMBER: "Sem kit: a filiação ainda não foi confirmada.",
   NOT_TEACHER: "Sem kit: não é professor(a).",
-  DEADLINE_PASSED: "Sem kit: o horário de entregar kits já passou.",
   MEMBER_NOT_CHECKED_IN: "Sem kit.",
   NO_GUEST: "Sem kit.",
   HOST_NOT_CHECKED_IN: "Kit fica para depois: sai quando quem convidou chegar.",

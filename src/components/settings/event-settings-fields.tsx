@@ -69,7 +69,7 @@ export function RegistrationPeriodFields({ form, timeZone }: { form: EventForm; 
   );
 }
 
-/** Horário limite para entregar kits no dia da festa. */
+/** Até quando os kits ficam guardados para quem se inscreveu (depois, sobras por ordem de chegada). */
 export function KitDeadlineField({ form }: { form: EventForm }) {
   const { register, formState, control } = form;
   const [deadline, start] = useWatch({ control, name: ["kitDeadlineTime", "startTime"] });
@@ -77,13 +77,13 @@ export function KitDeadlineField({ form }: { form: EventForm }) {
   return (
     <FormField
       id="kit-deadline"
-      label="Horário limite para entregar kits"
+      label="Kits guardados até"
       optional
       error={formState.errors.kitDeadlineTime?.message}
       description={
         deadline
-          ? `Quem entrar depois das ${formatClock(deadline)}${crossesMidnight ? " (madrugada seguinte)" : ""} entra sem kit. Deixe vazio para não ter limite.`
-          : "Deixe vazio para não ter limite. Horário antes do início vale para a madrugada seguinte (ex.: 01:00)."
+          ? `Até as ${formatClock(deadline)}${crossesMidnight ? " (madrugada seguinte)" : ""}, cada kit fica guardado para quem se inscreveu e a fila do kit espera. Depois, as sobras saem na entrada, por ordem de chegada, enquanto houver.`
+          : "Vazio: os kits ficam guardados a festa toda. Horário antes do início vale para a madrugada seguinte (ex.: 01:00)."
       }
     >
       <Input id="kit-deadline" type="time" className="sm:max-w-48" {...register("kitDeadlineTime")} />

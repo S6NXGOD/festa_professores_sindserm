@@ -75,12 +75,23 @@ export function Countdown({
   );
 }
 
-/** Contagem compacta até o horário limite dos kits (portaria/painel). */
-export function DeadlineTimer({ deadline, className }: { deadline: string | Date; className?: string }) {
+/** Contagem compacta até um horário (portaria/painel); na hora, mostra `doneLabel`. */
+export function DeadlineTimer({
+  deadline,
+  doneLabel = "ENCERRADO",
+  doneClassName = "text-danger",
+  className,
+}: {
+  deadline: string | Date;
+  /** O que aparece quando o horário chega (ex.: "SOBRAS" nos kits, "AGORA" no início da festa). */
+  doneLabel?: string;
+  doneClassName?: string;
+  className?: string;
+}) {
   const now = useNowSeconds();
   const remaining = now === null ? null : Math.floor(new Date(deadline).getTime() / 1000) - now;
   if (remaining === null) return <span className={cn("pixel text-[0.6rem] text-fg-muted", className)}>--:--</span>;
-  if (remaining <= 0) return <span className={cn("pixel text-[0.6rem] text-danger", className)}>ENCERRADO</span>;
+  if (remaining <= 0) return <span className={cn("pixel text-[0.6rem]", doneClassName, className)}>{doneLabel}</span>;
   const { days, hours, minutes, seconds } = parts(remaining);
   const text = days > 0 ? `${days}D ${pad(hours)}H` : hours > 0 ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
   return (

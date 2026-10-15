@@ -1,0 +1,1 @@
+ALTER TYPE "public"."stock_mode" ADD VALUE 'UNIFIED';

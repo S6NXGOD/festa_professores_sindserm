@@ -20,7 +20,7 @@ import {
   toDeliver,
   visibleRows,
 } from "@/domain/kit-comparison";
-import type { StockPool } from "@/domain/types";
+import type { StockMode, StockPool } from "@/domain/types";
 import { copyText } from "@/lib/clipboard";
 import { plural } from "@/lib/plural";
 import { playSound } from "@/lib/sound";
@@ -48,12 +48,15 @@ const ROW_GRID = "md:grid-cols-[minmax(0,1fr)_repeat(5,5.5rem)] md:items-center 
 export function PeopleKits({
   comparison,
   pools,
+  mode,
   summary,
   links,
 }: {
   comparison: PeopleKitComparison;
   /** Estoque cadastrado de cada tipo (para comparar com a previsão). */
   pools: { pool: StockPool; total: number }[];
+  /** Modo do estoque (no único para todos, o geral também atende a lista interna). */
+  mode?: StockMode;
   /** Resumo em texto, pronto para o WhatsApp. */
   summary: string;
   /** Linhas viram links só para quem pode abrir a lista de destino. */
@@ -64,9 +67,12 @@ export function PeopleKits({
   const totals = sumRows([...comparison.registrations, ...comparison.house]);
   const demand = kitDemandOf(comparison);
   const planned = demand.member + demand.guest + demand.employee;
-  const balances = stockBalance(pools, demand);
+  const balances = stockBalance(pools, demand, mode);
   const stockTotal = pools.reduce((sum, pool) => sum + pool.total, 0);
   const short = balances.filter((b) => b.balance < 0);
+  // Falta num estoque e sobra em outro: somando, dá para todos (o estoque único para todos resolve).
+  const unifiedBalance = stockTotal - planned;
+  const unifyHelps = mode !== "UNIFIED" && short.length > 0 && unifiedBalance >= 0;
   const hrefFor = (id: PeopleGroupId) =>
     id === "TEACHERS" || id === "TEACHER_GUESTS" || id === "OTHER_MEMBERS"
       ? links.registrations
@@ -126,6 +132,7 @@ export function PeopleKits({
             ) : short.length ? (
               <span className="font-bold text-warning">
                 Faltam {short.map((b) => `${-b.balance} ${POOL_SHORT_LABEL[b.pool]}`).join(" e ")}
+                {unifyHelps ? <span className="block font-semibold text-fg-muted">Somando tudo, sobram {unifiedBalance}</span> : null}
               </span>
             ) : (
               <span className="font-bold text-success-text">Sobram {stockTotal - planned}</span>
@@ -135,6 +142,15 @@ export function PeopleKits({
           testId="people-stock"
         />
       </div>
+      {unifyHelps ? (
+        <p className="mt-3 flex items-start gap-2 rounded-xl border border-warning/50 bg-warning-soft p-3 text-sm text-fg" data-testid="unify-hint">
+          <Warning className="mt-0.5 size-4 shrink-0 text-warning" />
+          <span>
+            Os estoques estão separados: falta kit em um e sobra no outro. Com <strong>um estoque só para todos</strong>, os {stockTotal} kits
+            atendem os {planned} previstos. Para juntar: Kits e estoque → <strong>Quantidades</strong> → “Um estoque só para todos”.
+          </span>
+        </p>
+      ) : null}
 
       <div className="mt-5">
         <div className={cn("hidden border-b border-line pb-2 text-right md:grid", ROW_GRID)} aria-hidden>

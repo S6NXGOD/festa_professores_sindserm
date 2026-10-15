@@ -37,12 +37,15 @@ export function QuickCourtesyForm({
   initialCpf,
   inviters,
   employeeStock,
+  stockLabel = "Estoque dos colaboradores",
 }: {
   initialName: string;
   initialCpf: string;
   inviters: string[];
-  /** Kits que ainda restam no estoque dos colaboradores (null: estoque não usado). */
+  /** Kits que ainda restam no estoque de onde sai o kit da cortesia (null: estoque não usado). */
   employeeStock: number | null;
+  /** "Estoque dos colaboradores" ou, no estoque único para todos, "Estoque de kits". */
+  stockLabel?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -134,8 +137,8 @@ export function QuickCourtesyForm({
           >
             {noStock ? <Warning className="size-4 shrink-0" /> : <Gift className="size-4 shrink-0 text-[#ff8fd0]" />}
             {noStock
-              ? "Estoque dos colaboradores zerado: a cortesia entra sem kit até alguém repor."
-              : `Estoque dos colaboradores: ${plural(employeeStock, "kit", "kits")} agora.`}
+              ? `${stockLabel} zerado: a cortesia entra sem kit até alguém repor.`
+              : `${stockLabel}: ${plural(employeeStock, "kit", "kits")} agora.`}
           </p>
         ) : null}
         <CourtesyRightsNote withKit={withKit} />

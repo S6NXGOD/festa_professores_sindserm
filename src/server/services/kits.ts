@@ -5,6 +5,7 @@ import { kitDelivery, kitStock, registration } from "@/server/db/schema";
 import {
   employeeKitAvailability,
   type EmployeeKitInput,
+  employeeStockPool,
   isActiveMember,
   isLowEmployeeStock,
   isLowStock,
@@ -87,9 +88,15 @@ async function takeFromStock(tx: Tx, pool: StockPool) {
   return stock;
 }
 
-/** O estoque dos funcionários existe e tem kits cadastrados? */
+/** O estoque de onde saem os kits de colaboradores (e cortesias) existe e tem kits cadastrados? */
 export async function hasEmployeeStock(tx: Tx): Promise<boolean> {
-  const [row] = await tx.select({ total: kitStock.total }).from(kitStock).where(eq(kitStock.pool, "EMPLOYEE")).limit(1);
+  const config = await getEventConfig(tx);
+  if (!config) return false;
+  const [row] = await tx
+    .select({ total: kitStock.total })
+    .from(kitStock)
+    .where(eq(kitStock.pool, employeeStockPool(config.stockMode)))
+    .limit(1);
   return Boolean(row && row.total > 0);
 }
 
@@ -159,7 +166,10 @@ export async function recordEmployeeKitDelivery(
   kitType: EmployeeKitType,
   context: "ENTRY" | "MANUAL",
 ): Promise<DeliveryResult> {
-  const stock = await takeFromStock(tx, "EMPLOYEE");
+  const config = await getEventConfig(tx);
+  // Estoque dos colaboradores ou, no estoque único para todos, o geral.
+  const pool = config ? employeeStockPool(config.stockMode) : "EMPLOYEE";
+  const stock = await takeFromStock(tx, pool);
   const beneficiary =
     kitType === "EMPLOYEE"
       ? { personId: group.person.id, fullName: group.person.fullName, guestLinkId: null }
@@ -173,7 +183,7 @@ export async function recordEmployeeKitDelivery(
       recipientPersonId: group.person.id,
       beneficiaryPersonId: beneficiary.personId,
       guestLinkId: beneficiary.guestLinkId,
-      stockPool: "EMPLOYEE",
+      stockPool: pool,
       deliveredByUserId: actor.userId,
     })
     .returning({ id: kitDelivery.id });
@@ -186,16 +196,17 @@ export async function recordEmployeeKitDelivery(
       kitType === "EMPLOYEE"
         ? `${group.category === "COURTESY" ? "Kit da cortesia" : "Kit de colaborador(a)"} entregue${where} a ${group.person.fullName}.`
         : `Kit do convidado ${beneficiary.fullName} entregue${where} (convidado(a) de ${group.person.fullName}, colaborador(a) do SINDSERM).`,
-    after: { employeeId: group.id, kitType, pool: "EMPLOYEE", context },
+    after: { employeeId: group.id, kitType, pool, context },
   });
   const available = stock.total - stock.delivered;
-  // Alerta só quando o que resta não dá para quem ainda vai receber (funcionários e convidados).
-  const low = isLowEmployeeStock(available, await countEmployeesAwaitingKit(tx));
+  // Estoque dos colaboradores: alerta quando o que resta não dá para quem ainda vai receber. Estoque geral: o limite de alerta.
+  const low =
+    pool === "EMPLOYEE" ? isLowEmployeeStock(available, await countEmployeesAwaitingKit(tx)) : isLowStock(available, config?.lowStockThreshold ?? 0);
   return {
     deliveryId: delivery!.id,
     kitType,
     beneficiaryName: beneficiary.fullName,
-    stock: { pool: "EMPLOYEE", ...stock, available, low },
+    stock: { pool, ...stock, available, low },
   };
 }
 

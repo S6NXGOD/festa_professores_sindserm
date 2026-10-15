@@ -107,8 +107,8 @@ describe("filiado(a) que não é professor(a)", () => {
   });
 });
 
-describe("horário limite para entregar kits", () => {
-  it("quem entra depois do horário entra sem kit, inclusive quando passa da meia-noite", async () => {
+describe("horário dos kits guardados", () => {
+  it("depois do horário, quem entra ainda leva o kit se houver, inclusive depois da meia-noite", async () => {
     await configureEvent(admin, { eventDate: "2026-10-15", startTime: "19:00", kitDeadlineTime: "01:00" });
     const host = await registerMember({ guest: true });
     await decideAffiliation(attendant, { registrationId: host.registrationId, decision: "CONFIRM" });
@@ -119,15 +119,8 @@ describe("horário limite para entregar kits", () => {
     const onTime = await registerCheckIn(security, { personId: host.state.member.id, method: "SEARCH" }, beforeDeadline);
     expect(onTime).toMatchObject({ kit: { kind: "DELIVERED", kitType: "MEMBER" } });
     const late = await registerCheckIn(security, { personId: host.state.guest!.personId, method: "SEARCH" }, afterDeadline);
-    expect(late).toMatchObject({
-      outcome: "CHECKED_IN",
-      kit: { kind: "NONE", message: "Sem kit: o horário de entregar kits já passou." },
-    });
-    const manual = await expectDomainError(
-      deliverKit(attendant, { personId: host.state.member.id, kitType: "GUEST" }, afterDeadline),
-      "KIT_NOT_AVAILABLE",
-    );
-    expect(manual.message).toMatch(/prazo/i);
+    // Depois do horário, as sobras saem por ordem de chegada: o convidado leva o kit dele.
+    expect(late).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "DELIVERED", kitType: "GUEST" } });
   });
 
   it("sem horário configurado, não há limite", async () => {

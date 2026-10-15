@@ -8,7 +8,7 @@ import { can } from "@/domain/rules";
 import { maskCpfInput } from "@/lib/cpf";
 import { db } from "@/server/db";
 import { listCourtesyInviters } from "@/server/services/employees";
-import { getStockOverview } from "@/server/services/settings";
+import { employeePoolOf, getStockOverview } from "@/server/services/settings";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Cortesia na portaria" };
@@ -24,8 +24,8 @@ export default async function GateCourtesyPage({ searchParams }: PageProps<"/por
   const initialName = typeof query.nome === "string" ? query.nome.trim().slice(0, 120) : "";
   const cpfDigits = typeof query.cpf === "string" ? query.cpf.replace(/\D/g, "").slice(0, 11) : "";
   const [inviters, stock] = await Promise.all([listCourtesyInviters(db), getStockOverview(db)]);
-  // O estoque dos colaboradores some do resumo quando está zerado e sem uso: aí a cortesia entra sem kit.
-  const employeeStock = stock ? (stock.pools.find((pool) => pool.pool === "EMPLOYEE")?.available ?? 0) : null;
+  // O estoque da cortesia (o dos colaboradores ou, no estoque único, o geral). Zerado e sem uso, some do resumo: a cortesia entra sem kit.
+  const employeeStock = stock ? (employeePoolOf(stock)?.available ?? 0) : null;
 
   return (
     <div className="space-y-4 pb-28">
@@ -49,6 +49,7 @@ export default async function GateCourtesyPage({ searchParams }: PageProps<"/por
         initialCpf={cpfDigits ? maskCpfInput(cpfDigits) : ""}
         inviters={inviters}
         employeeStock={employeeStock}
+        stockLabel={stock?.mode === "UNIFIED" ? "Estoque de kits" : "Estoque dos colaboradores"}
       />
     </div>
   );

@@ -186,7 +186,10 @@ describe("Regras de kits e convidado", () => {
     expect(kitAvailability(base, "MEMBER")).toEqual({ kind: "AVAILABLE" });
     expect(kitAvailability({ ...base, status: "PENDING" }, "MEMBER")).toEqual({ kind: "BLOCKED", code: "NOT_ACTIVE_MEMBER" });
     expect(kitAvailability({ ...base, isTeacher: false }, "MEMBER")).toEqual({ kind: "BLOCKED", code: "NOT_TEACHER" });
-    expect(kitAvailability({ ...base, deadlinePassed: true }, "MEMBER")).toEqual({ kind: "BLOCKED", code: "DEADLINE_PASSED" });
+    // Depois do horário dos kits guardados, o kit continua saindo; a fila do kit deixa de esperar.
+    expect(kitAvailability({ ...base, deadlinePassed: true }, "MEMBER")).toEqual({ kind: "AVAILABLE" });
+    expect(kitAvailability({ ...base, waitlisted: { MEMBER: true } }, "MEMBER")).toEqual({ kind: "BLOCKED", code: "KIT_WAITLIST" });
+    expect(kitAvailability({ ...base, waitlisted: { MEMBER: true }, deadlinePassed: true }, "MEMBER")).toEqual({ kind: "AVAILABLE" });
     // O kit do(a) professor(a) sai na entrada dele(a)...
     expect(kitAvailability({ ...base, memberCheckedIn: false }, "MEMBER")).toEqual({ kind: "BLOCKED", code: "MEMBER_NOT_CHECKED_IN" });
     // ...e o do convidado só depois que o(a) professor(a) que convidou chegou.
@@ -247,7 +250,7 @@ describe("Regras de kits e convidado", () => {
     expect(employeeKitAvailability({ ...group, employeeCheckedIn: false }, "GUEST")).toEqual({ kind: "BLOCKED", code: "HOST_NOT_CHECKED_IN" });
     expect(employeeKitAvailability({ ...group, guestCheckedIn: false }, "GUEST")).toEqual({ kind: "BLOCKED", code: "GUEST_NOT_CHECKED_IN" });
     expect(employeeKitAvailability({ ...group, hasGuest: false }, "GUEST")).toEqual({ kind: "BLOCKED", code: "NO_GUEST" });
-    expect(employeeKitAvailability({ ...group, deadlinePassed: true }, "EMPLOYEE")).toEqual({ kind: "BLOCKED", code: "DEADLINE_PASSED" });
+    expect(employeeKitAvailability({ ...group, deadlinePassed: true }, "EMPLOYEE")).toEqual({ kind: "AVAILABLE" });
     expect(employeeKitAvailability({ ...group, deadlinePassed: true, deliveries: { EMPLOYEE: delivery } }, "EMPLOYEE").kind).toBe("DELIVERED");
   });
   it("cortesia sem kit (ex.: convidado sem kit de colaborador(a)): entra, mas o kit nunca sai", () => {

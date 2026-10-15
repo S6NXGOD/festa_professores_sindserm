@@ -1,19 +1,28 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Gift, Hourglass } from "@/components/icons/pixel";
+import { Clock, Gift, Hourglass } from "@/components/icons/pixel";
 import type { KitOutlook } from "@/domain/kit-supply";
 import { firstName } from "@/lib/text";
 import { ConsentBox } from "./wizard-parts";
 
 /** Faixa no começo da inscrição: os kits acabaram, mas a inscrição (e a festa) continuam. */
-export function KitsSoldOutBanner({ staff = false }: { staff?: boolean }) {
+export function KitsSoldOutBanner({
+  staff = false,
+  deadlineLabel = null,
+  testId = "kits-sold-out",
+}: {
+  staff?: boolean;
+  /** Kits guardados até este horário: depois, as sobras saem por ordem de chegada. */
+  deadlineLabel?: string | null;
+  testId?: string;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       className="relative overflow-hidden rounded-xl border-2 border-warning/60 bg-[linear-gradient(135deg,rgb(250_204_21/0.16),rgb(8_8_8/0.85)_70%)] p-4 text-left"
-      data-testid="kits-sold-out"
+      data-testid={testId}
     >
       <span className="scanlines pointer-events-none absolute inset-0 opacity-30" aria-hidden />
       <p className="pixel relative text-[0.55rem] text-warning">
@@ -25,6 +34,14 @@ export function KitsSoldOutBanner({ staff = false }: { staff?: boolean }) {
           ? "Os kits de consumação já estão todos com quem se inscreveu antes. A inscrição continua: o kit de quem entrar agora vai para a fila do kit (sai se vagar, por ordem)."
           : "Os kits de consumação já estão todos com quem se inscreveu antes. Você ainda pode se inscrever e vir à festa: o seu kit entra na fila e, se vagar, é seu (por ordem de inscrição)."}
       </p>
+      {deadlineLabel ? (
+        <p className="relative mt-2 flex items-start gap-1.5 text-xs text-fg-muted">
+          <Clock className="mt-px size-3.5 shrink-0 text-warning" />
+          <span>
+            Depois das {deadlineLabel}, os kits de quem não veio saem para quem entrar, por ordem de chegada (enquanto houver).
+          </span>
+        </p>
+      ) : null}
     </motion.div>
   );
 }
@@ -75,7 +92,8 @@ export function KitWaitlistNotice({
               <p className="mt-1">
                 <strong>Os kits de consumação acabaram.</strong> {staff ? "A pessoa entra" : "Você entra"} na festa normalmente, e{" "}
                 {guestWaits ? `${ownKit} e o de ${guestFirst} entram` : `${ownKit} entra`} na fila do kit{places}. Se vagar kit (alguém
-                desistir ou o SINDSERM comprar mais), ele sai na recepção, por ordem de inscrição.
+                desistir ou o SINDSERM comprar mais), ele sai na recepção, por ordem de inscrição. Depois do horário dos kits guardados, as sobras saem
+                para quem entrar, por ordem de chegada.
               </p>
             ) : guestWaits ? (
               <p className="mt-1">

@@ -47,7 +47,7 @@ export default async function GateLayout({ children }: LayoutProps<"/portaria">)
                 {String(score).padStart(4, "0")}
               </span>
             </span>
-            <UserMenu name={actor.name} role={actor.role} showPanel={showPanel} compact version={appVersionLabel()} />
+            <UserMenu name={actor.name} role={actor.role} showPanel={showPanel} showTraining={can(actor.access, "checkIn")} compact version={appVersionLabel()} />
           </div>
         </div>
         <div className="neon-line h-px opacity-60" aria-hidden />

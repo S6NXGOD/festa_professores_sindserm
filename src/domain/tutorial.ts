@@ -13,6 +13,7 @@ export type TutorialScene =
   | "form"
   | "vouchers"
   | "gate"
+  | "training"
   | "entries"
   | "house"
   | "admin"
@@ -23,6 +24,8 @@ export interface TutorialStep {
   scene: TutorialScene;
   title: string;
   bullets: string[];
+  /** Botão extra da fase (ex.: abrir o treino da portaria). */
+  action?: { href: string; label: string };
 }
 
 function firstNameOf(name: string) {
@@ -140,6 +143,21 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
                 ]
               : ["Seu acesso é só para consultar: quem registra a entrada é a equipe da portaria."]),
           ],
+        }
+      : null,
+  );
+
+  add(
+    can(access, "checkIn")
+      ? {
+          id: "treino",
+          scene: "training",
+          title: "Treino da portaria",
+          bullets: [
+            "Antes da festa, treine as situações da porta com a tela de verdade: liberado, convidado que chega antes, ficha para assinar, QR cancelado, fila do kit e outras.",
+            "Leva uns 4 minutos e nada fica gravado. Dá para repetir quando quiser: menu do seu nome → Treino da portaria.",
+          ],
+          action: { href: "/portaria/treino", label: "Treinar agora" },
         }
       : null,
   );

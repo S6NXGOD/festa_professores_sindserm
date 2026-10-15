@@ -20,6 +20,7 @@ import type {
   GroupKitType,
   KitType,
   ParticipantRole,
+  StockPool,
 } from "@/domain/types";
 import { type Actor, assertPermission, type StaffActor } from "./actor";
 import { writeAudit } from "./audit";
@@ -87,7 +88,7 @@ export function hostNameOf(state: PersonState): string | null {
 
 /** O que aconteceu com um kit na hora da entrada. */
 export type EntryKitResult =
-  | { kind: "DELIVERED"; kitType: KitType; beneficiaryName: string; available: number; low: boolean }
+  | { kind: "DELIVERED"; kitType: KitType; beneficiaryName: string; available: number; low: boolean; pool: StockPool }
   /** Kit do convidado que chegou antes do(a) professor(a): sai quando ele(a) chegar. */
   | { kind: "WAITING"; message: string }
   | { kind: "NONE"; message: string };
@@ -129,6 +130,7 @@ async function deliverNow(
       beneficiaryName: delivered.beneficiaryName,
       available: delivered.stock.available,
       low: delivered.stock.low,
+      pool: delivered.stock.pool,
     };
   } catch (error) {
     if (error instanceof DomainError && error.code === "OUT_OF_STOCK") {
@@ -164,6 +166,7 @@ async function deliverEmployeeNow(
       beneficiaryName: delivered.beneficiaryName,
       available: delivered.stock.available,
       low: delivered.stock.low,
+      pool: delivered.stock.pool,
     };
   } catch (error) {
     if (error instanceof DomainError && error.code === "OUT_OF_STOCK") return { kind: "NONE", message: ENTRY_KIT_MESSAGE.OUT_OF_STOCK };

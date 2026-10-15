@@ -618,17 +618,17 @@ export type SigningSettingsData = z.output<typeof signingSettingsSchema>;
 
 export const stockSettingsSchema = z
   .object({
-    stockMode: z.enum(["SINGLE", "SPLIT"]),
+    stockMode: z.enum(["SINGLE", "SPLIT", "UNIFIED"]),
     totalAll: optionalIntField("a quantidade de kits"),
     totalMember: optionalIntField("a quantidade de kits de professor(a)"),
     totalGuest: optionalIntField("a quantidade de kits de convidado"),
-    /** Estoque dos funcionários (sempre separado). Vazio = 0. */
+    /** Estoque dos colaboradores (nos modos geral + colaboradores e separado). Vazio = 0. */
     totalEmployee: optionalIntField("a quantidade de kits dos colaboradores"),
     lowStockThreshold: intField("o limite de alerta"),
   })
   .superRefine((d, ctx) => {
     const required: (keyof typeof d)[] =
-      d.stockMode === "SINGLE" ? ["totalAll"] : ["totalMember", "totalGuest"];
+      d.stockMode === "SPLIT" ? ["totalMember", "totalGuest"] : ["totalAll"];
     for (const key of required) {
       if (d[key] === undefined) ctx.addIssue({ code: "custom", path: [key], message: "Informe a quantidade" });
     }
