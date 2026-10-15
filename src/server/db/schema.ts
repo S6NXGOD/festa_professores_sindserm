@@ -108,6 +108,16 @@ export const user = pgTable("user", {
   mustChangePassword: boolean("must_change_password").notNull().default(false),
   /** Quando a pessoa terminou (ou pulou) o tutorial do primeiro acesso. Nulo = o tutorial abre sozinho. */
   tutorialSeenAt: timestamptz("tutorial_seen_at"),
+  /**
+   * Treino relâmpago da portaria feito. Nulo = quem registra entradas (fora os
+   * administradores) faz o treino antes de abrir a portaria.
+   */
+  gateTrainingDoneAt: timestamptz("gate_training_done_at"),
+  /**
+   * Usuário apagado que já tinha histórico (entradas, kits, fichas): sem acesso
+   * e fora da lista, mas o nome continua nos registros. Sem histórico, a linha some.
+   */
+  deletedAt: timestamptz("deleted_at"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

@@ -8,7 +8,16 @@ import type { ActionResult } from "@/lib/action-result";
 import { auth } from "@/server/auth";
 import { DomainError } from "@/server/services/errors";
 import { enforceRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
-import { createStaffUser, markPasswordChanged, markTutorialSeen, resetStaffPassword, updateStaffUser } from "@/server/services/users";
+import {
+  createStaffUser,
+  deleteStaffUser,
+  finishGateTraining,
+  markPasswordChanged,
+  markTutorialSeen,
+  requireGateTrainingAgain,
+  resetStaffPassword,
+  updateStaffUser,
+} from "@/server/services/users";
 import { db } from "@/server/db";
 import { getActor, requireActionActor } from "@/server/session";
 import { runAction } from "./result";
@@ -17,6 +26,32 @@ import { runAction } from "./result";
 export async function finishTutorialAction(): Promise<ActionResult> {
   return runAction(async () => {
     await markTutorialSeen(db, await requireActionActor());
+  });
+}
+
+/** Treino relâmpago da portaria terminado: a portaria abre para esta pessoa. */
+export async function finishGateTrainingAction(): Promise<ActionResult> {
+  return runAction(async () => {
+    await finishGateTraining(db, await requireActionActor());
+    revalidatePath("/portaria", "layout");
+  });
+}
+
+/** Pede o treino relâmpago de novo a todo mundo que registra entradas (fora os administradores). */
+export async function requireGateTrainingAgainAction(): Promise<ActionResult<{ people: number }>> {
+  return runAction(async () => {
+    const result = await requireGateTrainingAgain(await requireActionActor());
+    revalidatePath("/painel/usuarios");
+    return result;
+  });
+}
+
+/** Apaga um usuário (quem tem histórico sai da lista e perde o acesso; o nome fica nos registros). */
+export async function deleteUserAction(input: { userId: string }): Promise<ActionResult<{ keptInHistory: boolean }>> {
+  return runAction(async () => {
+    const result = await deleteStaffUser(await requireActionActor(), input);
+    revalidatePath("/painel/usuarios");
+    return result;
   });
 }
 

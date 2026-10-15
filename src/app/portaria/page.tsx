@@ -12,13 +12,13 @@ import { can } from "@/domain/rules";
 import { db } from "@/server/db";
 import { getEventInfo } from "@/server/queries/config";
 import { getDashboardStats } from "@/server/services/stats";
-import { requirePageActor } from "@/server/session";
+import { requireGateActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Portaria" };
 
 export default async function GateHomePage() {
   // O layout também verifica, mas páginas podem renderizar em paralelo ao layout.
-  const actor = await requirePageActor("viewGate");
+  const actor = await requireGateActor("viewGate");
   const [stats, event] = await Promise.all([getDashboardStats(db), getEventInfo()]);
   const notStarted = event ? !event.started : false;
   // Cadastro rápido de quem chegou sem inscrição: quem cuida das inscrições (Atendimento).
@@ -118,8 +118,8 @@ export default async function GateHomePage() {
             <Target className="size-6" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block font-bold text-fg">Treino da portaria</span>
-            <span className="block text-xs text-fg-muted">As situações da porta, com a tela de verdade (nada fica gravado)</span>
+            <span className="block font-bold text-fg">Treino relâmpago</span>
+            <span className="block text-xs text-fg-muted">8 situações da porta em 1 minuto (nada fica gravado)</span>
           </span>
           <ArrowRight className="size-5 shrink-0 text-fg-dim transition-transform group-hover:translate-x-0.5" />
         </Link>

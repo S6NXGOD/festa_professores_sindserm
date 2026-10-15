@@ -10,7 +10,7 @@ import { can } from "@/domain/rules";
 import { maskCpfInput } from "@/lib/cpf";
 import { db } from "@/server/db";
 import { getKitSupply } from "@/server/services/kit-waitlist";
-import { requirePageActor } from "@/server/session";
+import { requireGateActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Cadastro rápido" };
 
@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: "Cadastro rápido" };
  * alguém, quem não é filiado(a)) têm o caminho certo logo abaixo.
  */
 export default async function GateQuickRegistrationPage({ searchParams }: PageProps<"/portaria/cadastro">) {
-  const actor = await requirePageActor("registerAtEvent");
+  const actor = await requireGateActor("registerAtEvent");
   const query = await searchParams;
   const initialName = typeof query.nome === "string" ? query.nome.trim().slice(0, 120) : "";
   const cpfDigits = typeof query.cpf === "string" ? query.cpf.replace(/\D/g, "").slice(0, 11) : "";

@@ -55,8 +55,12 @@ export default async function GateLayout({ children }: LayoutProps<"/portaria">)
       {/* Sem z-index aqui: com ele, o leitor de QR (tela cheia, "fixed") ficava preso embaixo deste cabeçalho,
           escondendo o "Voltar", a lanterna e a troca de câmera. O cenário já fica atrás (-z-10). */}
       <main className="relative mx-auto max-w-2xl px-4 pt-5 pb-16 print:p-0">{children}</main>
-      <Tutorial steps={tutorialSteps(actor.access, actor.name)} autoOpen={!actor.tutorialSeen} initials={initials(actor.name)} />
-      {!actor.tutorialSeen ? <span hidden data-testid="tutorial-pending" /> : null}
+      <Tutorial
+        steps={tutorialSteps(actor.access, actor.name)}
+        autoOpen={!actor.tutorialSeen && !actor.gateTrainingPending}
+        initials={initials(actor.name)}
+      />
+      {!actor.tutorialSeen && !actor.gateTrainingPending ? <span hidden data-testid="tutorial-pending" /> : null}
       <SessionKeeper />
     </div>
   );

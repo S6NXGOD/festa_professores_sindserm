@@ -50,7 +50,9 @@ describe("tutorial do primeiro acesso", () => {
   it("quem registra entradas ganha a fase do treino, com o botão para treinar", () => {
     const training = tutorialSteps(ROLE_PRESETS.SECURITY, "Rui Porto").find((step) => step.id === "treino")!;
     expect(training.action).toEqual({ href: "/portaria/treino", label: "Treinar agora" });
-    expect(training.bullets.join(" ")).toContain("nada fica gravado");
+    expect(training.title).toBe("Treino relâmpago");
+    // Para a Segurança é obrigatório (antes de abrir a portaria).
+    expect(training.bullets.join(" ")).toContain("obrigatório");
   });
 
   it("toda fase tem título e pelo menos uma explicação", () => {

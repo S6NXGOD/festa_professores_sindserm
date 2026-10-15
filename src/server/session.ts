@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { can, homePathFor, type Permission, resolveAccess } from "@/domain/access";
+import { gateTrainingRequired } from "@/domain/tutorial";
 import { STAFF_ROLES } from "@/domain/types";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
@@ -21,6 +22,8 @@ export interface SessionActor extends StaffActor {
   mustChangePassword: boolean;
   /** Já viu (ou pulou) o tutorial do primeiro acesso. */
   tutorialSeen: boolean;
+  /** Registra entradas e ainda não fez o treino relâmpago: a portaria abre só depois dele. */
+  gateTrainingPending: boolean;
 }
 
 export const getActor = cache(async (): Promise<SessionActor | null> => {
@@ -35,18 +38,22 @@ export const getActor = cache(async (): Promise<SessionActor | null> => {
       permissions: user.permissions,
       mustChangePassword: user.mustChangePassword,
       tutorialSeenAt: user.tutorialSeenAt,
+      gateTrainingDoneAt: user.gateTrainingDoneAt,
+      deletedAt: user.deletedAt,
     })
     .from(user)
     .where(eq(user.id, session.user.id));
-  if (!row?.active || !STAFF_ROLES.includes(row.role)) return null;
+  if (!row?.active || row.deletedAt || !STAFF_ROLES.includes(row.role)) return null;
+  const access = resolveAccess(row.role, row.permissions);
   return {
     kind: "staff",
     userId: session.user.id,
     name: row.name,
     role: row.role,
-    access: resolveAccess(row.role, row.permissions),
+    access,
     mustChangePassword: row.mustChangePassword,
     tutorialSeen: row.tutorialSeenAt !== null,
+    gateTrainingPending: row.gateTrainingDoneAt === null && gateTrainingRequired(access),
   };
 });
 
@@ -59,6 +66,13 @@ export async function requirePageActor(permission?: Permission, options: { passw
   if (!actor) redirect("/entrar");
   if (actor.mustChangePassword && !options.passwordChange) redirect("/conta?nova-senha=1");
   if (permission && !can(actor.access, permission)) redirect(homePathFor(actor.access));
+  return actor;
+}
+
+/** Páginas da portaria: quem ainda deve o treino relâmpago faz antes (leva 1 minuto). */
+export async function requireGateActor(permission?: Permission): Promise<SessionActor> {
+  const actor = await requirePageActor(permission);
+  if (actor.gateTrainingPending) redirect("/portaria/treino");
   return actor;
 }
 

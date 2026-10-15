@@ -6,14 +6,14 @@ import { ArrowLeft } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { db } from "@/server/db";
 import { loadGateView } from "@/server/services/gate-view";
-import { requirePageActor } from "@/server/session";
+import { requireGateActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Pessoa" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function GatePersonPage({ params, searchParams }: PageProps<"/portaria/pessoa/[id]">) {
-  const actor = await requirePageActor("viewGate");
+  const actor = await requireGateActor("viewGate");
   const [{ id }, query] = await Promise.all([params, searchParams]);
   if (!UUID.test(id)) notFound();
   const view = await loadGateView(db, id, actor.access);

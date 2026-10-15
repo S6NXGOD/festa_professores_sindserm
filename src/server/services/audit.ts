@@ -57,6 +57,8 @@ export const AUDIT_ACTIONS = {
   DOCUMENT_VIEWED: "Documento da ficha aberto",
   DOCUMENT_REMOVED: "Documento da ficha apagado",
   REPORT_GENERATED: "Relatório em PDF gerado",
+  USER_DELETED: "Usuário apagado",
+  GATE_TRAINING_REQUIRED: "Treino da portaria pedido de novo",
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

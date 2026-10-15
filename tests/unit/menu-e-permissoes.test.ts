@@ -38,7 +38,9 @@ describe("menu do painel", () => {
   it("cada item pede exatamente a permissão que a página dele exige", () => {
     for (const item of NAV_ITEMS) {
       const source = readFileSync(pageFor(item.href), "utf8");
-      expect(source, item.href).toContain(`requirePageActor("${item.permission}")`);
+      // Na portaria, requireGateActor faz a mesma checagem (e ainda pede o treino relâmpago antes).
+      const guarded = [`requirePageActor("${item.permission}")`, `requireGateActor("${item.permission}")`].some((call) => source.includes(call));
+      expect(guarded, item.href).toBe(true);
       // O atalho para a fila é a mesma página, só com o filtro.
       if (item.queueHref) expect(item.queueHref.startsWith(`${item.href}?filtro=`), item.queueHref).toBe(true);
     }
@@ -49,7 +51,7 @@ describe("menu do painel", () => {
     expect(pages.length).toBeGreaterThan(15);
     for (const file of pages) {
       const source = readFileSync(file, "utf8");
-      const guarded = source.includes("requirePageActor(");
+      const guarded = source.includes("requirePageActor(") || source.includes("requireGateActor(");
       const onlyRedirects = source.includes("redirect(") && !source.includes("return (");
       expect(guarded || onlyRedirects, path.relative(APP, file)).toBe(true);
     }

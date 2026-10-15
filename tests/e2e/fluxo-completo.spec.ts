@@ -20,6 +20,7 @@ const SECURITY = { name: "Sergio Seguranca Alves", email: "seguranca@e2e.test", 
 const EXTRA_ADMIN = { name: "Rodrigo Carneiro Admin", email: "rodrigo@e2e.test", password: "senha-rodri-123" };
 /** Pessoa da equipe que só consulta: Portaria e Inscrições em "só ver". */
 const VIEWER = { name: "Vera Consulta Moura", email: "consulta@e2e.test", password: "senha-consu-123" };
+const TEMP_USER = { name: "Tadeu Temporario Lopes", email: "temporario@e2e.test", password: "senha-tempo-123" };
 
 const MEMBER = {
   name: "Maria Aparecida Souza",
@@ -78,7 +79,18 @@ function localInput(date: Date) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
-async function login(page: Page, user: { email: string; password: string }, options: { keepTutorial?: boolean } = {}) {
+/** Treino relâmpago já feito (ele tem passo próprio): nos outros fluxos, a pessoa da portaria vai direto ao trabalho. */
+async function markGateTrained(email: string) {
+  const client = new pg.Client({ connectionString: E2E.databaseUrl });
+  await client.connect();
+  try {
+    await client.query('UPDATE "user" SET gate_training_done_at = now() WHERE email = $1', [email]);
+  } finally {
+    await client.end();
+  }
+}
+
+async function login(page: Page, user: { email: string; password: string }, options: { keepTutorial?: boolean; keepTraining?: boolean } = {}) {
   await page.goto("/entrar");
   await page.fill("#email", user.email);
   await page.fill("#password", user.password);
@@ -96,6 +108,13 @@ async function login(page: Page, user: { email: string; password: string }, opti
     await page.waitForURL((url) => url.pathname !== "/conta");
     user.password = own;
     await page.waitForLoadState("networkidle");
+  }
+  if (!options.keepTraining) {
+    await markGateTrained(user.email);
+    if (new URL(page.url()).pathname === "/portaria/treino") {
+      await page.goto("/portaria");
+      await page.waitForLoadState("networkidle");
+    }
   }
   // Primeiro acesso: o tutorial abre sozinho. Nos fluxos ele é pulado (o tutorial tem teste próprio).
   if (!options.keepTutorial && (await page.getByTestId("tutorial-pending").count()) > 0) {
@@ -869,32 +888,54 @@ test.describe.serial("festa das professoras e professores", () => {
       await context.close();
     });
 
-    await test.step("treino da portaria: as situações da porta com a tela de verdade (nada fica gravado)", async () => {
+    await test.step("treino relâmpago: obrigatório antes da portaria, curto, e o erro volta no fim", async () => {
+      // O administrador pede o treino de novo a quem registra entradas (a lista mostra quem falta).
+      const adminContext = await browser.newContext();
+      const admin = await adminContext.newPage();
+      await login(admin, ADMIN);
+      await admin.goto("/painel/usuarios");
+      await admin.getByTestId("require-training").click();
+      await admin.getByRole("button", { name: "Pedir o treino", exact: true }).click();
+      await expect(admin.getByText(/fazem? o treino antes de abrir a portaria/)).toBeVisible();
+      await expect(admin.getByTestId("user-row").filter({ hasText: SECURITY.email })).toContainText("Treino pendente");
+      await expect(admin.getByTestId("user-row").filter({ hasText: ADMIN.email })).not.toContainText("Treino");
+      await adminContext.close();
+
       const context = await browser.newContext({ ...devices["Pixel 7"] });
       const page = await context.newPage();
-      await login(page, SECURITY);
-      await page.getByTestId("open-training-card").click();
+      await login(page, SECURITY, { keepTraining: true });
+      // A portaria (até o leitor) só abre depois do treino.
+      await page.goto("/portaria/scanner");
       await expect(page).toHaveURL(/\/portaria\/treino$/);
+      await expect(page.getByTestId("gate-training")).toContainText("Antes de abrir a portaria");
       await page.getByTestId("training-start").click();
-      const total = Number((await page.getByTestId("training-progress").innerText()).match(/\/(\d+)/)![1]);
-      expect(total).toBeGreaterThanOrEqual(15);
-      // A Segurança não confere filiação: nessas situações, o certo é encaminhar ao Atendimento.
-      let forwards = 0;
-      for (let index = 0; index < total; index++) {
-        await expect(page.getByTestId("training-progress")).toContainText(`${index + 1}/${total}`);
-        const right = page.getByTestId("training-option-right");
-        if ((await right.innerText()).includes("Atendimento")) forwards++;
-        await right.click();
-        await expect(page.getByTestId("training-feedback")).toContainText("Acertou");
-        await page.getByTestId("training-next").click();
-      }
-      expect(forwards).toBeGreaterThanOrEqual(3);
-      await expect(page.getByTestId("training-score")).toHaveText(`${total} de ${total}`);
-      // Errou: a tela mostra o certo e o porquê.
-      await page.getByTestId("training-again").click();
-      await page.getByTestId("training-option-wrong").first().click();
+      await expect(page.getByTestId("training-progress")).toHaveText("0/8");
+      // Errou: mostra o certo, e a situação volta no fim.
+      const first = await page.getByTestId("training-question").getAttribute("data-question");
+      await page.getByTestId("training-option-wrong").click();
       await expect(page.getByTestId("training-feedback")).toContainText("O certo:");
-      // Também pelo menu do nome.
+      await page.getByTestId("training-next").click();
+      // A respondida sai com animação: espera a próxima entrar.
+      await expect.poll(() => page.getByTestId("training-question").getAttribute("data-question")).not.toBe(first);
+      // Acertou: a próxima vem sozinha.
+      const seen: string[] = [];
+      for (let turn = 0; turn < 12 && (await page.getByTestId("training-done").count()) === 0; turn++) {
+        await expect(page.getByTestId("training-option-right")).toBeEnabled();
+        const id = (await page.getByTestId("training-question").getAttribute("data-question"))!;
+        seen.push(id);
+        await page.getByTestId("training-option-right").click();
+        await expect(page.getByTestId("training-feedback")).toContainText("Isso!");
+        await expect
+          .poll(async () => (await page.getByTestId("training-done").count()) > 0 || (await page.getByTestId("training-question").getAttribute("data-question")) !== id)
+          .toBe(true);
+      }
+      expect(new Set(seen).size).toBe(8);
+      expect(seen.at(-1)).toBe(first);
+      await expect(page.getByTestId("training-score")).toHaveText("7 de 8 de primeira");
+      await page.getByTestId("training-go").click();
+      await expect(page).toHaveURL(/\/portaria$/);
+      await expect(page.getByTestId("open-scanner")).toBeVisible();
+      // Dá para treinar de novo quando quiser, pelo menu do nome.
       await page.getByTestId("user-menu").click();
       await expect(page.getByTestId("open-training")).toBeVisible();
       await context.close();
@@ -936,6 +977,20 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(nav).toContainText("Colaboradores SINDSERM");
       await expect(nav).toContainText("Acesso ao sistema");
       await context.close();
+    });
+
+    await test.step("apagar usuário: some da lista na hora (e ninguém apaga a si mesmo)", async () => {
+      const adminContext = await browser.newContext();
+      const admin = await adminContext.newPage();
+      await login(admin, ADMIN);
+      await admin.goto("/painel/usuarios");
+      await createStaffUser(admin, TEMP_USER, /^Segurança/);
+      await admin.getByTestId("user-row").filter({ hasText: TEMP_USER.email }).getByTestId("delete-user").click();
+      await admin.getByRole("button", { name: "Apagar usuário", exact: true }).click();
+      await expect(admin.getByText(`${TEMP_USER.name} foi apagado(a).`)).toBeVisible();
+      await expect(admin.getByTestId("user-row").filter({ hasText: TEMP_USER.email })).toHaveCount(0);
+      await expect(admin.getByTestId("user-row").filter({ hasText: ADMIN.email }).getByTestId("delete-user")).toHaveCount(0);
+      await adminContext.close();
     });
 
     await test.step("novo usuário: Administrador é acesso total (nada a marcar); os outros perfis já vêm marcados e ajustáveis", async () => {

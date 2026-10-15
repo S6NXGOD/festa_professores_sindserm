@@ -3,444 +3,403 @@
 import confetti from "canvas-confetti";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlarmClock,
-  ArrowRight,
   Cancel,
   Check,
+  Clock,
   Close,
   Gamepad,
-  Heart,
-  Keyboard,
-  Login,
+  Gift,
+  Info,
+  Loader,
   QrCode,
   Reload,
-  Search,
-  Target,
+  Shield,
+  Star,
   Trophy,
-  UserPlus,
   Warning,
 } from "@/components/icons/pixel";
-import { PixelTag } from "@/components/retro/bits";
+import { PixelTag, PlayerTag } from "@/components/retro/bits";
 import { Button } from "@/components/ui/button";
+import { callAction } from "@/lib/call-action";
 import { vibrate } from "@/lib/haptics";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { ConfirmEntryButton, GateResult } from "../gate-result";
-import { shuffled, type TrainingContext, type TrainingScenario, trainingScenarios } from "./scenarios";
+import { finishGateTrainingAction } from "@/server/actions/users";
+import { type MiniCard, type QuickQuestion, quickQuestions, shuffled, type TrainingContext } from "./scenarios";
 
-type Answer = { chosen: number; correct: boolean };
+/** Acertou: a próxima situação vem sozinha neste tempo (um toque adianta). */
+const AUTO_NEXT_MS = 1600;
+
+const TONE: Record<MiniCard["tone"], string> = {
+  success: "bg-success text-success-foreground",
+  warning: "bg-warning text-warning-foreground",
+  danger: "bg-danger text-white hazard",
+};
+const ICON = { ok: Shield, wait: Clock, again: Reload, stop: Cancel } as const;
+
+type Answer = { questionId: string; right: boolean };
 
 /**
- * Treino da portaria: cada situação mostra a tela de verdade e pergunta o que
- * fazer. Nada aqui grava no sistema (os dados são de mentira).
+ * Treino relâmpago da portaria: um cartão por vez, duas respostas, avanço
+ * automático quando acerta. Errou, a situação volta no fim (até acertar).
+ * `required`: é o treino obrigatório de quem registra entradas (sem "pular").
  */
-export function GateTraining({ context }: { context: TrainingContext }) {
-  const scenarios = useMemo(() => trainingScenarios(context), [context]);
-  const phases = useMemo(() => [...new Set(scenarios.map((s) => s.phase))], [scenarios]);
+export function GateTraining({ context, required }: { context: TrainingContext; required: boolean }) {
+  const router = useRouter();
+  const questions = useMemo(() => quickQuestions(context), [context]);
   const [stage, setStage] = useState<"intro" | "play" | "done">("intro");
   const [round, setRound] = useState(0);
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, Answer>>({});
-  const screenRef = useRef<HTMLDivElement>(null);
-  const topRef = useRef<HTMLDivElement>(null);
+  const [queue, setQueue] = useState<number[]>([]);
+  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [firstTry, setFirstTry] = useState<Record<string, boolean>>({});
+  const [combo, setCombo] = useState(0);
+  const [save, setSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const savedOnce = useRef(false);
+  // A fila também num ref: o toque e o tempo leem a mesma (sem pular duas situações).
+  const queueRef = useRef<number[]>([]);
 
-  const scenario = scenarios[index]!;
-  const options = useMemo(() => shuffled(scenario.options, (index + 1) * (round + 3)), [scenario, index, round]);
-  const answer = answers[scenario.id] ?? null;
-  const score = Object.values(answers).filter((a) => a.correct).length;
+  const current: QuickQuestion | null = stage === "play" && queue.length ? questions[queue[0]!]! : null;
+  const options = useMemo(
+    () => (current ? shuffled(["right", "wrong"] as const, (queue[0]! + 3) * (round + 7)) : []),
+    [current, queue, round],
+  );
+  const solved = questions.length - queue.length;
+  const rightFirst = Object.values(firstTry).filter(Boolean).length;
+
+  const store = useCallback(async () => {
+    setSave("saving");
+    const result = await callAction(finishGateTrainingAction());
+    setSave(result.ok ? "saved" : "error");
+    if (result.ok) router.refresh();
+  }, [router]);
 
   function start() {
-    setAnswers({});
-    setIndex(0);
+    const all = questions.map((_, index) => index);
+    queueRef.current = all;
+    setRound((r) => r + 1);
+    setQueue(all);
+    setFirstTry({});
+    setCombo(0);
+    setAnswer(null);
     setStage("play");
     playSound("coin");
-    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function choose(position: number) {
-    if (answer) return;
-    const option = options[position]!;
-    setAnswers((current) => ({ ...current, [scenario.id]: { chosen: position, correct: option.correct } }));
-    if (option.correct) {
-      const kit = scenario.after?.entryKit;
-      playSound(kit?.kind === "DELIVERED" ? (scenario.after?.entryGuestKit ? "fanfare" : "powerup") : "coin");
-      vibrate([40, 40, 120]);
+  function choose(right: boolean) {
+    if (!current || answer) return;
+    setAnswer({ questionId: current.id, right });
+    setFirstTry((seen) => (current.id in seen ? seen : { ...seen, [current.id]: right }));
+    if (right) {
+      setCombo((value) => value + 1);
+      playSound(combo + 1 >= 3 ? "powerup" : "coin");
+      vibrate(40);
     } else {
+      setCombo(0);
       playSound("error");
       vibrate([80, 60, 80]);
     }
-    // A tela muda para o resultado: volta para ela (o celular costuma estar lá embaixo, nas respostas).
-    window.requestAnimationFrame(() => screenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
-  function next() {
-    if (index === scenarios.length - 1) {
+  /**
+   * Passa para a próxima (só se ainda estiver na situação respondida: o toque e
+   * o tempo não pulam duas). Acabaram as situações: fim do treino, e a portaria abre.
+   */
+  const advance = useCallback(
+    (from: Answer) => {
+      const list = queueRef.current;
+      if (!list.length || questions[list[0]!]!.id !== from.questionId) return;
+      const [head, ...rest] = list;
+      const next = from.right ? rest : [...rest, head!];
+      queueRef.current = next;
+      setQueue(next);
+      setAnswer(null);
+      if (next.length > 0) return;
       setStage("done");
-      const total = Object.values(answers).filter((a) => a.correct).length;
       playSound("levelup");
-      if (total / scenarios.length >= 0.8 && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         confetti({ particleCount: 110, spread: 85, origin: { y: 0.55 }, colors: ["#ff2626", "#f8c000", "#ffffff", "#ff4fb4", "#22d3ee"], shapes: ["square"], flat: true });
       }
-    } else {
-      setIndex(index + 1);
-      playSound("blip");
-    }
-    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+      if (!savedOnce.current) {
+        savedOnce.current = true;
+        void store();
+      }
+    },
+    [questions, store],
+  );
 
-  function again() {
-    setRound((r) => r + 1);
-    start();
-  }
+  // Acertou: segue sozinho.
+  useEffect(() => {
+    if (!answer?.right) return;
+    const timer = window.setTimeout(() => advance(answer), AUTO_NEXT_MS);
+    return () => window.clearTimeout(timer);
+  }, [answer, advance]);
 
   return (
-    <div ref={topRef} className="scroll-mt-20" data-testid="gate-training">
+    <div className="mx-auto max-w-lg" data-testid="gate-training">
       {stage === "intro" ? (
-        <Intro total={scenarios.length} phases={phases.map((phase) => ({ phase, count: scenarios.filter((s) => s.phase === phase).length }))} onStart={start} />
+        <Intro total={questions.length} required={required} onStart={start} />
       ) : stage === "done" ? (
-        <Done scenarios={scenarios} answers={answers} onAgain={again} />
-      ) : (
-        <div className="space-y-4 pb-36">
-          <Progress scenarios={scenarios} index={index} answers={answers} score={score} />
+        <Done questions={questions} rightFirst={rightFirst} save={save} onRetrySave={store} onAgain={start} />
+      ) : current ? (
+        <div className="space-y-3.5">
+          {/* Placar: situações resolvidas e o combo. */}
+          <div className="flex items-center justify-between gap-3">
+            <PixelTag tone="red">
+              <Gamepad className="size-3.5" /> Treino relâmpago
+            </PixelTag>
+            <AnimatePresence mode="popLayout">
+              {combo >= 2 ? (
+                <motion.span
+                  key={combo}
+                  initial={{ scale: 1.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="pixel text-[0.6rem] text-warning"
+                  data-testid="training-combo"
+                >
+                  COMBO x{combo}
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+            <span className="pixel text-[0.55rem] text-fg-muted tabular" data-testid="training-progress">
+              {solved}/{questions.length}
+            </span>
+          </div>
+          <div className="flex gap-1" aria-hidden>
+            {questions.map((question, index) => (
+              <span
+                key={question.id}
+                className={cn(
+                  "h-1.5 flex-1 rounded-[2px] transition-colors duration-300",
+                  !queue.includes(index) ? "bg-success" : index === queue[0] ? "bg-warning shadow-[0_0_8px_rgb(248_192_0/0.8)]" : "bg-line-strong",
+                )}
+              />
+            ))}
+          </div>
+
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
-              key={`${round}-${scenario.id}`}
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -24 }}
-              transition={{ type: "spring", stiffness: 380, damping: 34 }}
-              className="space-y-4"
+              key={`${round}-${current.id}-${queue.length}`}
+              initial={{ opacity: 0, x: 28, rotate: 0.8 }}
+              animate={{ opacity: 1, x: 0, rotate: 0 }}
+              exit={{ opacity: 0, x: -28, rotate: -0.8 }}
+              transition={{ type: "spring", stiffness: 420, damping: 32 }}
+              className="space-y-3.5"
+              data-testid="training-question"
+              data-question={current.id}
             >
-              <p className="flex items-start gap-3 rounded-xl border border-line-strong bg-surface-2 p-3.5 text-[0.95rem] leading-snug font-semibold text-fg" data-testid="training-story">
-                <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-red text-white shadow-[0_3px_0_0_var(--brand-strong)]">
-                  <Target className="size-5" />
-                </span>
-                <span className="min-w-0 pt-1">{scenario.story}</span>
-              </p>
+              <MiniGateCard card={current.card} />
 
-              <div ref={screenRef} className="scroll-mt-20">
-                <p className="pixel mb-2 text-[0.5rem] text-fg-dim">{answer && scenario.after ? "Depois da resposta certa, a tela fica assim" : "A tela da portaria"}</p>
-                <TrainingScreenView scenario={scenario} showAfter={Boolean(answer)} />
-              </div>
-
-              {answer ? <Feedback scenario={scenario} options={options} answer={answer} /> : null}
-
-              <div role="group" aria-labelledby="training-question" className="space-y-2">
-                <p id="training-question" className="display text-2xl text-fg">
-                  O que você faz?
-                </p>
-                {options.map((option, position) => {
-                  const chosen = answer?.chosen === position;
-                  const reveal = Boolean(answer);
+              <p className="display text-xl leading-none text-fg">O que você faz?</p>
+              <div className="grid gap-2">
+                {options.map((option) => {
+                  const right = option === "right";
+                  const chosen = answer && answer.right === right;
                   return (
                     <button
-                      key={option.label}
+                      key={option}
                       type="button"
-                      onClick={() => choose(position)}
-                      disabled={reveal}
+                      onClick={() => choose(right)}
+                      disabled={Boolean(answer)}
                       className={cn(
-                        "flex min-h-14 w-full items-center gap-3 rounded-xl border-2 px-3.5 py-3 text-left text-[0.95rem] leading-snug font-semibold transition-[border-color,background-color,opacity,transform] outline-none focus-visible:ring-2 focus-visible:ring-red",
-                        !reveal && "border-line-strong bg-surface hover:border-red/60 hover:bg-surface-2 active:scale-[0.99]",
-                        reveal && option.correct && "border-success bg-success-soft text-fg",
-                        reveal && chosen && !option.correct && "border-danger bg-danger-soft text-fg",
-                        reveal && !chosen && !option.correct && "border-line opacity-55",
+                        "flex min-h-14 w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-[0.98rem] leading-snug font-bold transition-[border-color,background-color,opacity,transform] outline-none focus-visible:ring-2 focus-visible:ring-red",
+                        !answer && "border-line-strong bg-surface text-fg hover:border-red/60 active:scale-[0.98]",
+                        answer && right && "border-success bg-success-soft text-fg",
+                        answer && !right && chosen && "border-danger bg-danger-soft text-fg",
+                        answer && !right && !chosen && "border-line opacity-45",
                       )}
-                      data-testid={`training-option-${option.correct ? "right" : "wrong"}`}
+                      data-testid={right ? "training-option-right" : "training-option-wrong"}
                     >
                       <span
                         className={cn(
-                          "pixel inline-flex size-8 shrink-0 items-center justify-center rounded-md text-[0.6rem]",
-                          reveal && option.correct ? "bg-success text-success-foreground" : reveal && chosen ? "bg-danger text-white" : "bg-surface-3 text-fg-muted",
+                          "inline-flex size-7 shrink-0 items-center justify-center rounded-md",
+                          answer && right ? "bg-success text-success-foreground" : answer && chosen ? "bg-danger text-white" : "bg-surface-3 text-fg-muted",
                         )}
+                        aria-hidden
                       >
-                        {reveal && option.correct ? <Check className="size-4" /> : reveal && chosen ? <Close className="size-4" /> : String.fromCharCode(65 + position)}
+                        {answer && right ? <Check className="size-4" /> : answer && chosen ? <Close className="size-4" /> : <span className="size-2 rounded-[2px] bg-current" />}
                       </span>
-                      <span className="min-w-0">{option.label}</span>
+                      <span className="min-w-0">{right ? current.right : current.wrong}</span>
                     </button>
                   );
                 })}
               </div>
+
+              {answer ? <Feedback question={current} answer={answer} onNext={() => advance(answer)} /> : null}
             </motion.div>
           </AnimatePresence>
-
-          {answer ? (
-            <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ink/95 px-4 pt-3 backdrop-blur">
-              <div className="mx-auto max-w-2xl">
-                <Button size="xl" className="w-full" onClick={next} autoFocus data-testid="training-next">
-                  {index === scenarios.length - 1 ? (
-                    <>
-                      <Trophy /> Ver o resultado
-                    </>
-                  ) : (
-                    <>
-                      Próxima situação <ArrowRight />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          ) : null}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
-function Intro({ total, phases, onStart }: { total: number; phases: { phase: string; count: number }[]; onStart: () => void }) {
+function Intro({ total, required, onStart }: { total: number; required: boolean; onStart: () => void }) {
+  const colors = [
+    { swatch: "bg-success", name: "Verde", text: "liberado. Confirme (o kit sai junto)" },
+    { swatch: "bg-warning", name: "Amarelo", text: "falta resolver. Atendimento" },
+    { swatch: "bg-danger", name: "Vermelho", text: "parou. Leia o motivo na faixa" },
+  ];
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="relative overflow-hidden rounded-2xl border-2 border-red/50 bg-[linear-gradient(150deg,rgb(227_0_15/0.22),rgb(8_8_8/0.9)_65%)] p-5">
         <span className="scanlines pointer-events-none absolute inset-0 opacity-30" aria-hidden />
-        <PixelTag tone="red" className="relative w-fit">
-          <Gamepad className="size-3.5" /> Modo treino
+        <PixelTag tone={required ? "warning" : "red"} className="relative">
+          <Gamepad className="size-3.5" /> {required ? "Antes de abrir a portaria" : "Modo treino"}
         </PixelTag>
-        <h1 className="display relative mt-3 text-4xl leading-none text-fg sm:text-5xl">Treino da portaria</h1>
-        <p className="relative mt-3 text-[0.95rem] leading-relaxed text-fg-muted">
-          {total} situações da porta, com a tela de verdade. Você lê o que aparece e escolhe o que fazer. Leva uns 4 minutos e nada fica gravado
-          no sistema: as pessoas são de mentira.
+        <h1 className="display relative mt-3 text-[2.6rem] leading-none text-fg">Treino relâmpago</h1>
+        <p className="relative mt-2 text-[0.98rem] leading-relaxed text-fg-muted">
+          {total} situações da porta, <strong className="text-fg">1 minuto</strong>. Toque no que você faria. Errou? Ela volta no fim.
         </p>
-        <div className="relative mt-4 grid gap-2 sm:grid-cols-3">
-          {phases.map((item, position) => (
-            <div key={item.phase} className="rounded-lg border border-line-strong bg-ink/70 px-3 py-2.5">
-              <p className="pixel text-[0.5rem] text-red">Fase {position + 1}</p>
-              <p className="mt-1 font-bold text-fg">{item.phase}</p>
-              <p className="text-xs text-fg-muted">{item.count === 1 ? "1 situação" : `${item.count} situações`}</p>
-            </div>
+        <ul className="relative mt-4 grid gap-1.5">
+          {colors.map((color) => (
+            <li key={color.name} className="flex items-center gap-2.5 text-sm text-fg-muted">
+              <span className={cn("size-3.5 shrink-0 rounded-[3px]", color.swatch)} />
+              <span>
+                <strong className="text-fg">{color.name}</strong>: {color.text}
+              </span>
+            </li>
           ))}
-        </div>
-      </div>
-      <div className="grid gap-2 rounded-xl border border-line bg-surface p-4 text-sm text-fg-muted">
-        <p className="flex items-start gap-2">
-          <span className="mt-0.5 size-3 shrink-0 rounded-[2px] bg-success" /> <span><strong className="text-fg">Verde</strong>: liberado. Confirme a entrada; o kit sai junto.</span>
-        </p>
-        <p className="flex items-start gap-2">
-          <span className="mt-0.5 size-3 shrink-0 rounded-[2px] bg-warning" /> <span><strong className="text-fg">Amarelo</strong>: falta resolver algo (ou já entrou).</span>
-        </p>
-        <p className="flex items-start gap-2">
-          <span className="mt-0.5 size-3 shrink-0 rounded-[2px] bg-danger" /> <span><strong className="text-fg">Vermelho</strong>: parou. A faixa diz o motivo e o que fazer.</span>
-        </p>
+        </ul>
+        {required ? (
+          <p className="relative mt-4 flex items-start gap-2 rounded-lg bg-ink/60 px-3 py-2 text-xs text-fg-muted">
+            <Info className="mt-0.5 size-3.5 shrink-0 text-warning" /> Obrigatório para quem registra entradas: terminou, a portaria abre.
+          </p>
+        ) : null}
       </div>
       <Button size="xl" className="w-full" onClick={onStart} autoFocus data-testid="training-start">
-        <Gamepad /> Começar o treino
+        <Gamepad /> Começar
       </Button>
     </div>
   );
 }
 
-function Progress({ scenarios, index, answers, score }: { scenarios: TrainingScenario[]; index: number; answers: Record<string, Answer>; score: number }) {
-  const scenario = scenarios[index]!;
+/** O cartão da portaria, resumido (mesmas cores, títulos e jeito do cartão de verdade). */
+function MiniGateCard({ card }: { card: MiniCard }) {
+  const Icon = ICON[card.icon];
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <PixelTag tone="red" className="w-fit">
-          <Gamepad className="size-3.5" /> {scenario.phase}
-        </PixelTag>
-        <p className="pixel text-[0.55rem] text-fg-muted tabular" data-testid="training-progress">
-          {index + 1}/{scenarios.length} · <span className="text-success-text">{score} acertos</span>
-        </p>
+    <div className="overflow-hidden rounded-2xl border border-line-strong bg-surface shadow-[0_20px_50px_-30px_rgb(0_0_0/0.95)]" data-testid="training-card">
+      <div className={cn("px-4 py-3", TONE[card.tone])}>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-black/15">
+            <Icon className="size-6" />
+          </span>
+          <div className="min-w-0">
+            <p className="pixel text-[0.5rem] opacity-80">{card.kicker}</p>
+            <p className="display mt-0.5 text-[1.45rem] leading-[0.95]">{card.title}</p>
+          </div>
+        </div>
+        {card.detail ? <p className="mt-2 text-sm leading-snug font-bold opacity-95">{card.detail}</p> : null}
       </div>
-      <div className="flex gap-1" aria-hidden>
-        {scenarios.map((item, position) => {
-          const result = answers[item.id];
-          return (
-            <span
-              key={item.id}
+      {card.name ? (
+        <div className="space-y-2.5 px-4 py-3.5">
+          <div>
+            {card.tags?.length ? (
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                {card.tags.map((tag) =>
+                  tag === "MINOR" ? (
+                    <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-warning px-1.5 py-1 text-[0.62rem] font-bold text-warning-foreground">
+                      <Warning className="size-3" /> MENOR DE 18
+                    </span>
+                  ) : (
+                    <PlayerTag key={tag} player={tag === "P1" ? 1 : 2} />
+                  ),
+                )}
+              </div>
+            ) : null}
+            <p className="display text-[1.75rem] leading-none text-fg">{card.name}</p>
+            {card.role ? <p className="mt-1 text-sm font-semibold text-fg-muted">{card.role}</p> : null}
+          </div>
+          {card.kit ? (
+            <div
               className={cn(
-                "h-1.5 flex-1 rounded-[2px] transition-colors duration-300",
-                result ? (result.correct ? "bg-success" : "bg-danger") : position === index ? "bg-warning shadow-[0_0_8px_rgb(248_192_0/0.8)]" : "bg-line-strong",
+                "flex items-center gap-3 rounded-xl border px-3 py-2.5",
+                card.kit.kind === "give" ? "border-red/60 bg-brand-soft" : "border-line-strong bg-surface-2",
               )}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** A tela que a pessoa veria na portaria (o cartão é o componente de verdade, com dados de mentira). */
-function TrainingScreenView({ scenario, showAfter }: { scenario: TrainingScenario; showAfter: boolean }) {
-  const screen = scenario.screen;
-  if (showAfter && scenario.after) {
-    return (
-      <GateResult
-        view={scenario.after.view}
-        justCheckedIn
-        entryKit={scenario.after.entryKit}
-        entryGuestKit={scenario.after.entryGuestKit ?? null}
-        mode="gate"
-      />
-    );
-  }
-  switch (screen.kind) {
-    case "card":
-      return (
-        <div className="space-y-2">
-          <GateResult view={screen.view} mode="gate" />
-          {screen.view.entry.kind === "ALLOWED" ? (
-            // No leitor, este botão fica fixo embaixo da tela.
-            <div inert className="rounded-2xl border border-dashed border-line-strong p-2">
-              <ConfirmEntryButton view={screen.view} confirming={false} onConfirm={() => undefined} className="w-full" />
-              <p className="mt-1.5 text-center text-[0.7rem] text-fg-dim">No leitor, este botão fica fixo embaixo da tela.</p>
+            >
+              <span
+                className={cn(
+                  "relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg",
+                  card.kit.kind === "give" ? "bg-red text-white shadow-[0_3px_0_0_var(--brand-strong)]" : "bg-surface-3 text-fg-muted",
+                )}
+              >
+                {card.kit.kind === "give" ? <Gift className="size-6" /> : card.kit.kind === "wait" ? <Clock className="size-6" /> : <Info className="size-6" />}
+                {card.kit.count === 2 ? (
+                  <span className="pixel absolute -top-2 -right-2 rounded-md bg-white px-1 py-0.5 text-[0.5rem] text-red shadow">x2</span>
+                ) : null}
+              </span>
+              <div className="min-w-0">
+                <p className="display text-xl leading-none text-fg">{card.kit.title}</p>
+                <p className="mt-0.5 text-xs text-fg-muted">{card.kit.detail}</p>
+              </div>
             </div>
           ) : null}
         </div>
-      );
-    case "early":
-      return (
-        <div className="relative">
-          <GateResult view={screen.view} mode="gate" />
-          <div className="absolute inset-0 flex items-end justify-center rounded-2xl bg-black/65 p-3 backdrop-blur-[2px]" inert>
-            <div className="w-full max-w-md rounded-xl border border-line-strong bg-surface-2 p-4 shadow-2xl">
-              <PixelTag tone="warning" className="w-fit">
-                <AlarmClock className="size-3.5" /> Ainda não abriu
-              </PixelTag>
-              <p className="mt-2 text-lg font-bold text-fg">A festa ainda não começou</p>
-              <p className="mt-1 text-sm text-fg-muted">
-                Começa {screen.view.eventStart.label ?? "no horário marcado"} (faltam 20 minutos). A regra é registrar entradas só a partir desse
-                horário.
-              </p>
-              <p className="mt-3 rounded-lg border border-warning/40 bg-warning-soft p-3 text-sm text-fg">
-                Registrar a entrada de <strong>{screen.view.fullName}</strong> mesmo assim? Os kits saem normalmente e fica anotado na auditoria que a
-                entrada foi antes do horário.
-              </p>
-              <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button variant="outline" className="border-warning/60 text-warning">
-                  <Login /> Registrar mesmo assim
-                </Button>
-                <Button variant="light">Esperar o horário</Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    case "problem":
-      return (
-        <div className="overflow-hidden rounded-2xl border border-line-strong bg-surface" role="img" aria-label={screen.title}>
-          <div className="hazard bg-danger px-5 py-6 text-white">
-            <div className="flex items-center gap-4">
-              <span className="inline-flex size-14 items-center justify-center rounded-xl bg-black/20">
-                <Cancel className="size-9" />
-              </span>
-              <div>
-                <p className="pixel text-[0.55rem] opacity-80">Game over</p>
-                <p className="display mt-1 text-3xl leading-none">{screen.title}</p>
-              </div>
-            </div>
-            <p className="mt-3 text-sm font-bold">{screen.detail}</p>
-          </div>
-          <div className="p-5" inert>
-            <Button variant="outline" size="lg" className="w-full">
-              <Search /> Buscar pessoa manualmente
-            </Button>
-          </div>
-        </div>
-      );
-    case "scanner":
-      return (
-        <div className="overflow-hidden rounded-2xl border border-line-strong bg-ink" inert>
-          <div className="relative flex h-56 items-center justify-center bg-[radial-gradient(circle_at_50%_40%,#1d1d22,#050505)]">
-            <span className="scanlines absolute inset-0 opacity-50" aria-hidden />
-            <div className="relative size-36 rounded-2xl">
-              {["top-0 left-0 border-t-4 border-l-4", "top-0 right-0 border-t-4 border-r-4", "bottom-0 left-0 border-b-4 border-l-4", "right-0 bottom-0 border-r-4 border-b-4"].map((corner) => (
-                <span key={corner} className={cn("absolute size-8 border-red drop-shadow-[0_0_8px_var(--red)]", corner)} aria-hidden />
-              ))}
-              <span className="absolute inset-0 flex items-center justify-center text-fg-dim">
-                <Warning className="size-10" />
-              </span>
-            </div>
-            <p className="pixel absolute inset-x-0 bottom-4 text-center text-[0.5rem] text-fg">Sem QR para ler</p>
-          </div>
-          <div className="grid grid-cols-2 gap-2 border-t border-line p-3">
-            <Button variant="secondary" size="lg">
-              <Search /> Buscar nome/CPF
-            </Button>
-            <Button variant="secondary" size="lg">
-              <Keyboard /> Digitar código
-            </Button>
-          </div>
-        </div>
-      );
-    case "search":
-      return (
-        <div className="space-y-3 rounded-2xl border border-line-strong bg-surface p-4" inert>
-          <div className="flex h-12 items-center gap-2 rounded-lg border border-line-strong bg-ink px-3 text-fg">
-            <Search className="size-5 text-fg-dim" />
-            <span className="truncate">{screen.query}</span>
-          </div>
-          <div className="flex flex-col items-center rounded-xl border-2 border-dashed border-line px-6 py-6 text-center">
-            <Search className="size-8 text-fg-dim" />
-            <p className="display mt-2 text-xl text-fg">Ninguém encontrado</p>
-            <p className="text-sm text-fg-muted">Confira a grafia ou tente pelo CPF.</p>
-            <SearchActions register={screen.register} courtesy={screen.courtesy} />
-          </div>
-        </div>
-      );
-  }
-}
-
-/** Os botões da busca vazia, como a pessoa vê na portaria (dependem do acesso dela). */
-function SearchActions({ register, courtesy }: { register: boolean; courtesy: boolean }) {
-  if (!register && !courtesy) return <p className="mt-3 text-xs text-fg-dim">Chegou sem inscrição? Chame o Atendimento para o cadastro rápido.</p>;
-  return (
-    <div className="mt-4 grid w-full max-w-xs gap-1.5">
-      {register ? (
-        <>
-          <Button size="lg">
-            <UserPlus /> Cadastrar agora
-          </Button>
-          <span className="text-xs text-fg-dim">Cadastro rápido de quem chegou sem inscrição</span>
-        </>
-      ) : null}
-      {courtesy ? (
-        <Button size="lg" variant={register ? "outline" : "default"} className={cn(register && "mt-1.5")}>
-          <Heart className="text-[#ff8fd0]" /> Entrar como cortesia
-        </Button>
       ) : null}
     </div>
   );
 }
 
-function Feedback({ scenario, options, answer }: { scenario: TrainingScenario; options: TrainingScenario["options"]; answer: Answer }) {
-  const chosen = options[answer.chosen]!;
-  const right = options.find((option) => option.correct)!;
+function Feedback({ question, answer, onNext }: { question: QuickQuestion; answer: Answer; onNext: () => void }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ type: "spring", stiffness: 380, damping: 26 }}
-      className={cn(
-        "rounded-xl border-2 p-4 text-[0.95rem] leading-snug text-fg",
-        answer.correct ? "border-success/70 bg-success-soft" : "border-danger/70 bg-danger-soft",
-      )}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn("relative overflow-hidden rounded-xl border-2 p-3.5", answer.right ? "border-success/70 bg-success-soft" : "border-danger/70 bg-danger-soft")}
       role="status"
       data-testid="training-feedback"
     >
-      <p className={cn("pixel flex items-center gap-1.5 text-[0.55rem]", answer.correct ? "text-success-text" : "text-danger")}>
-        {answer.correct ? <Check className="size-4" /> : <Close className="size-4" />}
-        {answer.correct ? "Acertou" : "Não foi dessa vez"}
+      <p className={cn("pixel flex items-center gap-1.5 text-[0.55rem]", answer.right ? "text-success-text" : "text-danger")}>
+        {answer.right ? <Check className="size-4" /> : <Close className="size-4" />}
+        {answer.right ? "Isso!" : "Quase"}
       </p>
-      <p className="mt-1.5">{chosen.why}</p>
-      {!answer.correct ? (
-        <p className="mt-2 rounded-lg border border-success/50 bg-success-soft px-3 py-2">
-          <strong>O certo:</strong> {right.label}. {right.why.replace(/^Isso! /, "")}
-        </p>
+      <p className="mt-1.5 text-[0.95rem] leading-snug text-fg">
+        {answer.right ? null : (
+          <>
+            <strong>O certo: {question.right.charAt(0).toLowerCase() + question.right.slice(1)}.</strong>{" "}
+          </>
+        )}
+        {question.lesson}
+      </p>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <span className="text-xs text-fg-muted">{answer.right ? "Já vem a próxima…" : "Essa volta no fim, para fixar."}</span>
+        <Button size="sm" variant={answer.right ? "success" : "default"} onClick={onNext} autoFocus data-testid="training-next">
+          {answer.right ? "Próxima" : "Entendi"}
+        </Button>
+      </div>
+      {answer.right ? (
+        // A barrinha do tempo da próxima.
+        <motion.span
+          aria-hidden
+          className="absolute inset-x-0 bottom-0 h-1 origin-left bg-success"
+          initial={{ scaleX: 1 }}
+          animate={{ scaleX: 0 }}
+          transition={{ duration: AUTO_NEXT_MS / 1000, ease: "linear" }}
+        />
       ) : null}
-      <p className="mt-3 inline-flex items-start gap-2 rounded-md bg-ink/60 px-2.5 py-1.5 text-sm font-bold text-warning">
-        <Warning className="mt-0.5 size-4 shrink-0" /> {scenario.lesson}
-      </p>
     </motion.div>
   );
 }
 
-function Done({ scenarios, answers, onAgain }: { scenarios: TrainingScenario[]; answers: Record<string, Answer>; onAgain: () => void }) {
-  const score = scenarios.filter((s) => answers[s.id]?.correct).length;
-  const total = scenarios.length;
-  const ratio = score / total;
-  const rank = ratio === 1 ? "Gabaritou! A porta está em boas mãos." : ratio >= 0.8 ? "Pronto(a) para a porta." : "Vale treinar mais uma vez.";
+function Done({
+  questions,
+  rightFirst,
+  save,
+  onRetrySave,
+  onAgain,
+}: {
+  questions: QuickQuestion[];
+  rightFirst: number;
+  save: "idle" | "saving" | "saved" | "error";
+  onRetrySave: () => void;
+  onAgain: () => void;
+}) {
+  const total = questions.length;
+  const stars = rightFirst === total ? 3 : rightFirst >= total - 2 ? 2 : 1;
   return (
-    <div className="space-y-5" data-testid="training-done">
+    <div className="space-y-4" data-testid="training-done">
       <div className="relative overflow-hidden rounded-2xl border-2 border-warning/60 bg-[linear-gradient(150deg,rgb(248_192_0/0.18),rgb(8_8_8/0.9)_65%)] p-5 text-center">
         <span className="scanlines pointer-events-none absolute inset-0 opacity-30" aria-hidden />
         <motion.span
@@ -451,37 +410,56 @@ function Done({ scenarios, answers, onAgain }: { scenarios: TrainingScenario[]; 
         >
           <Trophy className="size-9" />
         </motion.span>
-        <p className="pixel relative mt-3 text-[0.55rem] text-warning">Treino concluído</p>
-        <p className="display relative mt-2 text-4xl leading-none text-fg" data-testid="training-score">
-          {score} de {total}
+        <p className="pixel relative mt-3 text-[0.55rem] text-warning">Treino completo</p>
+        <div className="relative mt-2 flex justify-center gap-1.5" aria-label={`${stars} de 3 estrelas`}>
+          {[1, 2, 3].map((n) => (
+            <motion.span key={n} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.15 * n, type: "spring", stiffness: 400, damping: 12 }}>
+              <Star className={cn("size-8", n <= stars ? "text-warning drop-shadow-[0_0_10px_rgb(248_192_0/0.7)]" : "text-fg-dim")} />
+            </motion.span>
+          ))}
+        </div>
+        <p className="display relative mt-2 text-3xl leading-none text-fg" data-testid="training-score">
+          {rightFirst} de {total} de primeira
         </p>
-        <p className="relative mt-2 font-semibold text-fg-muted">{rank}</p>
+        <p className="relative mt-1.5 text-sm font-semibold text-fg-muted">
+          {stars === 3 ? "Gabaritou: a porta está em boas mãos." : stars === 2 ? "Pronto(a) para a porta." : "Pronto(a)! Na dúvida, a faixa da tela sempre diz o que fazer."}
+        </p>
       </div>
 
       <div className="rounded-xl border border-line bg-surface p-4">
-        <p className="display text-2xl text-fg">Cola da portaria</p>
-        <p className="text-sm text-fg-muted">A regra de cada situação. As que você errou estão marcadas.</p>
-        <ul className="mt-3 grid gap-2">
-          {scenarios.map((s) => {
-            const missed = answers[s.id] && !answers[s.id]!.correct;
-            return (
-              <li key={s.id} className={cn("flex items-start gap-2 rounded-lg px-2.5 py-2 text-sm", missed ? "bg-danger-soft text-fg" : "text-fg-muted")}>
-                {missed ? <Close className="mt-0.5 size-4 shrink-0 text-danger" /> : <Check className="mt-0.5 size-4 shrink-0 text-success-text" />}
-                <span>{s.lesson}</span>
-              </li>
-            );
-          })}
+        <p className="display text-xl text-fg">Cola da portaria</p>
+        <ul className="mt-2 grid gap-1.5">
+          {questions.map((question) => (
+            <li key={question.id} className="flex items-start gap-2 text-sm leading-snug text-fg-muted">
+              <Check className="mt-0.5 size-4 shrink-0 text-success-text" />
+              <span>{question.lesson}</span>
+            </li>
+          ))}
         </ul>
       </div>
 
+      {save === "error" ? (
+        <p className="flex flex-wrap items-center gap-2 rounded-lg border border-danger/50 bg-danger-soft px-3 py-2 text-sm text-fg">
+          Não deu para salvar o treino.
+          <Button size="sm" variant="outline" onClick={onRetrySave}>
+            Tentar de novo
+          </Button>
+        </p>
+      ) : null}
       <div className="grid gap-2 sm:grid-cols-2">
+        <Button asChild={save === "saved"} size="xl" disabled={save !== "saved"} data-testid="training-go">
+          {save === "saved" ? (
+            <Link href="/portaria">
+              <QrCode /> Ir para a portaria
+            </Link>
+          ) : (
+            <span>
+              <Loader className="animate-spin-steps" /> Salvando…
+            </span>
+          )}
+        </Button>
         <Button size="xl" variant="outline" onClick={onAgain} data-testid="training-again">
           <Reload /> Treinar de novo
-        </Button>
-        <Button asChild size="xl">
-          <Link href="/portaria">
-            <QrCode /> Ir para a portaria
-          </Link>
         </Button>
       </div>
     </div>

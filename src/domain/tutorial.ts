@@ -28,6 +28,11 @@ export interface TutorialStep {
   action?: { href: string; label: string };
 }
 
+/** Treino relâmpago obrigatório: quem registra entradas e não administra o acesso ao sistema. */
+export function gateTrainingRequired(access: AccessMap): boolean {
+  return can(access, "checkIn") && !can(access, "manageUsers");
+}
+
 function firstNameOf(name: string) {
   return name.trim().split(/\s+/)[0] ?? name;
 }
@@ -152,10 +157,12 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
       ? {
           id: "treino",
           scene: "training",
-          title: "Treino da portaria",
+          title: "Treino relâmpago",
           bullets: [
-            "Antes da festa, treine as situações da porta com a tela de verdade: liberado, convidado que chega antes, ficha para assinar, QR cancelado, fila do kit e outras.",
-            "Leva uns 4 minutos e nada fica gravado. Dá para repetir quando quiser: menu do seu nome → Treino da portaria.",
+            "As situações da porta em 1 minuto: verde, amarelo, vermelho, convidado que chega antes, QR que não serve, fila do kit.",
+            gateTrainingRequired(access)
+              ? "É obrigatório antes de abrir a portaria. Dá para repetir quando quiser: menu do seu nome → Treino da portaria."
+              : "Dá para repetir quando quiser: menu do seu nome → Treino da portaria.",
           ],
           action: { href: "/portaria/treino", label: "Treinar agora" },
         }

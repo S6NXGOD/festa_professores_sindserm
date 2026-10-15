@@ -479,9 +479,11 @@ export async function listStaffUsers() {
       active: user.active,
       permissions: user.permissions,
       mustChangePassword: user.mustChangePassword,
+      gateTrainingDoneAt: user.gateTrainingDoneAt,
       createdAt: user.createdAt,
     })
     .from(user)
+    .where(isNull(user.deletedAt))
     .orderBy(desc(user.active), asc(user.name));
 }
 

@@ -9,7 +9,7 @@ import { maskCpfInput } from "@/lib/cpf";
 import { db } from "@/server/db";
 import { listCourtesyInviters } from "@/server/services/employees";
 import { employeePoolOf, getStockOverview } from "@/server/services/settings";
-import { requirePageActor } from "@/server/session";
+import { requireGateActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Cortesia na portaria" };
 
@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: "Cortesia na portaria" };
  * Colaboradores e cortesias). Vem preenchida com o que foi digitado na busca.
  */
 export default async function GateCourtesyPage({ searchParams }: PageProps<"/portaria/cortesia">) {
-  const actor = await requirePageActor("createCourtesyAtGate");
+  const actor = await requireGateActor("createCourtesyAtGate");
   const query = await searchParams;
   const initialName = typeof query.nome === "string" ? query.nome.trim().slice(0, 120) : "";
   const cpfDigits = typeof query.cpf === "string" ? query.cpf.replace(/\D/g, "").slice(0, 11) : "";

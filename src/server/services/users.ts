@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
 import type { Executor, Tx } from "@/server/db";
 import { account, session, user } from "@/server/db/schema";
@@ -8,6 +8,7 @@ import { type AccessMap, can, isAccessFixed, resolveAccess, sameAccess, storedAc
 import type { BootstrapAdminInput, CreateUserInput, UpdateUserInput } from "@/domain/schemas";
 import { bootstrapAdminSchema, createUserSchema, resetPasswordSchema, updateUserSchema } from "@/domain/schemas";
 import { ROLE_LABEL } from "@/domain/labels";
+import { gateTrainingRequired } from "@/domain/tutorial";
 import type { StaffRole } from "@/domain/types";
 import { safeEqual } from "@/server/crypto";
 import { type Actor, assertPermission, type StaffActor, staffActor } from "./actor";
@@ -145,7 +146,7 @@ async function otherUserManagers(tx: Tx, excludingUserId: string) {
   const rows = await tx
     .select({ id: user.id, role: user.role, permissions: user.permissions })
     .from(user)
-    .where(eq(user.active, true));
+    .where(and(eq(user.active, true), isNull(user.deletedAt)));
   return rows.filter((row) => row.id !== excludingUserId && can(resolveAccess(row.role, row.permissions), "manageUsers")).length;
 }
 
@@ -223,6 +224,86 @@ export async function resetStaffPassword(actor: Actor, rawInput: { userId: strin
       entityId: target.id,
       summary: `Senha de ${target.name} redefinida (provisória); sessões encerradas.`,
     });
+  });
+}
+
+/**
+ * Apaga um usuário. Quem nunca registrou nada some de vez. Quem já registrou
+ * entradas, kits ou fichas perde o acesso e sai da lista, mas o nome continua
+ * nesses registros (o histórico precisa dizer quem fez); o e-mail fica livre
+ * para um cadastro novo.
+ */
+export async function deleteStaffUser(actor: Actor, rawInput: { userId: string }) {
+  assertPermission(actor, "manageUsers");
+  const userId = typeof rawInput?.userId === "string" ? rawInput.userId : "";
+  return withTx(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('staff_users'))`);
+    const [current] = await tx.select().from(user).where(eq(user.id, userId)).for("update");
+    if (!current || current.deletedAt) throw new DomainError("NOT_FOUND", "Usuário não encontrado.");
+    if (actor.kind === "staff" && current.id === actor.userId) {
+      throw new DomainError("INVALID_STATE", "Você não pode apagar o próprio usuário.");
+    }
+    const manages = current.active && can(resolveAccess(current.role, current.permissions), "manageUsers");
+    if (manages && (await otherUserManagers(tx, current.id)) === 0) {
+      throw new DomainError("INVALID_STATE", "É preciso manter pelo menos uma pessoa ativa que administre o acesso ao sistema.");
+    }
+    const usage = await tx.execute<{ used: boolean }>(sql`
+      SELECT (
+        EXISTS (SELECT 1 FROM check_in WHERE checked_in_by_user_id = ${current.id})
+        OR EXISTS (SELECT 1 FROM kit_delivery WHERE delivered_by_user_id = ${current.id})
+        OR EXISTS (SELECT 1 FROM affiliation_form WHERE created_by_user_id = ${current.id})
+      ) AS used
+    `);
+    const keepsHistory = Boolean(usage.rows[0]?.used);
+    if (keepsHistory) {
+      await tx
+        .update(user)
+        .set({ active: false, deletedAt: new Date(), email: `${current.id}@usuario-apagado.invalid`, permissions: null, mustChangePassword: false })
+        .where(eq(user.id, current.id));
+      await tx.delete(session).where(eq(session.userId, current.id));
+      await tx.delete(account).where(eq(account.userId, current.id));
+    } else {
+      await tx.delete(user).where(eq(user.id, current.id));
+    }
+    await writeAudit(tx, actor, {
+      action: "USER_DELETED",
+      entityType: "user",
+      entityId: current.id,
+      summary: keepsHistory
+        ? `Usuário ${current.name} apagado: sem acesso e fora da lista; o nome continua nas entradas, kits e fichas que registrou.`
+        : `Usuário ${current.name} apagado.`,
+      before: { name: current.name, email: current.email, perfil: ROLE_LABEL[current.role] },
+    });
+    return { keptInHistory: keepsHistory };
+  });
+}
+
+/** Treino relâmpago da portaria feito: a portaria abre (e o tutorial em janela não aparece mais sozinho). */
+export async function finishGateTraining(ex: Executor, actor: StaffActor) {
+  await ex
+    .update(user)
+    .set({ gateTrainingDoneAt: new Date(), tutorialSeenAt: sql`coalesce(${user.tutorialSeenAt}, now())` })
+    .where(eq(user.id, actor.userId));
+}
+
+/** Pede o treino relâmpago de novo a quem registra entradas (fora os administradores). */
+export async function requireGateTrainingAgain(actor: Actor) {
+  assertPermission(actor, "manageUsers");
+  return withTx(async (tx) => {
+    const rows = await tx
+      .select({ id: user.id, role: user.role, permissions: user.permissions })
+      .from(user)
+      .where(and(eq(user.active, true), isNull(user.deletedAt)));
+    const ids = rows.filter((row) => gateTrainingRequired(resolveAccess(row.role, row.permissions))).map((row) => row.id);
+    if (ids.length) {
+      await tx.update(user).set({ gateTrainingDoneAt: null }).where(inArray(user.id, ids));
+    }
+    await writeAudit(tx, actor, {
+      action: "GATE_TRAINING_REQUIRED",
+      entityType: "user",
+      summary: `Treino da portaria pedido de novo: ${ids.length === 1 ? "1 pessoa faz" : `${ids.length} pessoas fazem`} antes de abrir a portaria.`,
+    });
+    return { people: ids.length };
   });
 }
 

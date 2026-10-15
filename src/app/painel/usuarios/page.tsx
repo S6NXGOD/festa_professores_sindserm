@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/staff/panel-ui";
+import { DeleteUserButton, RequireTrainingButton } from "@/components/staff/user-admin-actions";
 import { CreateUserDialog, EditUserDialog, ResetPasswordDialog } from "@/components/staff/user-dialogs";
 import { ToneBadge } from "@/components/status/status-badge";
 import { isCustomAccess, resolveAccess } from "@/domain/access";
 import { ROLE_LABEL } from "@/domain/labels";
+import { gateTrainingRequired } from "@/domain/tutorial";
 import { initials } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { listStaffUsers } from "@/server/queries/panel";
@@ -14,14 +16,30 @@ export const metadata: Metadata = { title: "Usuários" };
 export default async function UsersPage() {
   const actor = await requirePageActor("manageUsers");
   const users = await listStaffUsers();
+  // Quem registra entradas (fora os administradores) faz o treino relâmpago antes da portaria.
+  const trainees = users.filter((u) => u.active && gateTrainingRequired(resolveAccess(u.role, u.permissions)));
+  const pendingTraining = trainees.filter((u) => !u.gateTrainingDoneAt).length;
   return (
     <div>
       <PageHeader
         eyebrow="Acesso ao sistema"
         title="Usuários"
         description="Quem usa o sistema e o que cada pessoa pode fazer, área por área. Colaboradores que só vão à festa (sem usar o sistema) ficam em Colaboradores SINDSERM."
-        actions={<CreateUserDialog />}
+        actions={
+          <>
+            {trainees.length ? <RequireTrainingButton /> : null}
+            <CreateUserDialog />
+          </>
+        }
       />
+      {trainees.length ? (
+        <p className="mb-4 flex flex-wrap items-center gap-2 text-sm text-fg-muted" data-testid="training-summary">
+          <span className="pixel text-[0.55rem] text-red">Treino da portaria</span>
+          {pendingTraining
+            ? `${trainees.length - pendingTraining} de ${trainees.length} já fizeram; ${pendingTraining === 1 ? "falta 1 pessoa" : `faltam ${pendingTraining}`} (fazem antes de abrir a portaria).`
+            : `Todos os ${trainees.length} da portaria já fizeram.`}
+        </p>
+      ) : null}
       <div className="overflow-hidden rounded-xl border border-line bg-surface">
         <ul className="divide-y divide-line">
           {users.map((u) => (
@@ -36,6 +54,13 @@ export default async function UsersPage() {
                   {!u.active ? <ToneBadge tone="danger">Desativado</ToneBadge> : null}
                   {isCustomAccess(u.role, u.permissions) ? <ToneBadge tone="info">Permissões ajustadas</ToneBadge> : null}
                   {u.mustChangePassword && u.active ? <ToneBadge tone="warning">Senha provisória</ToneBadge> : null}
+                  {u.active && gateTrainingRequired(resolveAccess(u.role, u.permissions)) ? (
+                    u.gateTrainingDoneAt ? (
+                      <ToneBadge tone="success">Treino feito</ToneBadge>
+                    ) : (
+                      <ToneBadge tone="warning">Treino pendente</ToneBadge>
+                    )
+                  ) : null}
                 </p>
                 <p className="truncate text-sm text-fg-muted">
                   {u.email} · {ROLE_LABEL[u.role]}
@@ -55,6 +80,7 @@ export default async function UsersPage() {
                   isSelf={u.id === actor.userId}
                 />
                 <ResetPasswordDialog userId={u.id} name={u.name} />
+                {u.id !== actor.userId ? <DeleteUserButton userId={u.id} name={u.name} /> : null}
               </div>
             </li>
           ))}
