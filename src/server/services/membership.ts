@@ -18,6 +18,7 @@ import { writeAudit } from "./audit";
 import { convertActiveGuestLink } from "./conversion";
 import { hasSignedForm, linkDocumentsToForm, missingDocuments } from "./documents";
 import { DomainError, isUniqueViolation } from "./errors";
+import { allocateKitSlots, promoteKitWaitlist } from "./kit-waitlist";
 import { lockRegistration } from "./locks";
 import { personSearchFields } from "./registration";
 import { findRegistrationIdByMember, isActiveEmployee } from "./state";
@@ -108,6 +109,7 @@ export async function registerDeclaredMember(actor: Actor, rawInput: DeclaredMem
         })
         .returning({ id: registration.id });
       await ensureActiveVoucher(tx, target.id, actor.userId);
+      if (input.isTeacher) await allocateKitSlots(tx, actor, reg!.id, { member: true, guest: false });
       await writeAudit(tx, actor, {
         action: "DECLARED_MEMBER_REGISTERED",
         entityType: "registration",
@@ -176,6 +178,9 @@ export async function saveAffiliationForm(actor: Actor, rawInput: AffiliationFor
             });
           }
           await tx.update(registration).set({ isTeacher: data.isTeacher }).where(eq(registration.id, state.id));
+          // Passou a ser professor(a): o kit dela(e) entra na conta (ou na fila, se acabaram).
+          if (data.isTeacher) await allocateKitSlots(tx, actor, state.id, { member: true, guest: false });
+          else await tx.update(registration).set({ memberKitWaitlistedAt: null }).where(eq(registration.id, state.id));
         }
         if (data.documents) await linkDocumentsToForm(tx, form.id, data.documents);
         await writeAudit(tx, actor, {
@@ -297,9 +302,11 @@ export async function formalizeAffiliation(actor: Actor, formId: string, method:
 
       // Ordem de bloqueio: inscrição antes da pessoa.
       const own = await findRegistrationIdByMember(tx, form.personId);
+      let ownState: Awaited<ReturnType<typeof lockRegistration>> | null = null;
       if (own) {
         if (isActiveMember(own.status)) throw new DomainError("CONFLICT", "Esta pessoa já é filiada confirmada.");
         const state = await lockRegistration(tx, own.id);
+        ownState = state;
         if (!form.isTeacher && state.guest) {
           throw new DomainError("INVALID_STATE", "A ficha indica que a pessoa não é professor(a), mas há convidado cadastrado. Remova o convidado ou corrija a ficha.");
         }
@@ -349,6 +356,11 @@ export async function formalizeAffiliation(actor: Actor, formId: string, method:
       }
 
       const conversion = await convertActiveGuestLink(tx, actor, target.id, registrationId);
+      // Kit: inscrição nova, que tinha sido recusada ou que passou a ser de professor(a) entra na conta (ou na fila).
+      // Ficha antecipada que já era de professor(a) mantém o que foi decidido na inscrição.
+      if (form.isTeacher && (!ownState || ownState.status === "REJECTED" || !ownState.isTeacher)) {
+        await allocateKitSlots(tx, actor, registrationId, { member: true, guest: Boolean(ownState?.guest) && ownState?.status === "REJECTED" }, now);
+      }
       await ensureActiveVoucher(tx, target.id, actor.userId);
       await tx
         .update(affiliationForm)
@@ -396,6 +408,8 @@ export async function cancelAffiliationForm(actor: Actor, formId: string) {
             statusNote: "Ficha de filiação não assinada",
           })
           .where(eq(registration.id, state.id));
+        // Os kits que esta inscrição guardava vagam: a fila anda.
+        await promoteKitWaitlist(tx, actor);
       }
     }
     await writeAudit(tx, actor, {

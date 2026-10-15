@@ -88,7 +88,9 @@ export type KitBlockCode =
   | "EMPLOYEE_REMOVED"
   | "EMPLOYEE_NOT_CHECKED_IN"
   /** Cortesia ou convidado(a) de colaborador(a) cadastrado(a) sem kit de consumação. */
-  | "WITHOUT_KIT";
+  | "WITHOUT_KIT"
+  /** Inscrição feita quando os kits já estavam todos com os inscritos: o kit está na fila. */
+  | "KIT_WAITLIST";
 
 export type KitAvailability =
   | { kind: "DELIVERED"; delivery: DeliveryInfo }
@@ -110,6 +112,8 @@ export interface KitRegistrationInput {
    * (convidado que se filiou na festa): uma pessoa, um kit.
    */
   memberReceivedGuestKit?: boolean;
+  /** Kits na fila (inscrição depois que os kits do estoque acabaram): só saem quando vagar kit. */
+  waitlisted?: Partial<Record<GroupKitType, boolean>>;
 }
 
 /**
@@ -136,6 +140,8 @@ export function kitAvailability(reg: KitRegistrationInput, kitType: GroupKitType
     // ...e com o convidado presente (convidado fictício não gera kit).
     if (!reg.guestCheckedIn) return { kind: "BLOCKED", code: "GUEST_NOT_CHECKED_IN" };
   }
+  // Por último: tudo certo, só falta vagar kit (a fila guarda o kit de quem se inscreveu antes).
+  if (reg.waitlisted?.[kitType]) return { kind: "BLOCKED", code: "KIT_WAITLIST" };
   return { kind: "AVAILABLE" };
 }
 

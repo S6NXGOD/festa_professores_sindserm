@@ -71,6 +71,13 @@
       "when": 1790715025518,
       "tag": "0009_fichas_gov_br",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792092885307,
+      "tag": "0010_fila_e_montagem_do_kit",
+      "breakpoints": true
     }
   ]
 }

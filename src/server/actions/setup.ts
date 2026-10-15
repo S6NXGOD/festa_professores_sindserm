@@ -16,7 +16,9 @@ import {
   type VenueSettingsInput,
   venueSettingsSchema,
 } from "@/domain/schemas";
+import type { KitPlanInput } from "@/domain/kit-plan";
 import type { ActionResult } from "@/lib/action-result";
+import { updateKitPlan } from "@/server/services/kit-plan";
 import { enforceRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
 import {
   completeSetup,
@@ -81,11 +83,21 @@ export async function updateShareMessageAction(message: string | null): Promise<
   });
 }
 
-export async function updateStockSettingsAction(input: StockSettingsInput): Promise<ActionResult> {
+export async function updateStockSettingsAction(input: StockSettingsInput): Promise<ActionResult<{ promoted: number }>> {
   return runAction(async () => {
     const actor = await requireActionActor();
-    await updateStockSettings(actor, stockSettingsSchema.parse(input));
+    const result = await updateStockSettings(actor, stockSettingsSchema.parse(input));
     revalidatePath("/painel", "layout");
+    return { promoted: result.promoted };
+  });
+}
+
+/** O que vem em cada kit (a conta de quanto a consumação custa). */
+export async function updateKitPlanAction(input: KitPlanInput): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requireActionActor();
+    await updateKitPlan(actor, input);
+    revalidatePath("/painel/kits", "layout");
   });
 }
 

@@ -31,6 +31,8 @@ export interface DashboardStats {
   kitsOwedMember: number;
   kitsOwedGuest: number;
   kitsOwedEmployee: number;
+  /** Fila do kit: kits de professoras, professores e convidados esperando vagar (fora da previsão). */
+  kitWaitlist: { member: number; guest: number };
   /** A parte das cortesias, já contada em kitsDeliveredEmployee e kitsOwedEmployee (o estoque é o mesmo). */
   kitsDeliveredCourtesy: number;
   kitsOwedCourtesy: number;
@@ -113,17 +115,22 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
       (SELECT count(*) FROM expected_people e JOIN active_checkins c ON c.person_id = e.person_id)::int AS present_expected,
       (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'MEMBER')::int AS delivered_member,
       (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'GUEST' AND employee_id IS NULL)::int AS delivered_guest,
-      (SELECT count(*) FROM registration WHERE status IN ${ACTIVE_STATUSES} AND is_teacher)::int AS entitled_member,
+      (SELECT count(*) FROM registration WHERE status IN ${ACTIVE_STATUSES} AND is_teacher AND member_kit_waitlisted_at IS NULL)::int AS entitled_member,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${ACTIVE_STATUSES} AND r.is_teacher
+        WHERE r.status IN ${ACTIVE_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL
           AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
                OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS entitled_guest,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${EXPECTED_STATUSES} AND r.is_teacher
+        WHERE r.status IN ${EXPECTED_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL
           AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
                OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS demand_guest,
+      (SELECT count(*) FROM registration WHERE status IN ${EXPECTED_STATUSES} AND is_teacher AND member_kit_waitlisted_at IS NULL)::int AS demand_member,
+      (SELECT count(*) FROM registration WHERE status IN ${EXPECTED_STATUSES} AND is_teacher AND member_kit_waitlisted_at IS NOT NULL)::int AS waitlist_member,
+      (SELECT count(*) FROM registration r
+        WHERE r.status IN ${EXPECTED_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL
+          AND EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE'))::int AS waitlist_guest,
       (SELECT count(*) FROM employee WHERE removed_at IS NULL)::int AS employees,
       (SELECT count(*) FROM employee e JOIN active_checkins c ON c.person_id = e.person_id WHERE e.removed_at IS NULL)::int AS employees_present,
       (SELECT count(*) FROM employee WHERE removed_at IS NULL AND category = 'COURTESY')::int AS courtesies,
@@ -177,7 +184,9 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
     courtesiesPresent: n("courtesies_present"),
     courtesiesWithKit: n("courtesies_with_kit"),
     employeeGuests: n("employee_guests"),
-    kitDemand: { member: n("teachers"), guest: n("demand_guest"), employee: n("employees_with_kit") + n("entitled_employee_guest") },
+    kitWaitlist: { member: n("waitlist_member"), guest: n("waitlist_guest") },
+    // Previsão: kits garantidos (a fila do kit fica de fora até vagar).
+    kitDemand: { member: n("demand_member"), guest: n("demand_guest"), employee: n("employees_with_kit") + n("entitled_employee_guest") },
     stock: await getStockOverview(ex),
   };
 }
@@ -196,7 +205,7 @@ export async function getPeopleKitComparison(ex: Executor): Promise<PeopleKitCom
       SELECT DISTINCT person_id FROM check_in WHERE cancelled_at IS NULL
     ),
     expected_regs AS (
-      SELECT id, member_person_id, status, is_teacher FROM registration WHERE status IN ${EXPECTED_STATUSES}
+      SELECT id, member_person_id, status, is_teacher, member_kit_waitlisted_at, guest_kit_waitlisted_at FROM registration WHERE status IN ${EXPECTED_STATUSES}
     ),
     teacher_guests AS (
       SELECT gl.guest_person_id AS person_id
@@ -221,21 +230,26 @@ export async function getPeopleKitComparison(ex: Executor): Promise<PeopleKitCom
     )
     SELECT
       (SELECT count(*) FROM expected_regs WHERE is_teacher)::int AS teachers,
-      (SELECT count(*) FROM expected_regs WHERE is_teacher AND status IN ${ACTIVE_STATUSES})::int AS teachers_with_kit,
-      (SELECT count(*) FROM expected_regs WHERE is_teacher AND status IN ${WAITING_STATUSES})::int AS teachers_pending,
+      (SELECT count(*) FROM expected_regs WHERE is_teacher AND status IN ${ACTIVE_STATUSES} AND member_kit_waitlisted_at IS NULL)::int AS teachers_with_kit,
+      (SELECT count(*) FROM expected_regs WHERE is_teacher AND status IN ${WAITING_STATUSES} AND member_kit_waitlisted_at IS NULL)::int AS teachers_pending,
+      (SELECT count(*) FROM expected_regs WHERE is_teacher AND member_kit_waitlisted_at IS NOT NULL)::int AS teachers_waitlist,
       (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'MEMBER')::int AS teachers_delivered,
       (SELECT count(*) FROM expected_regs r JOIN active_checkins c ON c.person_id = r.member_person_id WHERE r.is_teacher)::int AS teachers_present,
 
       (SELECT count(*) FROM teacher_guests)::int AS guests,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${ACTIVE_STATUSES} AND r.is_teacher
+        WHERE r.status IN ${ACTIVE_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL
           AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
                OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS guests_with_kit,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${WAITING_STATUSES} AND r.is_teacher
+        WHERE r.status IN ${WAITING_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL
           AND EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
       )::int AS guests_pending,
+      (SELECT count(*) FROM registration r
+        WHERE r.status IN ${EXPECTED_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL
+          AND EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
+      )::int AS guests_waitlist,
       (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'GUEST' AND employee_id IS NULL)::int AS guests_delivered,
       (SELECT count(*) FROM teacher_guests g JOIN active_checkins c ON c.person_id = g.person_id)::int AS guests_present,
 
@@ -270,19 +284,21 @@ export async function getPeopleKitComparison(ex: Executor): Promise<PeopleKitCom
   `);
   const row = result.rows[0]!;
   const n = (key: string) => Number(row[key] ?? 0);
-  const group = (id: PeopleGroupId, prefix: string, withKit: number, pending = 0): PeopleGroupRow => ({
+  // A fila do kit só existe para os kits de inscritos (a lista interna é controlada pela organização).
+  const group = (id: PeopleGroupId, prefix: string, withKit: number, pending = 0, waitlist?: number): PeopleGroupRow => ({
     id,
     people: n(prefix),
     withKit,
     pending,
+    ...(waitlist === undefined ? {} : { waitlist }),
     delivered: n(`${prefix}_delivered`),
     present: n(`${prefix}_present`),
   });
   return {
     registrations: [
-      group("TEACHERS", "teachers", n("teachers_with_kit"), n("teachers_pending")),
-      group("TEACHER_GUESTS", "guests", n("guests_with_kit"), n("guests_pending")),
-      group("OTHER_MEMBERS", "others", 0),
+      group("TEACHERS", "teachers", n("teachers_with_kit"), n("teachers_pending"), n("teachers_waitlist")),
+      group("TEACHER_GUESTS", "guests", n("guests_with_kit"), n("guests_pending"), n("guests_waitlist")),
+      group("OTHER_MEMBERS", "others", 0, 0, 0),
     ],
     house: [
       group("EMPLOYEES", "employees", n("employees")),

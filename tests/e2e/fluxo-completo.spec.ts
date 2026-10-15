@@ -1445,6 +1445,97 @@ test.describe.serial("festa das professoras e professores", () => {
     });
   });
 
+  test("kits: quando acabam, a inscrição segue com a fila do kit; a montagem mostra quanto custa", async ({ browser }) => {
+    test.setTimeout(180_000);
+    const FILA = { name: "Fabiana Fila Kit", cpf: "27418596391", whatsapp: "86955554444", registration: "FILA-2026", guest: "Gustavo Fila Kit" };
+    const adminContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const admin = await adminContext.newPage();
+    await login(admin, ADMIN);
+    let committed = 0;
+    let vouchersUrl = "";
+
+    await test.step("o estoque fica do tamanho exato dos kits já garantidos: esgotou", async () => {
+      await admin.goto("/painel/kits");
+      const forecast = await admin.getByTestId("stock-forecast-all").innerText();
+      committed = Number(forecast.match(/(\d+) kits?/)![1]);
+      await admin.fill("#stock-all", String(committed));
+      await admin.getByRole("button", { name: "Salvar estoque" }).click();
+      await expect(admin.getByText("Estoque atualizado.")).toBeVisible();
+    });
+
+    await test.step("no site: aviso de kits esgotados, confirmação e o voucher com o lugar na fila", async () => {
+      const context = await browser.newContext({ ...devices["Pixel 7"] });
+      const page = await context.newPage();
+      await page.goto("/");
+      await expect(page.getByTestId("home-kits-sold-out")).toBeVisible();
+      await page.goto("/inscricao");
+      await expect(page.getByTestId("kits-sold-out")).toContainText("Os kits acabaram, a festa não!");
+      await page.getByTestId("answer-member-yes").click();
+      await page.fill("#member-name", FILA.name);
+      await page.fill("#member-cpf", FILA.cpf);
+      await page.fill("#member-whatsapp", FILA.whatsapp);
+      await page.fill("#member-registration", FILA.registration);
+      await page.fill("#member-workplace", "Escola Municipal Fila");
+      await page.getByTestId("teacher-yes").click();
+      await page.getByTestId("wizard-next").click();
+      await page.getByTestId("guest-yes").click();
+      await page.getByTestId("guest-name").fill(FILA.guest);
+      await page.getByTestId("wizard-next").click();
+      const notice = page.getByTestId("kit-waitlist-notice");
+      await expect(notice).toContainText("Os kits de consumação acabaram");
+      await expect(notice).toContainText("o seu kit e o de Gustavo entram na fila do kit (lugares nº 1 e 2)");
+      await page.locator("label[for=privacy-consent]").click();
+      // Sem confirmar o aviso dos kits, não grava.
+      await page.getByTestId("submit-registration").click();
+      await expect(page.getByText("Confirme que leu o aviso dos kits")).toBeVisible();
+      await page.locator("label[for=kit-waitlist-consent]").click();
+      await page.getByTestId("submit-registration").click();
+      await page.waitForURL("**/vouchers/**");
+      vouchersUrl = page.url();
+      await expect(page.getByTestId("voucher-kits").first()).toContainText("Seus kits estão na fila do kit (nº 1)");
+      await context.close();
+    });
+
+    await test.step("a equipe vê a fila; mais kits no estoque, a fila anda sozinha", async () => {
+      await admin.goto("/painel/kits");
+      await expect(admin.getByTestId("kit-waitlist-row")).toHaveCount(2);
+      await expect(admin.getByTestId("kit-waitlist")).toContainText(FILA.name);
+      await admin.fill("#stock-all", String(committed + 2));
+      await admin.getByRole("button", { name: "Salvar estoque" }).click();
+      await expect(admin.getByText("2 kits saíram da fila do kit")).toBeVisible();
+      await expect(admin.getByTestId("kit-waitlist")).toHaveCount(0);
+      const visitor = await browser.newContext();
+      const page = await visitor.newPage();
+      await page.goto(vouchersUrl);
+      await expect(page.getByTestId("voucher-kits").first()).toContainText("2 kits de consumação");
+      await visitor.close();
+    });
+
+    await test.step("montagem: o que vem no kit e quanto custa, com a lista de compras", async () => {
+      await admin.getByTestId("open-kit-plan").click();
+      await expect(admin.getByTestId("kit-plan-empty")).toBeVisible();
+      await admin.getByRole("button", { name: "+ Cerveja" }).click();
+      const editor = admin.getByTestId("kit-editor");
+      await editor.getByTestId("kit-item-price").first().fill("5,00");
+      // Professor(a): 2 cervejas.
+      await editor.getByTestId("kit-kind-member").getByRole("button", { name: /^Mais/ }).click();
+      await expect(editor.getByTestId("kit-kind-member").getByTestId("kit-quantity")).toHaveText("2");
+      await expect(editor.getByTestId("kit-kind-member")).toContainText("R$ 10,00 por kit");
+      // Colaborador(a): kit diferente, só 1 cerveja.
+      await editor.getByTestId("kit-same-employee").click();
+      await editor.getByTestId("kit-kind-employee").getByRole("button", { name: /^Menos/ }).click();
+      await expect(editor.getByTestId("kit-kind-employee").getByTestId("kit-quantity")).toHaveText("1");
+      await admin.getByTestId("kit-plan-save").click();
+      await expect(admin.getByText("Kit montado!")).toBeVisible();
+      await expect(admin.getByTestId("kit-cost-forecast")).toContainText("R$");
+      await expect(admin.getByTestId("shopping-list")).toContainText("Cerveja");
+      await admin.reload();
+      await expect(admin.getByTestId("kit-item-name").first()).toHaveValue("Cerveja");
+      await expect(admin.getByTestId("kit-kind-employee").getByTestId("kit-quantity")).toHaveText("1");
+    });
+    await adminContext.close();
+  });
+
   test("sessão: a equipe continua conectada até clicar em Sair", async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();

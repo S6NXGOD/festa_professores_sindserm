@@ -7,6 +7,7 @@ import { ROLE_PRESETS } from "@/domain/access";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { checkIn, guestLink, kitDelivery, kitStock, person, registration } from "@/server/db/schema";
+import { ENTRY_KIT_MESSAGE } from "@/domain/labels";
 import { registrationSchema, stockSettingsSchema } from "@/domain/schemas";
 import { decideAffiliation } from "@/server/services/affiliation";
 import { cancelCheckIn, registerCheckIn } from "@/server/services/checkin";
@@ -188,7 +189,7 @@ describe("3. o kit do convidado só sai depois que o(a) professor(a) chegou", ()
     expect((await stockOf()).delivered).toBe(2);
   });
 
-  it("com 1 kit no estoque, a chegada do(a) professor(a) entrega o dele e o do convidado fica sem", async () => {
+  it("com 1 kit no estoque, a chegada do(a) professor(a) entrega o dele e o do convidado fica na fila do kit", async () => {
     await updateStockSettings(admin, stockSettingsSchema.parse({ stockMode: "SINGLE", totalAll: 1, lowStockThreshold: 0 }));
     const { state } = await confirmedTeacher({ guest: true });
     await checkInPerson(state.guest!.personId);
@@ -196,7 +197,7 @@ describe("3. o kit do convidado só sai depois que o(a) professor(a) chegou", ()
     expect(preview?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação", detail: "Kit do(a) professor(a)" });
     expect(await checkInPerson(state.member.id)).toMatchObject({
       kit: { kind: "DELIVERED", kitType: "MEMBER" },
-      guestKit: { kind: "NONE", message: "Sem kit: o estoque acabou." },
+      guestKit: { kind: "NONE", message: ENTRY_KIT_MESSAGE.KIT_WAITLIST },
     });
     expect(await stockOf()).toMatchObject({ total: 1, delivered: 1 });
   });
@@ -535,7 +536,7 @@ describe("9. regra especial: convidado que vira filiado", () => {
 });
 
 describe("10. estoque nunca fica negativo", () => {
-  it("sem estoque, a pessoa entra do mesmo jeito, sem kit", async () => {
+  it("sem estoque, a pessoa entra do mesmo jeito, sem kit (quem se inscreveu depois fica na fila do kit)", async () => {
     await updateStockSettings(admin, stockSettingsSchema.parse({ stockMode: "SINGLE", totalAll: 1, lowStockThreshold: 0 }));
     const first = await confirmedTeacher();
     const second = await confirmedTeacher();
@@ -543,7 +544,24 @@ describe("10. estoque nunca fica negativo", () => {
     expect(preview?.kitOnEntry).toEqual({ kind: "WILL_DELIVER", count: 1, label: "1 kit de consumação", detail: "Kit do(a) professor(a)" });
     expect(await entryKit(first.state.member.id)).toMatchObject({ kind: "DELIVERED", available: 0, low: true });
 
-    // A tela da portaria já avisa antes de confirmar.
+    // A tela da portaria já avisa antes de confirmar: a segunda inscrição está na fila do kit.
+    const waiting = await loadGateView(db, second.state.member.id, ROLE_PRESETS.SECURITY);
+    expect(waiting?.kitOnEntry).toEqual({ kind: "NONE", message: ENTRY_KIT_MESSAGE.KIT_WAITLIST });
+    const entry = await checkInPerson(second.state.member.id);
+    expect(entry).toMatchObject({ outcome: "CHECKED_IN", kit: { kind: "NONE", message: ENTRY_KIT_MESSAGE.KIT_WAITLIST } });
+    await expectDomainError(deliverKit(attendant, { personId: second.state.member.id, kitType: "MEMBER" }), "KIT_NOT_AVAILABLE");
+    // Kit de sobra só sai se houver kit de verdade: sem estoque, recusa e a pessoa continua na fila.
+    await expectDomainError(deliverKit(attendant, { personId: second.state.member.id, kitType: "MEMBER", leftover: true }), "OUT_OF_STOCK");
+    expect((await reload(second.registrationId)).kitWaitlist.MEMBER).not.toBeNull();
+    expect(await stockOf()).toMatchObject({ total: 1, delivered: 1 });
+  });
+
+  it("estoque reduzido depois das inscrições: quem tinha o kit garantido entra sem kit se acabar na hora", async () => {
+    await updateStockSettings(admin, stockSettingsSchema.parse({ stockMode: "SINGLE", totalAll: 2, lowStockThreshold: 0 }));
+    const first = await confirmedTeacher();
+    const second = await confirmedTeacher();
+    await updateStockSettings(admin, stockSettingsSchema.parse({ stockMode: "SINGLE", totalAll: 1, lowStockThreshold: 0 }));
+    expect(await entryKit(first.state.member.id)).toMatchObject({ kind: "DELIVERED", available: 0 });
     const outOfStock = await loadGateView(db, second.state.member.id, ROLE_PRESETS.SECURITY);
     expect(outOfStock?.kitOnEntry).toEqual({ kind: "NONE", message: "Sem kit: o estoque acabou." });
     const entry = await checkInPerson(second.state.member.id);

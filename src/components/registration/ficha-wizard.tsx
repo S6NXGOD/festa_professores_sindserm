@@ -16,6 +16,8 @@ import { CassetteProgress } from "@/components/retro/cassette";
 import { ScrollHint } from "@/components/retro/scroll-hint";
 import { Input } from "@/components/ui/input";
 import { AUTHORIZATION_ACCEPT_LABEL, authorizationText, nextMonthValue } from "@/domain/affiliation-text";
+import { type KitSupply, kitOutlook, kitsSoldOut } from "@/domain/kit-supply";
+import { KitsSoldOutBanner, KitWaitlistNotice } from "./kit-waitlist-notice";
 import {
   guestNameClash,
   type PreAffiliationData,
@@ -79,7 +81,7 @@ function fileCount(total: number | undefined) {
  * papel), com a cópia do RG e do contracheque. Na recepção, falta apenas
  * assinar a autorização de desconto.
  */
-export function FichaWizard({ onExit, today }: { onExit: () => void; today: string }) {
+export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () => void; today: string; kitSupply?: KitSupply | null }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("personal");
   const [direction, setDirection] = useState(1);
@@ -114,6 +116,7 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
       authorizationAccepted: false,
       documents: { rg: [], payslip: [] },
       privacyConsent: false,
+      acceptKitWaitlist: false,
     },
   });
   const { control, register, formState, trigger, handleSubmit, setError, setValue, clearErrors } = form;
@@ -124,6 +127,10 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
   // CPF recusado por já estar inscrito: oferece abrir os vouchers da inscrição que já existe.
   const [takenCpf, setTakenCpf] = useState<string | null>(null);
   const isTeacher = values.isTeacher === true;
+  // Kits esgotados (ou acabaram enquanto a pessoa preenchia): o kit entra na fila do kit.
+  const [lateSellout, setLateSellout] = useState<string | null>(null);
+  const outlook = kitOutlook(kitSupply, { teacher: isTeacher, guest: Boolean(values.guest) });
+  const kitWaits = isTeacher && (Boolean(lateSellout) || outlook.member === "WAITLIST" || outlook.guest === "WAITLIST");
   const flow: Step[] = isTeacher
     ? ["personal", "work", "authorization", "guest", "documents", "review"]
     : ["personal", "work", "authorization", "documents", "review"];
@@ -196,6 +203,10 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
 
   function showServerErrors(error: string, fieldErrors: Record<string, string> = {}, code?: string) {
     if (code === "CPF_TAKEN" && fieldErrors["ficha.cpf"]) setTakenCpf(form.getValues("ficha.cpf"));
+    if (code === "KIT_WAITLIST") {
+      setLateSellout(error);
+      playSound("warn");
+    }
     toast.error(error);
     const entries = Object.entries(fieldErrors);
     for (const [path, message] of entries) setError(path as FieldPath<PreAffiliationInput>, { type: "server", message });
@@ -226,8 +237,21 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
   const f = values.ficha;
   const guest = values.guest;
 
+  // Kit na fila: a pessoa confirma que leu o aviso antes de gravar.
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    if (kitWaits && !form.getValues("acceptKitWaitlist")) {
+      event.preventDefault();
+      setError("acceptKitWaitlist", { type: "manual", message: "Confirme que leu o aviso dos kits" });
+      playSound("warn");
+      toast.error("Os kits acabaram: confirme que o kit entra na fila.");
+      document.getElementById("kit-waitlist-consent")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    void handleSubmit(onValid, onInvalid)(event);
+  };
+
   return (
-    <form onSubmit={handleSubmit(onValid, onInvalid)} noValidate className="mx-auto max-w-2xl">
+    <form onSubmit={submit} noValidate className="mx-auto max-w-2xl">
       <CassetteProgress step={index} steps={flow.map((s) => names[s])} label="LADO B" />
 
       <div className="mt-6 rounded-2xl border border-line bg-surface/95 p-5 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.9)] backdrop-blur sm:p-7">
@@ -242,6 +266,7 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
                 Qualquer servidor(a) municipal pode se filiar e vir à festa. <strong>O kit de consumação (e o convidado) é só
                 para professoras e professores.</strong>
               </Callout>
+              {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner /> : null}
               <FormField id="f-name" label="Nome completo" error={fe?.fullName?.message}>
                 <Input id="f-name" autoComplete="name" aria-invalid={Boolean(fe?.fullName)} {...register("ficha.fullName")} />
               </FormField>
@@ -486,7 +511,21 @@ export function FichaWizard({ onExit, today }: { onExit: () => void; today: stri
                 a autorização de desconto. Depois disso a entrada é liberada
                 {isTeacher ? " e o seu kit sai junto." : "."}
               </Callout>
-              {isTeacher ? (
+              {kitWaits ? (
+                <Controller
+                  control={control}
+                  name="acceptKitWaitlist"
+                  render={({ field }) => (
+                    <KitWaitlistNotice
+                      outlook={outlook}
+                      staff={false}
+                      guestName={guest?.fullName}
+                      lateMessage={lateSellout}
+                      consent={{ checked: Boolean(field.value), onChange: field.onChange, error: errors.acceptKitWaitlist?.message }}
+                    />
+                  )}
+                />
+              ) : isTeacher ? (
                 <Callout tone="info" icon={Gift}>
                   Como professor(a) filiado(a), você terá 1 kit de consumação
                   {guest ? " e mais 1 para o seu convidado" : ""}. Os kits são entregues na recepção

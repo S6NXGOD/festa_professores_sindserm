@@ -6,6 +6,7 @@ import {
   Clock,
   ClipboardNote,
   Gift,
+  Hourglass,
   Login,
   QrCode,
   Settings,
@@ -22,10 +23,13 @@ import { Marquee } from "@/components/retro/marquee";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/datetime";
 import { splitEventName } from "@/lib/text";
+import { kitsSoldOut } from "@/domain/kit-supply";
+import { db } from "@/server/db";
 import { APP_NAME, getEventInfo, getRegistrationWindow, hasUsers } from "@/server/queries/config";
+import { getKitSupply } from "@/server/services/kit-waitlist";
 
 export default async function HomePage() {
-  const [event, window, usersExist] = await Promise.all([getEventInfo(), getRegistrationWindow(), hasUsers()]);
+  const [event, window, usersExist, kitSupply] = await Promise.all([getEventInfo(), getRegistrationWindow(), hasUsers(), getKitSupply(db)]);
 
   if (!usersExist || !event) {
     return (
@@ -118,6 +122,16 @@ export default async function HomePage() {
             <InfoChip icon={Calendar} text={event.dateLongLabel} />
             <InfoChip icon={Clock} text={event.timeLabel} />
             {event.kitDeadline ? <InfoChip icon={Gift} text={`Kits até ${event.kitDeadline.label}`} /> : null}
+            {/* Kits esgotados: a inscrição continua, com a fila do kit (o formulário explica). */}
+            {kitsSoldOut(kitSupply) ? (
+              <span
+                className="inline-flex items-center gap-2 rounded-md border border-warning/60 bg-warning-soft px-3 py-2 text-sm font-semibold text-fg"
+                data-testid="home-kits-sold-out"
+              >
+                <Hourglass className="size-4 text-warning" />
+                Kits esgotados · inscrição continua, com fila do kit
+              </span>
+            ) : null}
           </Reveal>
           {event.description ? (
             <Reveal delay={0.15}>

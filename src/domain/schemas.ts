@@ -232,6 +232,8 @@ export const registrationSchema = z
     isTeacher: yesNoField(TEACHER_MESSAGE),
     guest: guestInputSchema.nullable(),
     privacyConsent: consentField(PRIVACY_MESSAGE),
+    /** Kits esgotados: a pessoa leu o aviso e aceita entrar na fila do kit. */
+    acceptKitWaitlist: z.boolean().optional(),
   })
   .superRefine((data, ctx) => refineGuest(data, data.member, ctx));
 
@@ -328,6 +330,8 @@ export const preAffiliationSchema = z
     authorizationAccepted: consentField(AUTHORIZATION_MESSAGE),
     documents: requiredDocumentsSchema,
     privacyConsent: consentField(PRIVACY_MESSAGE),
+    /** Kits esgotados: a pessoa leu o aviso e aceita entrar na fila do kit. */
+    acceptKitWaitlist: z.boolean().optional(),
   })
   .superRefine((data, ctx) => refineGuest(data, data.ficha, ctx));
 export type PreAffiliationInput = z.input<typeof preAffiliationSchema>;

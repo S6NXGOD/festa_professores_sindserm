@@ -44,11 +44,22 @@ import {
   WizardNav,
 } from "./wizard-parts";
 import { firstName } from "@/lib/text";
+import { type KitSupply, kitOutlook, kitsSoldOut } from "@/domain/kit-supply";
+import { KitsSoldOutBanner, KitWaitlistNotice } from "./kit-waitlist-notice";
 
 type Step = "member" | "guest" | "review";
 
 /** Inscrição de quem já é filiado(a): dados, convidado (só professoras e professores) e revisão. */
-export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExit?: () => void }) {
+export function MemberWizard({
+  mode,
+  onExit,
+  kitSupply = null,
+}: {
+  mode: "public" | "staff";
+  onExit?: () => void;
+  /** Kits que uma inscrição nova ainda garante (avisa quando acabaram). */
+  kitSupply?: KitSupply | null;
+}) {
   const router = useRouter();
   const eventName = useEventName();
   const [step, setStep] = useState<Step>("member");
@@ -67,6 +78,7 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
       isTeacher: null as unknown as boolean,
       guest: null,
       privacyConsent: false,
+      acceptKitWaitlist: false,
     },
   });
   const { control, register, formState, trigger, handleSubmit, setError, setValue, clearErrors } = form;
@@ -78,6 +90,10 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
   const staff = mode === "staff";
   // CPF recusado por já estar inscrito: no site, oferece abrir os vouchers (quase sempre é a própria pessoa).
   const [takenCpf, setTakenCpf] = useState<string | null>(null);
+  // Kits esgotados (ou acabaram enquanto a pessoa preenchia): o kit entra na fila do kit.
+  const [lateSellout, setLateSellout] = useState<string | null>(null);
+  const outlook = kitOutlook(kitSupply, { teacher: isTeacher, guest: Boolean(values.guest) });
+  const kitWaits = isTeacher && (Boolean(lateSellout) || outlook.member === "WAITLIST" || outlook.guest === "WAITLIST");
 
   function go(next: Step) {
     setDirection(flow.indexOf(next) >= index ? 1 : -1);
@@ -120,6 +136,10 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
 
   function showServerErrors(error: string, fieldErrors: Record<string, string> = {}, code?: string) {
     if (!staff && code === "CPF_TAKEN" && fieldErrors["member.cpf"]) setTakenCpf(form.getValues("member.cpf"));
+    if (code === "KIT_WAITLIST") {
+      setLateSellout(error);
+      playSound("warn");
+    }
     toast.error(error);
     const entries = Object.entries(fieldErrors);
     for (const [path, message] of entries) setError(path as FieldPath<RegistrationInput>, { type: "server", message });
@@ -145,6 +165,19 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
     });
   };
 
+  // Kit na fila: no site, a pessoa confirma que leu o aviso antes de gravar.
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    if (!staff && kitWaits && !form.getValues("acceptKitWaitlist")) {
+      event.preventDefault();
+      setError("acceptKitWaitlist", { type: "manual", message: "Confirme que leu o aviso dos kits" });
+      playSound("warn");
+      toast.error("Os kits acabaram: confirme que o kit entra na fila.");
+      document.getElementById("kit-waitlist-consent")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    void handleSubmit(onValid, onInvalid)(event);
+  };
+
   const onInvalid = (invalid: typeof errors) => {
     const first: Step = invalid.member || invalid.isTeacher ? "member" : invalid.guest ? "guest" : "review";
     if (first !== step) go(first);
@@ -156,7 +189,7 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
   const guest = values.guest;
 
   return (
-    <form onSubmit={handleSubmit(onValid, onInvalid)} noValidate className="mx-auto max-w-2xl">
+    <form onSubmit={submit} noValidate className="mx-auto max-w-2xl">
       <CassetteProgress step={index} steps={staff ? stepNames.map((s) => (s === "Seus dados" ? "Dados" : s)) : stepNames} />
 
       <div className="mt-6 rounded-2xl border border-line bg-surface/95 p-5 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.9)] backdrop-blur sm:p-7">
@@ -171,6 +204,7 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
                     : "Com estes dados o SINDSERM confirma que você é filiado(a). Cada CPF e cada matrícula só podem ser usados uma vez."
                 }
               />
+              {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner staff={staff} /> : null}
               <FormField id="member-name" label="Nome completo" error={errors.member?.fullName?.message}>
                 <Input id="member-name" autoComplete="name" aria-invalid={Boolean(errors.member?.fullName)} {...register("member.fullName")} />
               </FormField>
@@ -278,6 +312,21 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
                 </ReviewBlock>
               ) : null}
 
+              {kitWaits ? (
+                <Controller
+                  control={control}
+                  name="acceptKitWaitlist"
+                  render={({ field }) => (
+                    <KitWaitlistNotice
+                      outlook={outlook}
+                      staff={staff}
+                      guestName={guest?.fullName}
+                      lateMessage={lateSellout}
+                      consent={staff ? undefined : { checked: Boolean(field.value), onChange: field.onChange, error: errors.acceptKitWaitlist?.message }}
+                    />
+                  )}
+                />
+              ) : (
               <Callout tone="red" icon={Gift} testId="kit-summary">
                 {isTeacher ? (
                   <>
@@ -295,6 +344,7 @@ export function MemberWizard({ mode, onExit }: { mode: "public" | "staff"; onExi
                   <>Participação sem kit de consumação (exclusivo para professoras e professores).</>
                 )}
               </Callout>
+              )}
 
               <Callout tone="warning" icon={Info}>
                 {staff ? "O SINDSERM confirma a filiação" : "O SINDSERM vai confirmar se você é filiado(a)"}. Os vouchers já

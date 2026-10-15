@@ -187,7 +187,12 @@ export function StockSettingsForm({
         }
         return;
       }
-      toast.success("Estoque atualizado.");
+      // Mais kits: a fila do kit anda sozinha (por ordem de inscrição).
+      toast.success(
+        result.data.promoted > 0
+          ? `Estoque atualizado: ${result.data.promoted === 1 ? "1 kit saiu" : `${result.data.promoted} kits saíram`} da fila do kit.`
+          : "Estoque atualizado.",
+      );
       router.refresh();
     });
   });

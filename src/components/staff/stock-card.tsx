@@ -21,7 +21,16 @@ export function stockAlertText(pool: StockPoolView) {
 }
 
 /** Saldo de kits por estoque, num medidor de segmentos, com alerta de estoque baixo e previsão. */
-export function StockCard({ stock, demand }: { stock: StockOverview; demand?: KitDemand }) {
+export function StockCard({
+  stock,
+  demand,
+  waitlist,
+}: {
+  stock: StockOverview;
+  demand?: KitDemand;
+  /** Fila do kit (inscrições depois que os kits acabaram), fora da previsão. */
+  waitlist?: { member: number; guest: number };
+}) {
   return (
     <div className="space-y-5">
       {stock.pools.map((pool) => (
@@ -42,7 +51,14 @@ export function StockCard({ stock, demand }: { stock: StockOverview; demand?: Ki
           </div>
           <SegmentMeter className="mt-3" value={pool.available} max={pool.total} invert label={`Estoque disponível: ${pool.available} de ${pool.total}`} />
           {/* Quantos kits os inscritos garantem neste estoque (inclui entregues e quem aguarda conferência). */}
-          {demand ? <Forecast total={pool.total} demand={poolDemand(pool.pool, demand)} pool={pool.pool} /> : null}
+          {demand ? (
+            <Forecast
+              total={pool.total}
+              demand={poolDemand(pool.pool, demand)}
+              pool={pool.pool}
+              waiting={waitlist ? (pool.pool === "ALL" ? waitlist.member + waitlist.guest : pool.pool === "MEMBER" ? waitlist.member : pool.pool === "GUEST" ? waitlist.guest : 0) : 0}
+            />
+          ) : null}
           {pool.low ? (
             <p className="mt-2 flex items-center gap-1.5 text-xs font-bold text-danger">
               <Warning className="size-3.5 animate-blink" />
@@ -66,7 +82,7 @@ export function StockCard({ stock, demand }: { stock: StockOverview; demand?: Ki
   );
 }
 
-function Forecast({ total, demand, pool }: { total: number; demand: number; pool: StockPool }) {
+function Forecast({ total, demand, pool, waiting = 0 }: { total: number; demand: number; pool: StockPool; waiting?: number }) {
   const short = demand - total;
   return (
     <p
@@ -80,6 +96,7 @@ function Forecast({ total, demand, pool }: { total: number; demand: number; pool
     >
       {pool === "EMPLOYEE" ? "Colaboradores + convidados" : "Previsão com os inscritos"}: {plural(demand, "kit", "kits")} ·{" "}
       {short > 0 ? `faltam ${short} se todos vierem` : `sobram ${total - demand}`}
+      {waiting > 0 ? <span className="font-bold text-warning"> · {plural(waiting, "na fila do kit", "na fila do kit")}</span> : null}
     </p>
   );
 }

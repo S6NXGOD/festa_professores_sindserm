@@ -14,7 +14,9 @@ export type DomainErrorCode =
   | "ALREADY_DELIVERED"
   | "GUEST_CANNOT_RECEIVE_KIT"
   | "BENEFICIARY_LOCKED"
-  | "EVENT_NOT_STARTED";
+  | "EVENT_NOT_STARTED"
+  /** Os kits acabaram enquanto a pessoa se inscrevia: ela precisa confirmar que entra na fila do kit. */
+  | "KIT_WAITLIST";
 
 /** Erro de regra de negócio com mensagem segura para exibir ao usuário. */
 export class DomainError extends Error {

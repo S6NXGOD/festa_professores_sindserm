@@ -6,6 +6,7 @@ import { affiliationForm, voucher } from "@/server/db/schema";
 import { isActiveMember } from "@/domain/rules";
 import type { AffiliationStatus, EmployeeCategory } from "@/domain/types";
 import { formatVoucherCode, qrPayloadFor } from "@/server/crypto";
+import { kitWaitlistPositions } from "@/server/services/kit-waitlist";
 import { findRegistrationByAccessToken } from "@/server/services/registration";
 import { loadPersonState, loadRegistrationState, type PersonState } from "@/server/services/state";
 import { findVoucherByToken, revealVoucherToken } from "@/server/services/vouchers";
@@ -37,6 +38,17 @@ export interface VoucherCardData {
   withoutKit?: boolean;
   /** Convidado(a) sem kit: quem trouxe. */
   broughtByName?: string | null;
+  /**
+   * Fila do kit (inscrição depois que os kits acabaram): a posição de cada kit
+   * na fila (`self` = o da pessoa; `guest` = o do convidado dela). Sem fila: ausente.
+   */
+  kitWaitlist?: { self: number | null; guest: number | null };
+}
+
+/** Posição na fila dos kits de uma inscrição, só quando algum deles está na fila. */
+async function waitlistOf(registration: { id: string; kitWaitlist: { MEMBER: Date | null; GUEST: Date | null } }) {
+  if (!registration.kitWaitlist.MEMBER && !registration.kitWaitlist.GUEST) return null;
+  return kitWaitlistPositions(db, registration.id);
 }
 
 export async function qrSvgFor(token: string): Promise<string> {
@@ -91,17 +103,25 @@ async function cardFromState(state: PersonState, token: string, code: string): P
   // Mesma regra da portaria: enquanto a filiação própria não estiver confirmada,
   // quem está vinculado a alguém participa como convidado.
   if (state.guestOf && !isActiveMember(own?.status)) {
-    return { ...base, kind: "GUEST", hostName: state.guestOf.host.member.fullName };
+    const positions = await waitlistOf(state.guestOf.host);
+    return {
+      ...base,
+      kind: "GUEST",
+      hostName: state.guestOf.host.member.fullName,
+      ...(positions?.GUEST ? { kitWaitlist: { self: positions.GUEST, guest: null } } : {}),
+    };
   }
   if (state.guestOfEmployee && !isActiveMember(own?.status)) {
     return { ...base, kind: "GUEST", hostName: state.guestOfEmployee.host.person.fullName, hostIsEmployee: true };
   }
+  const positions = own?.isTeacher ? await waitlistOf(own) : null;
   return {
     ...base,
     kind: "MEMBER",
     affiliationStatus: own?.status,
     isTeacher: own?.isTeacher ?? false,
     guestName: own?.guest?.fullName ?? null,
+    ...(positions ? { kitWaitlist: { self: positions.MEMBER, guest: own?.guest ? positions.GUEST : null } } : {}),
   };
 }
 

@@ -17,6 +17,7 @@ import { maskCpf } from "@/lib/cpf";
 import { type Actor, assertPermission, type StaffActor } from "./actor";
 import { writeAudit } from "./audit";
 import { DomainError, isUniqueViolation } from "./errors";
+import { allocateKitSlots, clearGuestKitWaitlist } from "./kit-waitlist";
 import { lockEmployeeGroup, lockEmployeeRows, lockPersons, lockRegistration, lockRegistrationRow } from "./locks";
 import { personSearchFields } from "./registration";
 import {
@@ -243,6 +244,8 @@ export async function addGuest(actor: Actor, rawInput: AddGuestInput) {
       }
 
       const added = await attachGuest(tx, actor, host, input);
+      // Convidado novo de professor(a): o kit dele entra na conta (ou na fila, se acabaram). Na troca, a vaga continua a mesma.
+      if (host.kind === "REGISTRATION" && !replaced) await allocateKitSlots(tx, actor, host.id, { member: false, guest: true });
       await writeAudit(tx, actor, {
         action: replaced ? "GUEST_REPLACED" : "GUEST_ADDED",
         entityType: host.kind === "EMPLOYEE" ? "employee" : "registration",
@@ -296,6 +299,8 @@ export async function removeGuest(actor: Actor, input: { guestLinkId: string }) 
     if (host.guest?.guestLinkId !== link.id) throw new DomainError("NOT_FOUND", "Convidado não encontrado.");
 
     const guest = await endGuestLink(tx, actor, host, "Removido pelo Atendimento");
+    // Sem convidado, a vaga do kit dele fica vazia (e sai da fila, se estava).
+    if (host.kind === "REGISTRATION") await clearGuestKitWaitlist(tx, host.id);
     await writeAudit(tx, actor, {
       action: "GUEST_REMOVED",
       entityType: host.kind === "EMPLOYEE" ? "employee" : "registration",
@@ -326,6 +331,9 @@ export async function setTeacherStatus(actor: Actor, rawInput: TeacherStatusInpu
       }
     }
     await tx.update(registration).set({ isTeacher: input.isTeacher }).where(eq(registration.id, state.id));
+    // Passou a ser professor(a): o kit entra na conta (ou na fila). Deixou de ser: sai da fila.
+    if (input.isTeacher) await allocateKitSlots(tx, actor, state.id, { member: true, guest: false });
+    else await tx.update(registration).set({ memberKitWaitlistedAt: null }).where(eq(registration.id, state.id));
     // Mantém a ficha em aberto coerente com a inscrição.
     await tx
       .update(affiliationForm)

@@ -2,10 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { QuickModeTabs } from "@/components/gate/quick-mode-tabs";
 import { QuickRegistrationForm } from "@/components/gate/quick-registration";
+import { KitsSoldOutBanner } from "@/components/registration/kit-waitlist-notice";
+import { kitsSoldOut } from "@/domain/kit-supply";
 import { ArrowLeft, Building, ClipboardNote, Heart, Users } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { can } from "@/domain/rules";
 import { maskCpfInput } from "@/lib/cpf";
+import { db } from "@/server/db";
+import { getKitSupply } from "@/server/services/kit-waitlist";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Cadastro rápido" };
@@ -22,6 +26,7 @@ export default async function GateQuickRegistrationPage({ searchParams }: PagePr
   const cpfDigits = typeof query.cpf === "string" ? query.cpf.replace(/\D/g, "").slice(0, 11) : "";
   const canAffiliate = can(actor.access, "newAffiliation");
   const canCourtesy = can(actor.access, "createCourtesyAtGate");
+  const kitSupply = await getKitSupply(db);
 
   return (
     <div className="space-y-4 pb-28">
@@ -40,6 +45,7 @@ export default async function GateQuickRegistrationPage({ searchParams }: PagePr
         </p>
       </header>
 
+      {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner staff /> : null}
       <QuickRegistrationForm initialName={initialName} initialCpf={cpfDigits ? maskCpfInput(cpfDigits) : ""} />
 
       {/* Os outros casos da porta, cada um no seu caminho (sem inscrição nova). */}

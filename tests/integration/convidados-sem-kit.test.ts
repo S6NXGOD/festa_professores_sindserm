@@ -76,7 +76,7 @@ describe("convidado sem kit de colaborador(a)", () => {
       employee: { category: "COURTESY", withKit: false, broughtBy: { fullName: "Rodrigo Carneiro Lima", category: "STAFF" } },
       kitOnEntry: { kind: "NONE", message: ENTRY_KIT_MESSAGE.WITHOUT_KIT },
     });
-    expect(view.employee!.kits.EMPLOYEE).toEqual({ kind: "BLOCKED", message: KIT_BLOCK_MESSAGE.WITHOUT_KIT });
+    expect(view.employee!.kits.EMPLOYEE).toEqual({ kind: "BLOCKED", message: KIT_BLOCK_MESSAGE.WITHOUT_KIT, code: "WITHOUT_KIT" });
     expect((await searchPeople(db, "Lucas Amigo", { fullCpf: false }))[0]).toMatchObject({
       employee: { category: "COURTESY", withKit: false, jobTitle: "Rodrigo Carneiro Lima" },
     });

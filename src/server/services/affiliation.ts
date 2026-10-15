@@ -8,6 +8,7 @@ import { type Actor, assertPermission } from "./actor";
 import { writeAudit } from "./audit";
 import { convertActiveGuestLink, type GuestConversion } from "./conversion";
 import { DomainError } from "./errors";
+import { allocateKitSlots, promoteKitWaitlist } from "./kit-waitlist";
 import { lockRegistration, lockRegistrationWithPeople } from "./locks";
 import { withTx } from "./tx";
 
@@ -39,6 +40,8 @@ export async function decideAffiliation(
       .where(eq(registration.id, state.id));
     const conversion =
       status === "CONFIRMED" ? await convertActiveGuestLink(tx, actor, state.member.id, state.id) : null;
+    // Filiação não confirmada: os kits que a inscrição guardava vagam e a fila anda.
+    if (status === "REJECTED") await promoteKitWaitlist(tx, actor);
     await writeAudit(tx, actor, {
       action: status === "CONFIRMED" ? "AFFILIATION_CONFIRMED" : "AFFILIATION_REJECTED",
       entityType: "registration",
@@ -72,6 +75,8 @@ export async function confirmAfterProof(
       .set({ status: "CONFIRMED", statusChangedAt: new Date(), statusChangedByUserId: actor.userId, statusNote: justification })
       .where(eq(registration.id, state.id));
     const conversion = await convertActiveGuestLink(tx, actor, state.member.id, state.id);
+    // Voltou a valer: os kits entram na conta de novo (ou na fila, se acabaram).
+    if (state.isTeacher) await allocateKitSlots(tx, actor, state.id, { member: true, guest: Boolean(state.guest) });
     await writeAudit(tx, actor, {
       action: "AFFILIATION_PROVEN",
       entityType: "registration",
@@ -104,6 +109,10 @@ export async function reopenAffiliation(actor: Actor, input: { registrationId: s
       .update(registration)
       .set({ status: "PENDING", statusChangedAt: new Date(), statusChangedByUserId: actor.userId, statusNote: justification })
       .where(eq(registration.id, state.id));
+    // Quem tinha sido recusado(a) volta a pedir os kits (ou entra na fila, se acabaram).
+    if (state.status === "REJECTED" && state.isTeacher) {
+      await allocateKitSlots(tx, actor, state.id, { member: true, guest: Boolean(state.guest) });
+    }
     await writeAudit(tx, actor, {
       action: "AFFILIATION_REOPENED",
       entityType: "registration",

@@ -7,7 +7,9 @@ import { PixelTag } from "@/components/retro/bits";
 import { Button } from "@/components/ui/button";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { type KitSupply, kitsSoldOut } from "@/domain/kit-supply";
 import { FichaWizard } from "./ficha-wizard";
+import { KitsSoldOutBanner } from "./kit-waitlist-notice";
 import { MemberWizard } from "./member-wizard";
 
 type Path = "choose" | "not-member" | "guest-info" | "member" | "ficha";
@@ -17,16 +19,19 @@ export function RegistrationFlow({
   initialPath = "choose",
   today,
   venue,
+  kitSupply = null,
 }: {
   initialPath?: "choose" | "ficha";
   today: string;
   /** Cartão do local da festa (vem pronto do servidor). */
   venue?: React.ReactNode;
+  /** Kits que uma inscrição nova ainda garante (avisa quando acabaram). */
+  kitSupply?: KitSupply | null;
 }) {
   const [path, setPath] = useState<Path>(initialPath);
 
-  if (path === "member") return <MemberWizard mode="public" onExit={() => setPath("choose")} />;
-  if (path === "ficha") return <FichaWizard today={today} onExit={() => setPath("not-member")} />;
+  if (path === "member") return <MemberWizard mode="public" onExit={() => setPath("choose")} kitSupply={kitSupply} />;
+  if (path === "ficha") return <FichaWizard today={today} onExit={() => setPath("not-member")} kitSupply={kitSupply} />;
 
   return (
     <AnimatePresence mode="wait">
@@ -45,6 +50,11 @@ export function RegistrationFlow({
             </p>
             <h1 className="display mt-4 text-[2.6rem] text-fg sm:text-5xl">Você é filiado(a) ao SINDSERM?</h1>
             <p className="mt-3 text-fg-muted">A inscrição é feita por quem é filiado(a), que também cadastra o seu convidado.</p>
+            {kitsSoldOut(kitSupply) ? (
+              <div className="mt-6">
+                <KitsSoldOutBanner />
+              </div>
+            ) : null}
             <div className="mt-8 grid gap-3 text-left">
               <BigChoice
                 icon={MemberCard}

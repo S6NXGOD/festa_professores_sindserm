@@ -12,6 +12,7 @@ import {
   isActiveMember,
   kitAvailability,
   type KitAvailability,
+  type KitBlockCode,
   type KitRegistrationInput,
   stockPoolFor,
 } from "@/domain/rules";
@@ -28,7 +29,8 @@ import { firstName } from "@/lib/text";
 export type KitView =
   | { kind: "DELIVERED"; deliveryId: string; at: Date; byName: string; beneficiaryName: string }
   | { kind: "AVAILABLE" }
-  | { kind: "BLOCKED"; message: string };
+  /** `code`: por que não sai (KIT_WAITLIST = na fila do kit: a equipe pode entregar um kit de sobra). */
+  | { kind: "BLOCKED"; message: string; code: KitBlockCode };
 
 /** O que acontece com os kits se a entrada for confirmada agora. */
 export type KitOnEntry =
@@ -139,8 +141,15 @@ export interface GateView {
   };
 }
 
+/** Antes das entradas, um kit na fila não "sai junto com a entrada": a portaria já vê que ele espera vagar. */
+const BEFORE_ENTRY: readonly KitBlockCode[] = ["MEMBER_NOT_CHECKED_IN", "GUEST_NOT_CHECKED_IN", "HOST_NOT_CHECKED_IN"];
+
 function kitView(reg: RegistrationState, kitType: GroupKitType, deadlinePassed: boolean): KitView {
-  return toKitView(kitAvailability(kitInput(reg, deadlinePassed), kitType));
+  const view = toKitView(kitAvailability(kitInput(reg, deadlinePassed), kitType));
+  if (view.kind === "BLOCKED" && reg.kitWaitlist[kitType] && BEFORE_ENTRY.includes(view.code)) {
+    return { ...view, message: "Na fila do kit (inscrição depois que os kits acabaram): só sai se vagar kit." };
+  }
+  return view;
 }
 
 function toKitView(availability: KitAvailability): KitView {
@@ -153,7 +162,7 @@ function toKitView(availability: KitAvailability): KitView {
       beneficiaryName: availability.delivery.beneficiaryName,
     };
   }
-  if (availability.kind === "BLOCKED") return { kind: "BLOCKED", message: KIT_BLOCK_MESSAGE[availability.code] };
+  if (availability.kind === "BLOCKED") return { kind: "BLOCKED", message: KIT_BLOCK_MESSAGE[availability.code], code: availability.code };
   return { kind: "AVAILABLE" };
 }
 

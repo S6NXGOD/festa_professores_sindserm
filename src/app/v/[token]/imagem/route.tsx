@@ -64,13 +64,17 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
       : guestFirst
         ? `2 kits de consumação: o seu e o de ${guestFirst}`
         : "1 kit de consumação"
-    : isMember
-      ? card.isTeacher
-        ? guestFirst
-          ? `2 kits de consumação: o seu e o de ${guestFirst}`
-          : "1 kit de consumação"
-        : "Participação sem kit de consumação"
-      : `1 kit de consumação, depois que ${card.hostName ? firstName(card.hostName) : "quem te convidou"} chegar`;
+    : card.kitWaitlist?.self
+      ? `Kit na fila do kit (nº ${card.kitWaitlist.self}): sai se vagar`
+      : isMember
+        ? card.isTeacher
+          ? card.kitWaitlist?.guest
+            ? `Seu kit garantido; o de ${guestFirst ?? "convidado"} na fila (nº ${card.kitWaitlist.guest})`
+            : guestFirst
+              ? `2 kits de consumação: o seu e o de ${guestFirst}`
+              : "1 kit de consumação"
+          : "Participação sem kit de consumação"
+        : `1 kit de consumação, depois que ${card.hostName ? firstName(card.hostName) : "quem te convidou"} chegar`;
   const tag = isEmployee ? metal.tag : isMember ? "PLAYER 1" : "PLAYER 2";
   const subtitle = isEmployee
     ? card.broughtByName

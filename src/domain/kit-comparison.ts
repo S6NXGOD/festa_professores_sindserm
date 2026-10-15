@@ -18,6 +18,8 @@ export interface PeopleGroupRow {
   withKit: number;
   /** Ganham kit quando a filiação for confirmada (aguardando conferência ou ficha para assinar). */
   pending: number;
+  /** Na fila do kit (inscrição depois que os kits acabaram): ganham kit se vagar. */
+  waitlist?: number;
   /** Kits já entregues. */
   delivered: number;
   /** Já entraram na festa. */

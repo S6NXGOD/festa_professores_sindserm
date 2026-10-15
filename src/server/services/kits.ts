@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, gt, lt, sql } from "drizzle-orm";
 import type { Tx } from "@/server/db";
-import { kitDelivery, kitStock } from "@/server/db/schema";
+import { kitDelivery, kitStock, registration } from "@/server/db/schema";
 import {
   employeeKitAvailability,
   type EmployeeKitInput,
@@ -53,6 +53,7 @@ export function kitInput(
     deliveries: state.deliveries,
     deadlinePassed,
     memberReceivedGuestKit: state.memberReceivedGuestKit,
+    waitlisted: { MEMBER: Boolean(state.kitWaitlist.MEMBER), GUEST: Boolean(state.kitWaitlist.GUEST) },
     ...overrides,
   };
 }
@@ -227,10 +228,13 @@ async function deliverEmployeeGroupKit(tx: Tx, actor: StaffActor, employeeId: st
  * - MEMBER: kit do(a) próprio(a) professor(a), depois da entrada dele(a);
  * - EMPLOYEE: kit do(a) próprio(a) funcionário(a), depois da entrada dele(a);
  * - GUEST: kit do convidado, depois das entradas de quem convidou e do convidado.
+ *
+ * `leftover`: kit de sobra para quem está na fila do kit (ex.: fim da festa,
+ * gente que não veio). Sai do estoque na hora, se houver, e fica na auditoria.
  */
 export async function deliverKit(
   actor: Actor,
-  input: { personId: string; kitType: KitType },
+  input: { personId: string; kitType: KitType; leftover?: boolean },
   now = new Date(),
 ): Promise<DeliveryResult> {
   assertPermission(actor, "deliverKits");
@@ -257,6 +261,24 @@ export async function deliverKit(
       const state = await lockRegistrationWithPeople(tx, own!.id);
       const config = await getEventConfig(tx);
       if (!config) throw new DomainError("INVALID_STATE", "Estoque não configurado.");
+      const groupKit = kitType as GroupKitType;
+      if (input.leftover && state.kitWaitlist[groupKit]) {
+        // Sobrou kit: a equipe decide entregar para quem está na fila (sai da fila e o kit sai do estoque).
+        await tx
+          .update(registration)
+          .set(groupKit === "MEMBER" ? { memberKitWaitlistedAt: null } : { guestKitWaitlistedAt: null })
+          .where(eq(registration.id, state.id));
+        state.kitWaitlist[groupKit] = null;
+        await writeAudit(tx, actor, {
+          action: "KIT_LEFTOVER_RELEASED",
+          entityType: "registration",
+          entityId: state.id,
+          summary:
+            groupKit === "MEMBER"
+              ? `Kit de sobra liberado para ${state.member.fullName}, que estava na fila do kit.`
+              : `Kit de sobra liberado para o convidado ${state.guest?.fullName ?? ""} (grupo de ${state.member.fullName}), que estava na fila do kit.`,
+        });
+      }
       const availability = kitAvailability(kitInput(state, isKitDeadlinePassed(config, now)), kitType);
       if (availability.kind === "DELIVERED") {
         throw new DomainError(

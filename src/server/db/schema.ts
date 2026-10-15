@@ -198,6 +198,8 @@ export const eventConfig = pgTable(
     shareMessage: text("share_message"),
     stockMode: stockModeEnum("stock_mode").notNull(),
     lowStockThreshold: integer("low_stock_threshold").notNull(),
+    /** O que vem em cada kit (itens, quantidades e preços): a conta de quanto a consumação custa. Nulo = não montado. */
+    kitPlan: jsonb("kit_plan"),
     setupCompletedAt: timestamptz("setup_completed_at").notNull().defaultNow(),
     updatedAt: updatedAt(),
   },
@@ -324,6 +326,13 @@ export const registration = pgTable(
       onDelete: "set null",
     }),
     statusNote: text("status_note"),
+    /**
+     * Fila do kit: quando os kits do estoque já estavam todos com os inscritos, o
+     * kit do(a) professor(a) (ou o do convidado dele(a)) fica na fila desde esta
+     * hora. Nulo = tem o kit garantido. Vagou kit: sai da fila por ordem de chegada nela.
+     */
+    memberKitWaitlistedAt: timestamptz("member_kit_waitlisted_at"),
+    guestKitWaitlistedAt: timestamptz("guest_kit_waitlisted_at"),
     createdByUserId: text("created_by_user_id").references(() => user.id, {
       onDelete: "set null",
     }),

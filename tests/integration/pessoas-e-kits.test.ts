@@ -73,9 +73,9 @@ describe("pessoas e kits", () => {
     const comparison = await getPeopleKitComparison(db);
 
     expect(comparison.registrations).toEqual([
-      { id: "TEACHERS", people: 2, withKit: 1, pending: 1, delivered: 1, present: 1 },
-      { id: "TEACHER_GUESTS", people: 2, withKit: 1, pending: 1, delivered: 1, present: 1 },
-      { id: "OTHER_MEMBERS", people: 1, withKit: 0, pending: 0, delivered: 0, present: 0 },
+      { id: "TEACHERS", people: 2, withKit: 1, pending: 1, waitlist: 0, delivered: 1, present: 1 },
+      { id: "TEACHER_GUESTS", people: 2, withKit: 1, pending: 1, waitlist: 0, delivered: 1, present: 1 },
+      { id: "OTHER_MEMBERS", people: 1, withKit: 0, pending: 0, waitlist: 0, delivered: 0, present: 0 },
     ]);
     expect(comparison.house).toEqual([
       { id: "EMPLOYEES", people: 2, withKit: 2, pending: 0, delivered: 1, present: 1 },

@@ -1,9 +1,12 @@
-import { Clock, Gift, Package } from "@/components/icons/pixel";
+import { Clock, Coins, Gift, Package } from "@/components/icons/pixel";
+import { Button } from "@/components/ui/button";
 import { DeadlineTimer } from "@/components/retro/countdown";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { StockSettingsForm } from "@/components/settings/settings-forms";
 import { EmptyState, PageHeader, Pagination, Panel } from "@/components/staff/panel-ui";
+import { KitRules } from "@/components/staff/kit-rules";
+import { KitWaitlistPanel } from "@/components/staff/kit-waitlist-panel";
 import { PeopleKits } from "@/components/staff/people-kits";
 import { StockCard } from "@/components/staff/stock-card";
 import { ToneBadge } from "@/components/status/status-badge";
@@ -14,6 +17,7 @@ import { formatShortDateTime } from "@/lib/datetime";
 import { db } from "@/server/db";
 import { listDeliveries, pageNumber } from "@/server/queries/panel";
 import { APP_NAME, getConfig, getEventInfo } from "@/server/queries/config";
+import { getKitSupply, listKitWaitlist } from "@/server/services/kit-waitlist";
 import { getDashboardStats, getPeopleKitComparison } from "@/server/services/stats";
 import { requirePageActor } from "@/server/session";
 
@@ -24,12 +28,14 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
   const canPeople = can(actor.access, "viewPeople");
   const query = await searchParams;
   const page = pageNumber(query.page);
-  const [stats, deliveries, event, comparison, config] = await Promise.all([
+  const [stats, deliveries, event, comparison, config, queue, supply] = await Promise.all([
     getDashboardStats(db),
     listDeliveries({ page }),
     getEventInfo(),
     getPeopleKitComparison(db),
     getConfig(),
+    listKitWaitlist(db),
+    getKitSupply(db),
   ]);
   const stock = stats.stock;
   const byPool = Object.fromEntries((stock?.pools ?? []).map((p) => [p.pool, p.total]));
@@ -43,12 +49,19 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
         title="Kits e estoque"
         description={stock ? `${STOCK_MODE_LABEL[stock.mode]} · alerta quando restarem até ${stock.threshold} kits.` : undefined}
         actions={
-          event?.kitDeadline ? (
-            <span className="flex items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm font-semibold text-fg">
-              <Clock className="size-4 text-red" /> Kits até {event.kitDeadline.label}
-              <DeadlineTimer deadline={event.kitDeadline.at} />
-            </span>
-          ) : null
+          <>
+            <Button asChild variant="outline">
+              <Link href="/painel/kits/montagem" data-testid="open-kit-plan">
+                <Coins /> Montagem e custo
+              </Link>
+            </Button>
+            {event?.kitDeadline ? (
+              <span className="flex items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm font-semibold text-fg">
+                <Clock className="size-4 text-red" /> Kits até {event.kitDeadline.label}
+                <DeadlineTimer deadline={event.kitDeadline.at} />
+              </span>
+            ) : null}
+          </>
         }
       />
       {/* Quem vem x quem tem kit, grupo por grupo (substitui os números "entregues / a entregar" separados por barra). */}
@@ -58,9 +71,10 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
         summary={summary}
         links={{ registrations: can(actor.access, "viewRegistrations"), employees: can(actor.access, "viewEmployees") }}
       />
+      <KitWaitlistPanel queue={queue} shared={supply?.shared ?? true} canPeople={canPeople} canAdvance={can(actor.access, "deliverKits")} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Panel title="Saldo" icon={Gift}>
-          {stock ? <StockCard stock={stock} demand={stats.kitDemand} /> : null}
+          {stock ? <StockCard stock={stock} demand={stats.kitDemand} waitlist={stats.kitWaitlist} /> : null}
         </Panel>
         {can(actor.access, "manageSettings") && stock ? (
           <Panel title="Quantidades" icon={Package}>
@@ -78,6 +92,8 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
           </Panel>
         ) : null}
       </div>
+
+      <KitRules deadlineLabel={event?.kitDeadline?.label ?? null} separateStock={stock?.mode === "SPLIT"} />
 
       <Panel title="Entregas registradas" icon={Package}>
         {deliveries.rows.length === 0 ? (

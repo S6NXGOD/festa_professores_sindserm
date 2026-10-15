@@ -8,6 +8,7 @@ import type { StockMode, StockPool } from "@/domain/types";
 import { zonedLocalToUtc } from "@/lib/datetime";
 import { type Actor, assertPermission } from "./actor";
 import { writeAudit } from "./audit";
+import { promoteKitWaitlist } from "./kit-waitlist";
 import { DomainError } from "./errors";
 import { withTx } from "./tx";
 
@@ -201,6 +202,9 @@ export async function updateStockSettings(actor: Actor, stock: StockSettingsData
       },
       after: { stockMode: stock.stockMode, lowStockThreshold: stock.lowStockThreshold, totals },
     });
+    // Mais kits no estoque: a fila do kit anda (por ordem).
+    const promoted = await promoteKitWaitlist(tx, actor);
+    return { promoted: promoted.length };
   });
 }
 

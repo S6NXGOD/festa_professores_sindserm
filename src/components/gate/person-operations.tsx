@@ -586,6 +586,24 @@ function GroupKitsSection({
                   onDone={onChanged}
                 />
               ) : null}
+              {/* Na fila do kit: só sai se sobrar (decisão de quem está na portaria, fica na auditoria). */}
+              {state.kind === "BLOCKED" && state.code === "KIT_WAITLIST" ? (
+                <ConfirmActionDialog
+                  trigger={
+                    <Button variant="outline" size="lg" data-testid={`leftover-${kit.type.toLowerCase()}-kit`}>
+                      <Gift /> Entregar kit de sobra
+                    </Button>
+                  }
+                  title="Entregar um kit de sobra?"
+                  description={`${kit.type === "GUEST" ? `O convidado ${kit.guestName ?? ""}` : view.fullName} está na fila do kit: a inscrição foi feita depois que os kits acabaram. Use quando sobrar kit (por exemplo, no fim da festa, de quem não veio). O kit sai do estoque agora e fica na auditoria.`}
+                  confirmLabel="Entregar a sobra"
+                  tone="success"
+                  sound="powerup"
+                  onConfirm={() => callAction(deliverKitAction({ personId: view.personId, kitType: kit.type, leftover: true }))}
+                  successMessage="Kit de sobra entregue."
+                  onDone={onChanged}
+                />
+              ) : null}
             </div>
           );
         })}

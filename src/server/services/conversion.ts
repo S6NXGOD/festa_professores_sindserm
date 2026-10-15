@@ -4,6 +4,7 @@ import type { Tx } from "@/server/db";
 import { guestLink } from "@/server/db/schema";
 import type { StaffActor } from "./actor";
 import { writeAudit } from "./audit";
+import { clearGuestKitWaitlist } from "./kit-waitlist";
 import { lockEmployeeGroup, lockRegistration } from "./locks";
 import { findActiveGuestLink } from "./state";
 
@@ -69,6 +70,8 @@ export async function convertActiveGuestLink(
     .where(eq(guestLink.id, link.id));
 
   const guestKitReleased = !host.guestKitOut;
+  // A vaga de convidado de quem convidou ficou vazia: sai da fila do kit, se estava.
+  if (host.kind === "registration") await clearGuestKitWaitlist(tx, host.id);
   await writeAudit(tx, actor, {
     action: "GUEST_PROMOTED",
     entityType: host.kind,

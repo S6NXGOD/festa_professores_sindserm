@@ -346,7 +346,9 @@ export default async function DashboardPage() {
           icon={Gift}
           tone="neutral"
           href={canKits ? "/painel/kits#comparativo" : undefined}
-          hint={`${kitParts(stats.kitsOwedMember, stats.kitsOwedGuest, employeeKitsOwed, stats.kitsOwedCourtesy)} · saem na entrada`}
+          hint={`${kitParts(stats.kitsOwedMember, stats.kitsOwedGuest, employeeKitsOwed, stats.kitsOwedCourtesy)} · saem na entrada${
+            stats.kitWaitlist.member + stats.kitWaitlist.guest ? ` · ${stats.kitWaitlist.member + stats.kitWaitlist.guest} na fila do kit` : ""
+          }`}
           testId="stat-kits-owed"
         />
         {/* Como os outros quadros, o número é o total; quem já entrou aparece embaixo, na festa. */}
@@ -405,7 +407,7 @@ export default async function DashboardPage() {
             ) : null
           }
         >
-          {stock ? <StockCard stock={stock} demand={stats.kitDemand} /> : null}
+          {stock ? <StockCard stock={stock} demand={stats.kitDemand} waitlist={stats.kitWaitlist} /> : null}
         </Panel>
       </div>
 

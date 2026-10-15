@@ -150,6 +150,7 @@ export function registrationInput(options: MemberOptions = {}): RegistrationInpu
       ? { fullName: options.guestName ?? personName(0), cpf: options.guestCpf ?? randomCpf(), isMinor: false }
       : null,
     privacyConsent: true,
+    acceptKitWaitlist: true,
   };
 }
 
@@ -213,6 +214,7 @@ export function preAffiliationInput(options: { isTeacher?: boolean; guest?: bool
     authorizationAccepted: true,
     documents: { rg: [randomUUID()], payslip: [randomUUID()] },
     privacyConsent: true,
+    acceptKitWaitlist: true,
   };
 }
 

@@ -12,6 +12,7 @@ import { confirmAfterProof, decideAffiliation, reopenAffiliation } from "@/serve
 import { assertPermission } from "@/server/services/actor";
 import { cancelCheckIn } from "@/server/services/checkin";
 import { addGuest, removeGuest, setTeacherStatus } from "@/server/services/group";
+import { advanceKitWaitlist } from "@/server/services/kit-waitlist";
 import { cancelKitDelivery, deliverKit, type DeliveryResult } from "@/server/services/kits";
 import { registerDeclaredMember } from "@/server/services/membership";
 import { correctPerson } from "@/server/services/people";
@@ -65,12 +66,21 @@ export async function reopenAffiliationAction(input: { registrationId: string; j
   });
 }
 
-export async function deliverKitAction(input: { personId: string; kitType: KitType }): Promise<ActionResult<DeliveryResult>> {
+export async function deliverKitAction(input: { personId: string; kitType: KitType; leftover?: boolean }): Promise<ActionResult<DeliveryResult>> {
   return runAction(async () => {
     const kitType: KitType = input.kitType === "GUEST" || input.kitType === "EMPLOYEE" ? input.kitType : "MEMBER";
-    const result = await deliverKit(await staff(), { personId: String(input.personId), kitType });
+    const result = await deliverKit(await staff(), { personId: String(input.personId), kitType, leftover: input.leftover === true });
     refreshStaffViews();
     return result;
+  });
+}
+
+/** Fila do kit: dá a vez aos próximos se houver kit sem dono (normalmente ela anda sozinha). */
+export async function advanceKitWaitlistAction(): Promise<ActionResult<{ promoted: number }>> {
+  return runAction(async () => {
+    const promoted = await advanceKitWaitlist(await staff());
+    refreshStaffViews();
+    return { promoted };
   });
 }
 

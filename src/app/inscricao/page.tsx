@@ -8,12 +8,20 @@ import { VenueCompact } from "@/components/public/venue";
 import { RegistrationFlow } from "@/components/registration/registration-flow";
 import { Button } from "@/components/ui/button";
 import { formatDateTime, todayInZone } from "@/lib/datetime";
+import { db } from "@/server/db";
 import { getConfig, getEventInfo, getRegistrationWindow } from "@/server/queries/config";
+import { getKitSupply } from "@/server/services/kit-waitlist";
 
 export const metadata: Metadata = { title: "Inscrição" };
 
 export default async function RegistrationPage({ searchParams }: PageProps<"/inscricao">) {
-  const [config, window, params, event] = await Promise.all([getConfig(), getRegistrationWindow(), searchParams, getEventInfo()]);
+  const [config, window, params, event, kitSupply] = await Promise.all([
+    getConfig(),
+    getRegistrationWindow(),
+    searchParams,
+    getEventInfo(),
+    getKitSupply(db),
+  ]);
   if (!config) redirect("/");
 
   if (window.state !== "OPEN") {
@@ -47,6 +55,7 @@ export default async function RegistrationPage({ searchParams }: PageProps<"/ins
         initialPath={params.ficha === "1" ? "ficha" : "choose"}
         today={todayInZone()}
         venue={event?.venue ? <VenueCompact venue={event.venue} /> : null}
+        kitSupply={kitSupply}
       />
     </PublicShell>
   );

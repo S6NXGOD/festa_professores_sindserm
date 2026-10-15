@@ -21,6 +21,7 @@ import { type Actor, actorUserId, assertPermission, PUBLIC_ACTOR } from "./actor
 import { writeAudit } from "./audit";
 import { linkDocumentsToForm } from "./documents";
 import { DomainError, isUniqueViolation } from "./errors";
+import { allocateKitSlots, type SlotOutcome } from "./kit-waitlist";
 import { getEventConfig, registrationWindow } from "./settings";
 import { withTx } from "./tx";
 import { issueVoucher } from "./vouchers";
@@ -82,6 +83,25 @@ async function assertIdentifiersAvailable(
   }
   if (Object.keys(fieldErrors).length) {
     throw new DomainError("CPF_TAKEN", "Há dados já cadastrados. Revise os campos destacados.", fieldErrors);
+  }
+}
+
+/**
+ * Kits esgotados: no formulário público, a pessoa precisa ter lido o aviso e
+ * aceitado a fila do kit (se os kits acabaram enquanto ela preenchia, a tela
+ * pede a confirmação e ela manda de novo). Pelo Atendimento, quem cadastra avisa.
+ */
+function assertKitWaitlistAccepted(actor: Actor, kits: { member: SlotOutcome | null; guest: SlotOutcome | null }, accepted: boolean | undefined) {
+  if (actor.kind !== "public" || accepted) return;
+  if (kits.member === "WAITLIST") {
+    throw new DomainError("KIT_WAITLIST", "Os kits de consumação acabaram enquanto você se inscrevia. Confirme que entra na fila do kit para continuar.", {
+      acceptKitWaitlist: "Confirme que leu o aviso dos kits",
+    });
+  }
+  if (kits.guest === "WAITLIST") {
+    throw new DomainError("KIT_WAITLIST", "O último kit ficou com você; o do seu convidado entra na fila do kit. Confirme para continuar.", {
+      acceptKitWaitlist: "Confirme que leu o aviso dos kits",
+    });
   }
 }
 
@@ -186,6 +206,9 @@ export async function createRegistration(actor: Actor, rawInput: RegistrationInp
 
       await issueVoucher(tx, member!.id, createdBy);
       if (input.guest) await insertGuest(tx, reg!.id, input.guest, createdBy);
+      // Kits por ordem de inscrição: esgotados, os desta inscrição entram na fila.
+      const kits = await allocateKitSlots(tx, actor, reg!.id, { member: input.isTeacher, guest: input.isTeacher && Boolean(input.guest) }, now);
+      assertKitWaitlistAccepted(actor, kits, input.acceptKitWaitlist);
 
       await writeAudit(tx, actor, {
         action: "REGISTRATION_CREATED",
@@ -197,6 +220,7 @@ export async function createRegistration(actor: Actor, rawInput: RegistrationInp
           isTeacher: input.isTeacher,
           guest: guestAudit(input.guest),
           origin,
+          kits,
         },
       });
 
@@ -276,6 +300,8 @@ export async function createPreAffiliation(actor: Actor, rawInput: PreAffiliatio
 
       await issueVoucher(tx, member!.id, createdBy);
       if (input.guest) await insertGuest(tx, reg!.id, input.guest, createdBy);
+      const kits = await allocateKitSlots(tx, actor, reg!.id, { member: input.isTeacher, guest: input.isTeacher && Boolean(input.guest) }, now);
+      assertKitWaitlistAccepted(actor, kits, input.acceptKitWaitlist);
 
       await writeAudit(tx, actor, {
         action: "PRE_AFFILIATION_CREATED",
@@ -288,6 +314,7 @@ export async function createPreAffiliation(actor: Actor, rawInput: PreAffiliatio
           isTeacher: input.isTeacher,
           guest: guestAudit(input.guest),
           documents: { rg: input.documents.rg.length, payslip: input.documents.payslip.length },
+          kits,
         },
       });
 
