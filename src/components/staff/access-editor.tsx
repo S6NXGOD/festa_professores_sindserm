@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Check, ClipboardNote, Crown, Eye, Heart, Lock, Pencil, type PixelIcon, Reload, Shield } from "@/components/icons/pixel";
+import { Check, ClipboardNote, Crown, Eye, Heart, Lock, Package, Pencil, type PixelIcon, Reload, Shield } from "@/components/icons/pixel";
 import { ToneBadge } from "@/components/status/status-badge";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -27,7 +27,7 @@ const LEVEL_TONE: Record<AccessLevel, string> = {
   view: "border-warning bg-warning/15 text-warning",
   edit: "border-success bg-success/15 text-success-text",
 };
-const ROLE_ICON: Record<StaffRole, PixelIcon> = { ADMIN: Crown, ATTENDANT: ClipboardNote, SECURITY: Shield };
+const ROLE_ICON: Record<StaffRole, PixelIcon> = { ADMIN: Crown, ATTENDANT: ClipboardNote, SECURITY: Shield, KIT_DESK: Package };
 
 /** Administrador: tudo liberado, nada para marcar — só a confirmação do que ele alcança. */
 function FullAccessCard() {

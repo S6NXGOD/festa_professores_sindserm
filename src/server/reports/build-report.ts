@@ -158,7 +158,13 @@ async function kitsReport(report: ReportPdf, deadline: ReportContext["kitDeadlin
       value: n(planned),
       hint: totals.pending ? `${n(totals.pending)} ${totals.pending === 1 ? "depende" : "dependem"} de conferência` : "Todos já garantidos",
     },
-    { label: "Já entregues", value: n(stock?.totalDelivered ?? totals.delivered), tone: "success", hint: `Faltam sair ${n(totals.toDeliver)}` },
+    {
+      label: "Já entregues",
+      // Os da gordura (inscrições na hora) também saíram: contam aqui, fora da conta do oficial.
+      value: n(stock ? stock.totalDelivered + (stock.extra?.delivered ?? 0) : totals.delivered),
+      tone: "success",
+      hint: `Faltam sair ${n(totals.toDeliver)}`,
+    },
     { label: "Fila do kit", value: n(waiting), tone: waiting ? "warning" : undefined, hint: waiting ? "Saem se vagar kit" : "Ninguém esperando" },
   ]);
 
@@ -233,6 +239,14 @@ async function kitsReport(report: ReportPdf, deadline: ReportContext["kitDeadlin
           : undefined,
     },
   );
+
+  if (stock?.extra) {
+    report.callout(
+      `Gordura (inscrições na hora, fora do oficial): ${n(stock.extra.total)} na gordura − ${n(stock.extra.committed)} prometidos = ${n(stock.extra.free)} livres. Já entregues: ${n(stock.extra.delivered)}.`,
+      stock.extra.free > 0 ? "neutral" : "warning",
+    );
+  }
+  if (stock?.kitsAtDesk) report.callout("Os kits saem na mesa dos kits, depois da entrada: a portaria só registra a entrada.", "neutral");
 
   report.section("Pessoas e kits", "Quem vem, quem tem direito a kit, o que já saiu e o que falta sair. Quem aguarda conferência ganha o kit quando a filiação for confirmada.");
   const groupColumns = [

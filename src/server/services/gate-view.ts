@@ -17,11 +17,11 @@ import {
   stockPoolFor,
 } from "@/domain/rules";
 import type { AccessMap } from "@/domain/access";
-import { kitPlanSchema } from "@/domain/kit-plan";
 import type { AffiliationStatus, CheckInMethod, DocumentKind, EmployeeKitType, GroupKitType, ParticipantRole, EmployeeCategory } from "@/domain/types";
 import { displayCpf } from "@/lib/cpf";
 import { formatVoucherCode } from "@/server/crypto";
 import { entryDecisionFor } from "./checkin";
+import { evaluateDeskKit, hasMinorKit, walkInOf } from "./desk-kit";
 import { employeeKitInput, kitInput } from "./kits";
 import { employeePoolOf, type EventConfig, getEventConfig, getStockOverview, type StockOverview } from "./settings";
 import { type ActiveGuest, type EmployeeGroupState, loadPersonState, type PersonState, type RegistrationState } from "./state";
@@ -46,7 +46,9 @@ export type KitOnEntry =
     }
   /** Convidado que chega antes de quem convidou: o kit dele sai quando essa pessoa chegar. */
   | { kind: "WAITING"; message: string }
-  | { kind: "NONE"; message: string };
+  | { kind: "NONE"; message: string }
+  /** Mesa dos kits: a portaria só registra a entrada e manda a pessoa à mesa. `extra` = kit da gordura. */
+  | { kind: "AT_DESK"; extra: boolean; minor: boolean };
 
 export type EntryView =
   | { kind: "ALREADY_IN"; at: Date; byName: string; method: CheckInMethod }
@@ -127,6 +129,10 @@ export interface GateView {
   kitDeadline: { at: Date; passed: boolean } | null;
   /** A montagem tem kit próprio para menor de 18 (ex.: sem bebida alcoólica): o cartão diz quando entregar esse. */
   minorKit: boolean;
+  /** Onde o kit sai hoje: na mesa dos kits (verdadeiro) ou junto com a entrada. */
+  kitsAtDesk: boolean;
+  /** Inscrição feita na hora: o kit é o da gordura (selo no cartão e no voucher). */
+  walkIn: boolean;
   entry: EntryView;
   /** Só quando a entrada está liberada: a recepção já sabe se entrega kit. */
   kitOnEntry: KitOnEntry | null;
@@ -158,11 +164,6 @@ function willDeliver(count: 1 | 2, label: string, detail: string, minors: number
 
 const minorCount = (...people: ({ isMinor: boolean } | null)[]) => people.filter((person) => person?.isMinor).length;
 
-/** A montagem tem kit próprio para menor de 18: a portaria avisa qual kit entregar. */
-function hasMinorKit(config: Pick<EventConfig, "kitPlan"> | null): boolean {
-  const parsed = kitPlanSchema.safeParse(config?.kitPlan ?? null);
-  return parsed.success && parsed.data.minor !== null;
-}
 
 /** Antes das entradas, um kit na fila não "sai junto com a entrada": a portaria já vê que ele espera vagar. */
 const BEFORE_ENTRY: readonly KitBlockCode[] = ["MEMBER_NOT_CHECKED_IN", "GUEST_NOT_CHECKED_IN", "HOST_NOT_CHECKED_IN"];
@@ -337,6 +338,23 @@ function kitOnEntryPreview(
   return { kind: "NONE", message: ownReason };
 }
 
+/** Prévia do kit na entrada: no modo mesa, só o recado "kit na mesa" (ou por que não tem kit). */
+function entryKitPreview(
+  state: PersonState,
+  role: ParticipantRole,
+  config: Parameters<typeof buildGateView>[2],
+  now: Date,
+  deadlinePassed: boolean,
+  stock: StockOverview | null,
+): KitOnEntry {
+  if (!config?.kitsAtDesk) return kitOnEntryPreview(state, role, deadlinePassed, stock);
+  const desk = evaluateDeskKit(state, { stockMode: "SINGLE", ...config, kitsAtDesk: true }, now, null, { enteringAs: role });
+  if (desk.kind === "READY") return { kind: "AT_DESK", extra: desk.extra, minor: desk.minor };
+  if (desk.kind === "DELIVERED") return { kind: "NONE", message: ENTRY_KIT_MESSAGE.ALREADY };
+  if (desk.kind === "BLOCKED") return { kind: "NONE", message: desk.message };
+  return { kind: "NONE", message: "Sem kit." };
+}
+
 function hostView(state: PersonState): GateView["host"] {
   if (state.guestOf) {
     const host = state.guestOf.host;
@@ -375,7 +393,8 @@ function hostView(state: PersonState): GateView["host"] {
 export function buildGateView(
   state: PersonState,
   access: AccessMap,
-  config: Pick<EventConfig, "eventDate" | "startTime" | "kitDeadlineTime" | "kitPlan"> | null,
+  config: Pick<EventConfig, "eventDate" | "startTime" | "kitDeadlineTime" | "kitPlan"> &
+    Partial<Pick<EventConfig, "stockMode" | "kitsAtDesk">> | null,
   now = new Date(),
   stock: StockOverview | null = null,
 ): GateView {
@@ -461,8 +480,10 @@ export function buildGateView(
       : null,
     kitDeadline: deadlineAt ? { at: deadlineAt, passed: deadlinePassed } : null,
     minorKit: hasMinorKit(config),
+    kitsAtDesk: Boolean(config?.kitsAtDesk),
+    walkIn: walkInOf(state),
     entry,
-    kitOnEntry: entry.kind === "ALLOWED" ? kitOnEntryPreview(state, entry.role, deadlinePassed, stock) : null,
+    kitOnEntry: entry.kind === "ALLOWED" ? entryKitPreview(state, entry.role, config, now, deadlinePassed, stock) : null,
     eventStart: config
       ? { started: hasEventStarted(config, now), label: eventStartLabel(config), at: eventStartAt(config)?.toISOString() ?? null }
       : { started: true, label: null, at: null },

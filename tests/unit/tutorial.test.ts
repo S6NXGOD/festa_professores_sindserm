@@ -7,7 +7,9 @@ const ids = (access: AccessMap) => tutorialSteps(access, "Maria Souza").map((ste
 describe("tutorial do primeiro acesso", () => {
   it("cada perfil vê só as fases do que usa", () => {
     expect(ids(ROLE_PRESETS.SECURITY)).toEqual(["boas-vindas", "portaria", "treino", "pronto"]);
-    expect(ids(ROLE_PRESETS.ATTENDANT)).toEqual(["boas-vindas", "placar", "inscricoes", "fichas", "vouchers", "portaria", "treino", "na-festa", "pronto"]);
+    expect(ids(ROLE_PRESETS.ATTENDANT)).toEqual(["boas-vindas", "placar", "inscricoes", "fichas", "vouchers", "portaria", "treino", "mesa", "na-festa", "pronto"]);
+    // Mesa dos kits: não registra entradas, então pula a portaria e o treino dela.
+    expect(ids(ROLE_PRESETS.KIT_DESK)).toEqual(["boas-vindas", "mesa", "na-festa", "pronto"]);
     expect(ids(ROLE_PRESETS.ADMIN)).toEqual([
       "boas-vindas",
       "placar",
@@ -16,6 +18,7 @@ describe("tutorial do primeiro acesso", () => {
       "vouchers",
       "portaria",
       "treino",
+      "mesa",
       "na-festa",
       "casa",
       "administracao",

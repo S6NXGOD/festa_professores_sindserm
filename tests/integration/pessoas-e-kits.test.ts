@@ -75,6 +75,7 @@ describe("pessoas e kits", () => {
     expect(comparison.registrations).toEqual([
       { id: "TEACHERS", people: 2, withKit: 1, pending: 1, waitlist: 0, delivered: 1, present: 1 },
       { id: "TEACHER_GUESTS", people: 2, withKit: 1, pending: 1, waitlist: 0, delivered: 1, present: 1 },
+      { id: "WALK_INS", people: 0, withKit: 0, pending: 0, delivered: 0, present: 0 },
       { id: "OTHER_MEMBERS", people: 1, withKit: 0, pending: 0, waitlist: 0, delivered: 0, present: 0 },
     ]);
     expect(comparison.house).toEqual([

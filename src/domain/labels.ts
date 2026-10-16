@@ -41,12 +41,14 @@ export const ROLE_LABEL: Record<StaffRole, string> = {
   ADMIN: "Administrador",
   ATTENDANT: "Atendimento",
   SECURITY: "Segurança/Recepção",
+  KIT_DESK: "Mesa dos kits",
 };
 
 export const ROLE_DESCRIPTION: Record<StaffRole, string> = {
   ADMIN: "Acesso total a todas as áreas. Não precisa marcar nada.",
   ATTENDANT: "Portaria, conferência de filiação, fichas, convidados e kits. Ajustável.",
   SECURITY: "Leitura de QR, busca e registro de entrada. Ajustável.",
+  KIT_DESK: "Confere quem entrou e entrega os kits (não registra entradas). Ajustável.",
 };
 
 export const KIT_TYPE_LABEL: Record<KitType, string> = {
@@ -66,6 +68,7 @@ export const STOCK_POOL_LABEL: Record<StockPool, string> = {
   MEMBER: "Kits de professor(a)",
   GUEST: "Kits de convidado",
   EMPLOYEE: "Kits dos colaboradores",
+  EXTRA: "Gordura (inscrições na hora)",
 };
 
 export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {

@@ -5,7 +5,7 @@ import { CreateUserDialog, EditUserDialog, ResetPasswordDialog } from "@/compone
 import { ToneBadge } from "@/components/status/status-badge";
 import { isCustomAccess, resolveAccess } from "@/domain/access";
 import { ROLE_LABEL } from "@/domain/labels";
-import { gateTrainingRequired } from "@/domain/tutorial";
+import { deskTrainingRequired, gateTrainingRequired } from "@/domain/tutorial";
 import { initials } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { listStaffUsers } from "@/server/queries/panel";
@@ -19,6 +19,9 @@ export default async function UsersPage() {
   // Quem registra entradas (fora os administradores) faz o treino relâmpago antes da portaria.
   const trainees = users.filter((u) => u.active && gateTrainingRequired(resolveAccess(u.role, u.permissions)));
   const pendingTraining = trainees.filter((u) => !u.gateTrainingDoneAt).length;
+  // Quem entrega kits (fora os administradores) faz o treino da mesa antes de abrir a mesa dos kits.
+  const deskTrainees = users.filter((u) => u.active && deskTrainingRequired(resolveAccess(u.role, u.permissions)));
+  const pendingDesk = deskTrainees.filter((u) => !u.deskTrainingDoneAt).length;
   return (
     <div>
       <PageHeader
@@ -27,7 +30,7 @@ export default async function UsersPage() {
         description="Quem usa o sistema e o que cada pessoa pode fazer, área por área. Colaboradores que só vão à festa (sem usar o sistema) ficam em Colaboradores SINDSERM."
         actions={
           <>
-            {trainees.length ? <RequireTrainingButton /> : null}
+            {trainees.length || deskTrainees.length ? <RequireTrainingButton /> : null}
             <CreateUserDialog />
           </>
         }
@@ -38,6 +41,14 @@ export default async function UsersPage() {
           {pendingTraining
             ? `${trainees.length - pendingTraining} de ${trainees.length} já fizeram; ${pendingTraining === 1 ? "falta 1 pessoa" : `faltam ${pendingTraining}`} (fazem antes de abrir a portaria).`
             : `Todos os ${trainees.length} da portaria já fizeram.`}
+        </p>
+      ) : null}
+      {deskTrainees.length ? (
+        <p className="mb-4 flex flex-wrap items-center gap-2 text-sm text-fg-muted" data-testid="desk-training-summary">
+          <span className="pixel text-[0.55rem] text-success-text">Treino da mesa</span>
+          {pendingDesk
+            ? `${deskTrainees.length - pendingDesk} de ${deskTrainees.length} já fizeram; ${pendingDesk === 1 ? "falta 1 pessoa" : `faltam ${pendingDesk}`} (fazem antes de abrir a mesa dos kits).`
+            : `Todos os ${deskTrainees.length} que entregam kits já fizeram.`}
         </p>
       ) : null}
       <div className="overflow-hidden rounded-xl border border-line bg-surface">
@@ -59,6 +70,13 @@ export default async function UsersPage() {
                       <ToneBadge tone="success">Treino feito</ToneBadge>
                     ) : (
                       <ToneBadge tone="warning">Treino pendente</ToneBadge>
+                    )
+                  ) : null}
+                  {u.active && deskTrainingRequired(resolveAccess(u.role, u.permissions)) ? (
+                    u.deskTrainingDoneAt ? (
+                      <ToneBadge tone="success">Mesa: treino feito</ToneBadge>
+                    ) : (
+                      <ToneBadge tone="warning">Mesa: treino pendente</ToneBadge>
                     )
                   ) : null}
                 </p>

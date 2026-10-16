@@ -58,6 +58,8 @@ export interface EventInfo {
   started: boolean;
   /** Horário limite dos kits (`passed`: já encerrou, nesta requisição). */
   kitDeadline: { at: Date; label: string; passed: boolean } | null;
+  /** Onde o kit sai: na mesa dos kits (verdadeiro) ou na portaria, junto com a entrada. */
+  kitsAtDesk: boolean;
   venue: VenueInfo | null;
   /** WhatsApp da organização para dúvidas (somente dígitos). */
   helpWhatsapp: string | null;
@@ -85,6 +87,7 @@ export const getEventInfo = cache(async (): Promise<EventInfo | null> => {
     startLabel: eventStartLabel(config),
     started: hasEventStarted(config),
     kitDeadline: deadline ? { at: deadline, label: formatTime(deadline), passed: isKitDeadlinePassed(config) } : null,
+    kitsAtDesk: config.kitsAtDesk,
     venue: hasVenue
       ? {
           name: config.venueName,

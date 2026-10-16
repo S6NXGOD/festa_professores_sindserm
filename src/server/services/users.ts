@@ -8,7 +8,7 @@ import { type AccessMap, can, isAccessFixed, resolveAccess, sameAccess, storedAc
 import type { BootstrapAdminInput, CreateUserInput, UpdateUserInput } from "@/domain/schemas";
 import { bootstrapAdminSchema, createUserSchema, resetPasswordSchema, updateUserSchema } from "@/domain/schemas";
 import { ROLE_LABEL } from "@/domain/labels";
-import { gateTrainingRequired } from "@/domain/tutorial";
+import { deskTrainingRequired, gateTrainingRequired } from "@/domain/tutorial";
 import type { StaffRole } from "@/domain/types";
 import { safeEqual } from "@/server/crypto";
 import { type Actor, assertPermission, type StaffActor, staffActor } from "./actor";
@@ -286,7 +286,18 @@ export async function finishGateTraining(ex: Executor, actor: StaffActor) {
     .where(eq(user.id, actor.userId));
 }
 
-/** Pede o treino relâmpago de novo a quem registra entradas (fora os administradores). */
+/** Treino da mesa dos kits terminado: a mesa abre. */
+export async function finishDeskTraining(ex: Executor, actor: StaffActor) {
+  await ex
+    .update(user)
+    .set({ deskTrainingDoneAt: new Date(), tutorialSeenAt: sql`coalesce(${user.tutorialSeenAt}, now())` })
+    .where(eq(user.id, actor.userId));
+}
+
+/**
+ * Pede os treinos de novo (fora os administradores): o da portaria a quem
+ * registra entradas e o da mesa a quem entrega kits.
+ */
 export async function requireGateTrainingAgain(actor: Actor) {
   assertPermission(actor, "manageUsers");
   return withTx(async (tx) => {
@@ -294,16 +305,22 @@ export async function requireGateTrainingAgain(actor: Actor) {
       .select({ id: user.id, role: user.role, permissions: user.permissions })
       .from(user)
       .where(and(eq(user.active, true), isNull(user.deletedAt)));
-    const ids = rows.filter((row) => gateTrainingRequired(resolveAccess(row.role, row.permissions))).map((row) => row.id);
-    if (ids.length) {
-      await tx.update(user).set({ gateTrainingDoneAt: null }).where(inArray(user.id, ids));
+    const gateIds = rows.filter((row) => gateTrainingRequired(resolveAccess(row.role, row.permissions))).map((row) => row.id);
+    const deskIds = rows.filter((row) => deskTrainingRequired(resolveAccess(row.role, row.permissions))).map((row) => row.id);
+    if (gateIds.length) {
+      await tx.update(user).set({ gateTrainingDoneAt: null }).where(inArray(user.id, gateIds));
     }
+    if (deskIds.length) {
+      await tx.update(user).set({ deskTrainingDoneAt: null }).where(inArray(user.id, deskIds));
+    }
+    const people = new Set([...gateIds, ...deskIds]).size;
     await writeAudit(tx, actor, {
       action: "GATE_TRAINING_REQUIRED",
       entityType: "user",
-      summary: `Treino da portaria pedido de novo: ${ids.length === 1 ? "1 pessoa faz" : `${ids.length} pessoas fazem`} antes de abrir a portaria.`,
+      summary: `Treinos pedidos de novo: ${people === 1 ? "1 pessoa faz" : `${people} pessoas fazem`} antes de abrir a portaria ou a mesa dos kits.`,
+      after: { gate: gateIds.length, desk: deskIds.length },
     });
-    return { people: ids.length };
+    return { people };
   });
 }
 

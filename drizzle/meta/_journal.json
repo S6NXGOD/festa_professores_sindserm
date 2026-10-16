@@ -92,6 +92,13 @@
       "when": 1792104809676,
       "tag": "0012_treino_obrigatorio_e_apagar_usuario",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792178768110,
+      "tag": "0013_mesa_dos_kits_e_gordura",
+      "breakpoints": true
     }
   ]
 }

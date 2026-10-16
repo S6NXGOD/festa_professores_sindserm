@@ -116,6 +116,11 @@ export interface KitRegistrationInput {
   memberReceivedGuestKit?: boolean;
   /** Kits na fila (inscrição depois que os kits do estoque acabaram): só saem quando vagar kit. */
   waitlisted?: Partial<Record<GroupKitType, boolean>>;
+  /**
+   * Kits na mesa dos kits: o convidado pega o kit dele depois da própria entrada,
+   * sem esperar quem convidou (decisão da organização para a mesa).
+   */
+  guestIndependent?: boolean;
 }
 
 /**
@@ -137,8 +142,8 @@ export function kitAvailability(reg: KitRegistrationInput, kitType: GroupKitType
     if (!reg.memberCheckedIn) return { kind: "BLOCKED", code: "MEMBER_NOT_CHECKED_IN" };
   } else {
     if (!reg.hasGuest) return { kind: "BLOCKED", code: "NO_GUEST" };
-    // O kit do convidado só sai depois que o(a) professor(a) que convidou chegou...
-    if (!reg.memberCheckedIn) return { kind: "BLOCKED", code: "HOST_NOT_CHECKED_IN" };
+    // O kit do convidado só sai depois que o(a) professor(a) que convidou chegou (na mesa dos kits, não espera)...
+    if (!reg.memberCheckedIn && !reg.guestIndependent) return { kind: "BLOCKED", code: "HOST_NOT_CHECKED_IN" };
     // ...e com o convidado presente (convidado fictício não gera kit).
     if (!reg.guestCheckedIn) return { kind: "BLOCKED", code: "GUEST_NOT_CHECKED_IN" };
   }
@@ -160,6 +165,8 @@ export interface EmployeeKitInput {
   deliveries: EmployeeDeliveries;
   /** Passou o horário dos kits guardados (o kit do(a) colaborador(a) sai do mesmo jeito, se houver). */
   deadlinePassed: boolean;
+  /** Mesa dos kits: o convidado não espera quem convidou (ver KitRegistrationInput). */
+  guestIndependent?: boolean;
 }
 
 /**
@@ -176,7 +183,7 @@ export function employeeKitAvailability(input: EmployeeKitInput, kitType: Employ
     if (!input.employeeCheckedIn) return { kind: "BLOCKED", code: "EMPLOYEE_NOT_CHECKED_IN" };
   } else {
     if (!input.hasGuest) return { kind: "BLOCKED", code: "NO_GUEST" };
-    if (!input.employeeCheckedIn) return { kind: "BLOCKED", code: "HOST_NOT_CHECKED_IN" };
+    if (!input.employeeCheckedIn && !input.guestIndependent) return { kind: "BLOCKED", code: "HOST_NOT_CHECKED_IN" };
     if (!input.guestCheckedIn) return { kind: "BLOCKED", code: "GUEST_NOT_CHECKED_IN" };
   }
   return { kind: "AVAILABLE" };
@@ -207,6 +214,11 @@ export function employeeStockPool(mode: StockMode): StockPool {
 
 export function isLowStock(available: number, threshold: number): boolean {
   return available <= threshold;
+}
+
+/** Gordura: alerta quando restar 10% (no mínimo 2 kits). O limite geral, pensado para centenas de kits, não serve. */
+export function isLowExtraStock(available: number, total: number): boolean {
+  return total > 0 && available <= Math.max(2, Math.ceil(total * 0.1));
 }
 
 /**

@@ -14,6 +14,7 @@ import {
   Gift,
   Info,
   Loader,
+  Package,
   QrCode,
   Reload,
   Shield,
@@ -22,6 +23,7 @@ import {
   Warning,
 } from "@/components/icons/pixel";
 import { PixelTag, PlayerTag } from "@/components/retro/bits";
+import { WalkInStamp } from "@/components/gate/walk-in-stamp";
 import { Button } from "@/components/ui/button";
 import { callAction } from "@/lib/call-action";
 import { vibrate } from "@/lib/haptics";
@@ -303,6 +305,8 @@ function MiniGateCard({ card }: { card: MiniCard }) {
                     <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-warning px-1.5 py-1 text-[0.62rem] font-bold text-warning-foreground">
                       <Warning className="size-3" /> MENOR DE 18
                     </span>
+                  ) : tag === "WALK_IN" ? (
+                    <WalkInStamp key={tag} />
                   ) : (
                     <PlayerTag key={tag} player={tag === "P1" ? 1 : 2} />
                   ),
@@ -316,16 +320,28 @@ function MiniGateCard({ card }: { card: MiniCard }) {
             <div
               className={cn(
                 "flex items-center gap-3 rounded-xl border px-3 py-2.5",
-                card.kit.kind === "give" ? "border-red/60 bg-brand-soft" : "border-line-strong bg-surface-2",
+                card.kit.kind === "give" ? "border-red/60 bg-brand-soft" : card.kit.kind === "desk" ? "border-success/50 bg-success-soft" : "border-line-strong bg-surface-2",
               )}
             >
               <span
                 className={cn(
                   "relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg",
-                  card.kit.kind === "give" ? "bg-red text-white shadow-[0_3px_0_0_var(--brand-strong)]" : "bg-surface-3 text-fg-muted",
+                  card.kit.kind === "give"
+                    ? "bg-red text-white shadow-[0_3px_0_0_var(--brand-strong)]"
+                    : card.kit.kind === "desk"
+                      ? "bg-success text-white"
+                      : "bg-surface-3 text-fg-muted",
                 )}
               >
-                {card.kit.kind === "give" ? <Gift className="size-6" /> : card.kit.kind === "wait" ? <Clock className="size-6" /> : <Info className="size-6" />}
+                {card.kit.kind === "give" ? (
+                  <Gift className="size-6" />
+                ) : card.kit.kind === "desk" ? (
+                  <Package className="size-6" />
+                ) : card.kit.kind === "wait" ? (
+                  <Clock className="size-6" />
+                ) : (
+                  <Info className="size-6" />
+                )}
                 {card.kit.count === 2 ? (
                   <span className="pixel absolute -top-2 -right-2 rounded-md bg-white px-1 py-0.5 text-[0.5rem] text-red shadow">x2</span>
                 ) : null}

@@ -26,8 +26,8 @@ import { withTx } from "./tx";
 const EXPECTED_STATUSES: readonly string[] = ["PENDING", "AWAITING_SIGNATURE", "CONFIRMED", "JOINED_AT_EVENT"];
 const EXPECTED = sql`('PENDING', 'AWAITING_SIGNATURE', 'CONFIRMED', 'JOINED_AT_EVENT')`;
 
-/** Estoques dos kits de inscritos (o dos colaboradores não tem fila). */
-type GroupPool = Exclude<StockPool, "EMPLOYEE">;
+/** Estoques dos kits de inscritos (o dos colaboradores e a gordura não têm fila). */
+type GroupPool = Exclude<StockPool, "EMPLOYEE" | "EXTRA">;
 
 function groupPools(mode: StockMode): GroupPool[] {
   return mode === "SPLIT" ? ["MEMBER", "GUEST"] : ["ALL"];
@@ -41,6 +41,7 @@ async function getEventConfig(ex: Executor) {
       eventDate: eventConfig.eventDate,
       startTime: eventConfig.startTime,
       kitDeadlineTime: eventConfig.kitDeadlineTime,
+      registrationClosesAt: eventConfig.registrationClosesAt,
     })
     .from(eventConfig)
     .where(eq(eventConfig.id, 1))
@@ -69,10 +70,11 @@ async function slotCounts(ex: Executor, excludeRegistrationId: string | null) {
   const exclude = excludeRegistrationId ? sql`AND r.id <> ${excludeRegistrationId}` : sql``;
   const result = await ex.execute<Record<string, number>>(sql`
     SELECT
+      -- Kits da gordura (inscrição na hora) não contam no oficial.
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.member_kit_waitlisted_at IS NULL ${exclude})::int AS member_committed,
+        WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.member_kit_waitlisted_at IS NULL AND r.member_kit_extra_at IS NULL ${exclude})::int AS member_committed,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL ${exclude}
+        WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL AND r.guest_kit_extra_at IS NULL ${exclude}
           AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
                OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS guest_committed,
@@ -125,6 +127,45 @@ export async function loadKitBalances(
   });
 }
 
+export interface ExtraBalance {
+  total: number;
+  delivered: number;
+  /** Kits da gordura prometidos a quem se inscreveu na hora (inclui os já entregues). */
+  committed: number;
+  /** Kits da gordura ainda sem dono. */
+  free: number;
+}
+
+/**
+ * Saldo da gordura: o estoque separado do oficial para quem se inscreve na hora.
+ * `extra`: vagas a somar nos prometidos (a outra vaga da mesma inscrição).
+ */
+export async function loadExtraBalance(
+  ex: Executor,
+  excludeRegistrationId: string | null = null,
+  extra: Partial<Record<GroupKitType, number>> = {},
+): Promise<ExtraBalance> {
+  const exclude = excludeRegistrationId ? sql`AND r.id <> ${excludeRegistrationId}` : sql``;
+  const [counts, rows] = await Promise.all([
+    ex.execute<{ member: number; guest: number }>(sql`
+      SELECT
+        (SELECT count(*) FROM registration r
+          WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.member_kit_extra_at IS NOT NULL ${exclude})::int AS member,
+        (SELECT count(*) FROM registration r
+          WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_extra_at IS NOT NULL ${exclude}
+            AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
+                 OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
+        )::int AS guest
+    `),
+    ex.select().from(kitStock).where(eq(kitStock.pool, "EXTRA")),
+  ]);
+  const total = rows[0]?.total ?? 0;
+  const delivered = rows[0]?.delivered ?? 0;
+  const row = counts.rows[0];
+  const committed = Number(row?.member ?? 0) + Number(row?.guest ?? 0) + (extra.MEMBER ?? 0) + (extra.GUEST ?? 0);
+  return { total, delivered, committed, free: Math.max(0, Math.min(total - committed, total - delivered)) };
+}
+
 /**
  * Quantos kits uma inscrição nova ainda consegue garantir, por tipo (o
  * formulário avisa quando acabaram). Estoque zerado = sem controle (sem fila).
@@ -147,6 +188,19 @@ export async function getKitSupply(ex: Executor): Promise<KitSupply | null> {
     queue: { member: balanceOf("MEMBER")?.waitlist ?? 0, guest: balanceOf("GUEST")?.waitlist ?? 0 },
     reservedUntil: deadline ? { label: formatTime(deadline), passed: isKitDeadlinePassed(config) } : null,
   };
+}
+
+/**
+ * Oferta de kits para o cadastro feito pela equipe. Depois que as inscrições
+ * fecham, quem se inscreve na hora pega o kit da gordura (enquanto houver): o
+ * formulário mostra o saldo dela em vez do oficial (sem fila).
+ */
+export async function getStaffKitSupply(ex: Executor, now = new Date()): Promise<KitSupply | null> {
+  const [base, config] = await Promise.all([getKitSupply(ex), getEventConfig(ex)]);
+  if (!base || !config || now < config.registrationClosesAt) return base;
+  const extra = await loadExtraBalance(ex);
+  if (extra.total <= 0 || extra.free <= 0) return base;
+  return { ...base, shared: true, member: extra.free, guest: extra.free, queue: { member: 0, guest: 0 }, extra: { free: extra.free } };
 }
 
 export interface WaitingSlot {
@@ -274,7 +328,8 @@ export async function promoteKitWaitlist(tx: Tx, actor: Actor): Promise<WaitingS
   return moveQueue(tx, actor, config.stockMode, freeByPool(balances), null);
 }
 
-export type SlotOutcome = "KIT" | "WAITLIST";
+/** EXTRA: inscrição na hora (as inscrições já fecharam), com o kit da gordura. */
+export type SlotOutcome = "KIT" | "WAITLIST" | "EXTRA";
 
 /**
  * Decide o kit de uma inscrição (nova, ou que voltou a valer): garantido, se
@@ -299,11 +354,14 @@ export async function allocateKitSlots(
     is_teacher: boolean;
     member_since: Date | null;
     guest_since: Date | null;
+    member_extra: Date | null;
+    guest_extra: Date | null;
     name: string;
     guest_name: string | null;
     guest_kit_out: boolean;
   }>(sql`
     SELECT r.status::text AS status, r.is_teacher, r.member_kit_waitlisted_at AS member_since, r.guest_kit_waitlisted_at AS guest_since,
+           r.member_kit_extra_at AS member_extra, r.guest_kit_extra_at AS guest_extra,
            p.full_name AS name,
            (SELECT gp.full_name FROM guest_link gl JOIN person gp ON gp.id = gl.guest_person_id
              WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE' LIMIT 1) AS guest_name,
@@ -320,6 +378,8 @@ export async function allocateKitSlots(
     isTeacher: row.is_teacher,
     memberSince: row.member_since ? new Date(row.member_since) : null,
     guestSince: row.guest_since ? new Date(row.guest_since) : null,
+    memberExtra: row.member_extra ? new Date(row.member_extra) : null,
+    guestExtra: row.guest_extra ? new Date(row.guest_extra) : null,
     name: row.name,
     guestName: row.guest_name,
     guestKitOut: row.guest_kit_out,
@@ -331,8 +391,8 @@ export async function allocateKitSlots(
     // A conta não inclui as vagas que estão sendo decididas agora; a outra vaga desta inscrição, se garantida, conta.
     const expected = EXPECTED_STATUSES.includes(current.status) && current.isTeacher;
     const extra = {
-      MEMBER: !slots.member && expected && !current.memberSince ? 1 : 0,
-      GUEST: !slots.guest && expected && !current.guestSince && (current.guestName !== null || current.guestKitOut) ? 1 : 0,
+      MEMBER: !slots.member && expected && !current.memberSince && !current.memberExtra ? 1 : 0,
+      GUEST: !slots.guest && expected && !current.guestSince && !current.guestExtra && (current.guestName !== null || current.guestKitOut) ? 1 : 0,
     };
     const balances = await loadKitBalances(tx, config.stockMode, registrationId, extra);
     // Quem já esperava na fila tem a vez.
@@ -348,9 +408,23 @@ export async function allocateKitSlots(
       open.set(balance.pool, Math.max(0, (free.get(balance.pool) ?? 0) - stillWaiting));
     }
   }
+  // Inscrição na hora (as inscrições já fecharam): o kit sai da gordura, enquanto houver; depois, a regra do oficial.
+  let extraOpen = 0;
+  if (config && now >= config.registrationClosesAt) {
+    const expected = EXPECTED_STATUSES.includes(current.status) && current.isTeacher;
+    const balance = await loadExtraBalance(tx, registrationId, {
+      MEMBER: !slots.member && expected && current.memberExtra ? 1 : 0,
+      GUEST: !slots.guest && expected && current.guestExtra && (current.guestName !== null || current.guestKitOut) ? 1 : 0,
+    });
+    extraOpen = balance.free;
+  }
   // No estoque único, o kit do(a) professor(a) e o do convidado saem do mesmo saldo.
   const take = (kitType: GroupKitType): SlotOutcome => {
     if (!config) return "KIT";
+    if (extraOpen >= 1) {
+      extraOpen -= 1;
+      return "EXTRA";
+    }
     const pool = stockPoolFor(config.stockMode, kitType);
     const left = open.get(pool) ?? Number.POSITIVE_INFINITY;
     if (left < 1) return "WAITLIST";
@@ -360,11 +434,36 @@ export async function allocateKitSlots(
   if (slots.member) outcome.member = take("MEMBER");
   if (slots.guest) outcome.guest = take("GUEST");
 
-  const update: { memberKitWaitlistedAt?: Date | null; guestKitWaitlistedAt?: Date | null } = {};
+  const update: {
+    memberKitWaitlistedAt?: Date | null;
+    guestKitWaitlistedAt?: Date | null;
+    memberKitExtraAt?: Date | null;
+    guestKitExtraAt?: Date | null;
+  } = {};
   // Quem já estava na fila mantém o lugar (a hora em que entrou nela).
-  if (outcome.member) update.memberKitWaitlistedAt = outcome.member === "WAITLIST" ? (current.memberSince ?? now) : null;
-  if (outcome.guest) update.guestKitWaitlistedAt = outcome.guest === "WAITLIST" ? (current.guestSince ?? now) : null;
+  if (outcome.member) {
+    update.memberKitWaitlistedAt = outcome.member === "WAITLIST" ? (current.memberSince ?? now) : null;
+    update.memberKitExtraAt = outcome.member === "EXTRA" ? (current.memberExtra ?? now) : null;
+  }
+  if (outcome.guest) {
+    update.guestKitWaitlistedAt = outcome.guest === "WAITLIST" ? (current.guestSince ?? now) : null;
+    update.guestKitExtraAt = outcome.guest === "EXTRA" ? (current.guestExtra ?? now) : null;
+  }
   await tx.update(registration).set(update).where(eq(registration.id, registrationId));
+
+  const fromExtra = [
+    outcome.member === "EXTRA" && !current.memberExtra ? `o de ${current.name}` : null,
+    outcome.guest === "EXTRA" && !current.guestExtra ? `o do convidado ${current.guestName ?? ""}`.trim() : null,
+  ].filter(Boolean);
+  if (fromExtra.length) {
+    await writeAudit(tx, actor, {
+      action: "KIT_EXTRA_ASSIGNED",
+      entityType: "registration",
+      entityId: registrationId,
+      summary: `Inscrição na hora: ${fromExtra.join(" e ")} sai${fromExtra.length > 1 ? "em" : ""} da gordura.`,
+      after: { member: outcome.member, guest: outcome.guest },
+    });
+  }
 
   const waiting = [
     outcome.member === "WAITLIST" && !current.memberSince ? `o de ${current.name}` : null,
@@ -382,9 +481,70 @@ export async function allocateKitSlots(
   return outcome;
 }
 
-/** Sem convidado, a vaga do kit dele fica vazia (e sai da fila, se estava). */
+/** Sem convidado, a vaga do kit dele fica vazia (e sai da fila ou da gordura, se estava). */
 export async function clearGuestKitWaitlist(tx: Tx, registrationId: string) {
-  await tx.update(registration).set({ guestKitWaitlistedAt: null }).where(eq(registration.id, registrationId));
+  await tx.update(registration).set({ guestKitWaitlistedAt: null, guestKitExtraAt: null }).where(eq(registration.id, registrationId));
+}
+
+/**
+ * A gordura ganhou kits (ou foi cadastrada depois que as inscrições fecharam):
+ * quem se inscreveu na hora e ainda não pegou o kit passa para a gordura, por
+ * ordem de inscrição. Os kits do oficial que essas pessoas seguravam vagam e a
+ * fila anda. Convidado trocado na hora continua no oficial (a vaga já era dele).
+ */
+export async function moveWalkInsToExtra(tx: Tx, actor: Actor, now = new Date()): Promise<number> {
+  const config = await getEventConfig(tx);
+  if (!config || now < config.registrationClosesAt) return 0;
+  await lockKitAllocation(tx);
+  let free = (await loadExtraBalance(tx)).free;
+  if (free <= 0) return 0;
+  const closes = config.registrationClosesAt;
+  const candidates = await tx.execute<{ id: string; kit_type: GroupKitType; name: string }>(sql`
+    SELECT id, kit_type, name FROM (
+      SELECT r.id, 'MEMBER' AS kit_type, r.created_at AS since, p.full_name AS name
+        FROM registration r
+        JOIN person p ON p.id = r.member_person_id
+       WHERE r.created_at >= ${closes} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.member_kit_extra_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'MEMBER' AND kd.cancelled_at IS NULL)
+      UNION ALL
+      SELECT r.id, 'GUEST', gl.created_at, gp.full_name
+        FROM registration r
+        JOIN guest_link gl ON gl.registration_id = r.id AND gl.status = 'ACTIVE'
+        JOIN person gp ON gp.id = gl.guest_person_id
+       WHERE gl.created_at >= ${closes} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_extra_at IS NULL
+         AND (r.created_at >= ${closes}
+              OR NOT EXISTS (SELECT 1 FROM guest_link old WHERE old.registration_id = r.id AND old.created_at < ${closes}))
+         AND NOT EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL)
+    ) walk_ins
+    ORDER BY since, id, kit_type DESC
+  `);
+  const moved: string[] = [];
+  for (const slot of candidates.rows) {
+    if (free <= 0) break;
+    const [row] = await tx
+      .select({ id: registration.id })
+      .from(registration)
+      .where(eq(registration.id, slot.id))
+      .for("update", { skipLocked: true });
+    if (!row) continue;
+    await tx
+      .update(registration)
+      .set(slot.kit_type === "MEMBER" ? { memberKitExtraAt: now, memberKitWaitlistedAt: null } : { guestKitExtraAt: now, guestKitWaitlistedAt: null })
+      .where(eq(registration.id, slot.id));
+    free -= 1;
+    moved.push(slot.name);
+  }
+  if (moved.length) {
+    await writeAudit(tx, actor, {
+      action: "KIT_EXTRA_ASSIGNED",
+      entityType: "stock",
+      summary: `Gordura: ${moved.length === 1 ? "o kit de quem se inscreveu na hora passou" : `${moved.length} kits de quem se inscreveu na hora passaram`} para a gordura (${moved.join(", ")}).`,
+      after: { moved: moved.length },
+    });
+    // Os kits do oficial que essas pessoas seguravam vagaram: a fila anda.
+    await promoteKitWaitlist(tx, actor);
+  }
+  return moved.length;
 }
 
 /** "Andar a fila agora" (Kits e estoque): para quem entrega kits. */

@@ -56,6 +56,8 @@ export interface RegistrationState {
   memberReceivedGuestKit: boolean;
   /** Fila do kit: desde quando o kit do(a) professor(a) e o do convidado esperam vagar (nulo = garantido). */
   kitWaitlist: { MEMBER: Date | null; GUEST: Date | null };
+  /** Kit da gordura (inscrição na hora): desde quando o kit sai do estoque gordura (nulo = estoque oficial). */
+  kitExtra: { MEMBER: Date | null; GUEST: Date | null };
 }
 
 export interface GuestOfState {
@@ -347,6 +349,8 @@ export async function loadRegistrationState(
       statusNote: registration.statusNote,
       memberKitWaitlistedAt: registration.memberKitWaitlistedAt,
       guestKitWaitlistedAt: registration.guestKitWaitlistedAt,
+      memberKitExtraAt: registration.memberKitExtraAt,
+      guestKitExtraAt: registration.guestKitExtraAt,
       member: personColumns,
     })
     .from(registration)
@@ -403,6 +407,7 @@ export async function loadRegistrationState(
     deliveries,
     memberReceivedGuestKit: Boolean(kitAsGuest),
     kitWaitlist: { MEMBER: row.memberKitWaitlistedAt, GUEST: row.guestKitWaitlistedAt },
+    kitExtra: { MEMBER: row.memberKitExtraAt, GUEST: row.guestKitExtraAt },
   };
 }
 

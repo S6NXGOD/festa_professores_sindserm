@@ -14,6 +14,8 @@ export interface KitSupply {
   queue: { member: number; guest: number };
   /** Kits guardados até este horário; depois, as sobras saem por ordem de chegada (null = sem horário). */
   reservedUntil?: { label: string; passed: boolean } | null;
+  /** Inscrição na hora (as inscrições já fecharam): o kit sai da gordura, que ainda tem `free` kits livres. */
+  extra?: { free: number } | null;
 }
 
 export type KitOutcome = "KIT" | "WAITLIST";

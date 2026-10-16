@@ -6,6 +6,7 @@ import { affiliationForm, voucher } from "@/server/db/schema";
 import { isActiveMember } from "@/domain/rules";
 import type { AffiliationStatus, EmployeeCategory } from "@/domain/types";
 import { formatVoucherCode, qrPayloadFor } from "@/server/crypto";
+import { walkInOf } from "@/server/services/desk-kit";
 import { kitWaitlistPositions } from "@/server/services/kit-waitlist";
 import { findRegistrationByAccessToken } from "@/server/services/registration";
 import { loadPersonState, loadRegistrationState, type PersonState } from "@/server/services/state";
@@ -43,6 +44,8 @@ export interface VoucherCardData {
    * na fila (`self` = o da pessoa; `guest` = o do convidado dela). Sem fila: ausente.
    */
   kitWaitlist?: { self: number | null; guest: number | null };
+  /** Inscrição feita na hora (depois que as inscrições fecharam): o kit é o da gordura. */
+  walkIn?: boolean;
 }
 
 /** Posição na fila dos kits de uma inscrição, só quando algum deles está na fila. */
@@ -87,6 +90,7 @@ async function cardFromState(state: PersonState, token: string, code: string): P
     fullName: state.person.fullName,
     isMinor: state.person.isMinor,
     checkedInAt: state.checkIn?.checkedInAt ?? null,
+    walkIn: walkInOf(state),
   };
   if (state.employee?.active) {
     return {

@@ -14,6 +14,8 @@ export interface TrainingContext {
   kitDeadline: string | null;
   /** A montagem tem kit próprio para menor de 18. */
   minorKit: boolean;
+  /** O kit sai na mesa dos kits: a portaria só registra a entrada e manda a pessoa à mesa. */
+  kitsAtDesk?: boolean;
 }
 
 export type CardTone = "success" | "warning" | "danger";
@@ -29,9 +31,9 @@ export interface MiniCard {
   name?: string;
   /** "Professora · Filiação confirmada", "Convidada de Carla Mendes". */
   role?: string;
-  tags?: ("P1" | "P2" | "MINOR")[];
-  /** O que sai de kit com a entrada. */
-  kit?: { kind: "give" | "wait" | "none"; title: string; detail: string; count?: 1 | 2 };
+  tags?: ("P1" | "P2" | "MINOR" | "WALK_IN")[];
+  /** O que sai de kit com a entrada ("desk": a pessoa pega na mesa dos kits). */
+  kit?: { kind: "give" | "wait" | "none" | "desk"; title: string; detail: string; count?: 1 | 2 };
 }
 
 export interface QuickQuestion {
@@ -189,7 +191,58 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       lesson: "Menor de 18: entregue o kit de menor (o cartão avisa).",
     });
   }
-  return questions;
+  return ctx.kitsAtDesk ? atDesk(questions) : questions;
+}
+
+/**
+ * Kits na mesa dos kits: a portaria confirma a entrada e manda a pessoa à mesa.
+ * Saem as situações de entregar kit na porta; entra o voucher amarelo (inscrição na hora).
+ */
+function atDesk(questions: QuickQuestion[]): QuickQuestion[] {
+  const desk = { kind: "desk" as const, title: "Pega na mesa", detail: "O kit sai na mesa dos kits" };
+  const adapted = questions
+    .filter((question) => question.id !== "dois-kits" && question.id !== "menor")
+    .map((question): QuickQuestion => {
+      if (question.id === "verde") {
+        return {
+          ...question,
+          card: { ...question.card, kit: desk },
+          right: "Confirmar a entrada e mandar à mesa dos kits",
+          wrong: "Entregar o kit aqui na porta",
+          lesson: "Verde: confirme a entrada. O kit sai na mesa dos kits, não na porta.",
+        };
+      }
+      if (question.id === "convidado-antes") {
+        return {
+          ...question,
+          card: { ...question.card, kit: desk },
+          right: "Confirmar a entrada e mandar à mesa",
+          wrong: "Pedir para ela esperar a Carla lá fora",
+          lesson: "Convidado entra antes e pega o kit na mesa, sem esperar quem convidou.",
+        };
+      }
+      if (question.id === "ja-entrou") {
+        return { ...question, wrong: "Registrar a entrada de novo", lesson: "Já entrou: não registra de novo. Nome não bate? Chame a organização." };
+      }
+      return question;
+    });
+  adapted.splice(1, 0, {
+    id: "na-hora",
+    card: {
+      tone: "success",
+      icon: "ok",
+      kicker: "Ready",
+      title: "LIBERADO PARA ENTRADA",
+      name: "Rafael Souza",
+      role: "Professor · Filiação confirmada",
+      tags: ["P1", "WALK_IN"],
+      kit: { kind: "desk", title: "Pega na mesa", detail: "Kit da gordura (inscrição na hora)" },
+    },
+    right: "Confirmar a entrada e mandar à mesa",
+    wrong: "Mandar voltar para se inscrever",
+    lesson: "Voucher amarelo (inscrição na hora): entra normal; na mesa, o kit sai da gordura.",
+  });
+  return adapted;
 }
 
 /** Embaralha sem sorteio de verdade (o mesmo no servidor e no navegador). */

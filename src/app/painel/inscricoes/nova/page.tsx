@@ -5,14 +5,15 @@ import { MemberWizard } from "@/components/registration/member-wizard";
 import { PageHeader } from "@/components/staff/panel-ui";
 import { Button } from "@/components/ui/button";
 import { db } from "@/server/db";
-import { getKitSupply } from "@/server/services/kit-waitlist";
+import { WalkInKitNotice } from "@/components/registration/walk-in-kit-notice";
+import { getStaffKitSupply } from "@/server/services/kit-waitlist";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Cadastro na hora" };
 
 export default async function StaffRegistrationPage() {
   await requirePageActor("registerAtEvent");
-  const kitSupply = await getKitSupply(db);
+  const kitSupply = await getStaffKitSupply(db);
   return (
     <div>
       <PageHeader
@@ -27,6 +28,7 @@ export default async function StaffRegistrationPage() {
           </Button>
         }
       />
+      {kitSupply?.extra ? <WalkInKitNotice free={kitSupply.extra.free} /> : null}
       <MemberWizard mode="staff" kitSupply={kitSupply} />
     </div>
   );

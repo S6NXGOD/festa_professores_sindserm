@@ -51,7 +51,8 @@ describe("menu do painel", () => {
     expect(pages.length).toBeGreaterThan(15);
     for (const file of pages) {
       const source = readFileSync(file, "utf8");
-      const guarded = source.includes("requirePageActor(") || source.includes("requireGateActor(");
+      // requireDeskActor: a mesa dos kits (Kits: editar), que também pede o treino da mesa antes.
+      const guarded = source.includes("requirePageActor(") || source.includes("requireGateActor(") || source.includes("requireDeskActor(");
       const onlyRedirects = source.includes("redirect(") && !source.includes("return (");
       expect(guarded || onlyRedirects, path.relative(APP, file)).toBe(true);
     }
@@ -61,6 +62,7 @@ describe("menu do painel", () => {
     expect(visibleLabels(ROLE_PRESETS.ADMIN)).toHaveLength(NAV_ITEMS.length);
     expect(visibleLabels(ROLE_PRESETS.ATTENDANT)).toEqual(["Placar", "Portaria", "Entradas", "Kits e estoque", "Inscrições", "Fichas de filiação"]);
     expect(visibleLabels(ROLE_PRESETS.SECURITY)).toEqual(["Portaria"]);
+    expect(visibleLabels(ROLE_PRESETS.KIT_DESK)).toEqual(["Portaria", "Kits e estoque"]);
     expect(can(ROLE_PRESETS.SECURITY, "viewPanel")).toBe(false);
   });
 

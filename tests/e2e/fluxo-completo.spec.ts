@@ -1697,4 +1697,129 @@ test.describe.serial("festa das professoras e professores", () => {
     });
     await context.close();
   });
+
+  test("mesa dos kits: a portaria só registra a entrada, a mesa treina, confere e entrega; gordura para quem se inscreve na hora", async ({ browser }) => {
+    test.setTimeout(240_000);
+    const DESK = { name: "Marta Mesa Kits", email: "mesa@e2e.test", password: "senha-mesa-1234" };
+    const WALK_IN = { name: "Rafaela Hora Gordura", cpf: "74185296355" };
+    const client = new pg.Client({ connectionString: E2E.databaseUrl });
+    await client.connect();
+    const { rows } = await client.query<{ closes: Date }>("SELECT registration_closes_at AS closes FROM event_config WHERE id = 1");
+    const adminContext = await browser.newContext();
+    const admin = await adminContext.newPage();
+    await login(admin, ADMIN);
+
+    try {
+      await test.step("o administrador manda os kits para a mesa, cadastra a gordura e cria a pessoa da mesa", async () => {
+        await admin.goto("/painel/kits");
+        const settings = admin.getByTestId("kit-desk-settings");
+        await settings.getByTestId("kits-at-desk").click();
+        await settings.getByTestId("extra-total").fill("5");
+        await settings.getByTestId("kit-desk-save").click();
+        await expect(admin.getByText("Salvo.")).toBeVisible();
+        await expect(settings.getByTestId("extra-math")).toContainText("5 na gordura");
+        await admin.goto("/painel/usuarios");
+        await createStaffUser(admin, DESK, /^Mesa dos kits/);
+        await expect(admin.getByTestId("user-row").filter({ hasText: DESK.email })).toContainText("Mesa: treino pendente");
+      });
+
+      // As inscrições do site fecharam: quem a equipe cadastrar agora é "na hora".
+      await client.query("UPDATE event_config SET registration_closes_at = now() - interval '1 minute' WHERE id = 1");
+
+      const attendantContext = await browser.newContext({ ...devices["Pixel 7"] });
+      const gate = await attendantContext.newPage();
+      await test.step("cadastro na hora: aviso da gordura, selo amarelo e a portaria manda à mesa", async () => {
+        await login(gate, ATTENDANT);
+        await gate.goto(`/portaria/cadastro?nome=${encodeURIComponent(WALK_IN.name)}`);
+        await expect(gate.getByTestId("walk-in-kit-notice")).toContainText("5");
+        await gate.getByTestId("quick-cpf").fill(WALK_IN.cpf);
+        await gate.getByTestId("quick-whatsapp").fill("86977776666");
+        await gate.getByTestId("quick-registration-number").fill("HORA-2026");
+        await gate.getByTestId("quick-workplace").fill("Escola Municipal Hora");
+        await gate.getByTestId("teacher-yes").click();
+        await gate.locator("label[for=quick-consent]").click();
+        await gate.getByTestId("quick-submit").click();
+        await expect(gate.getByTestId("gate-person-name")).toHaveText(WALK_IN.name);
+        await gate.getByTestId("confirm-affiliation").click();
+        await gate.getByTestId("confirm-dialog-action").click();
+        const prompt = gate.getByTestId("entry-prompt");
+        await expect(prompt.getByTestId("prompt-kit")).toContainText("Pega na mesa");
+        await expect(prompt.getByTestId("prompt-kit")).toContainText("gordura");
+        await prompt.getByTestId("prompt-confirm-entry").click();
+        await confirmEarlyEntry(gate);
+        await expect(gate.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
+        await expect(gate.getByTestId("entry-kit-result")).toContainText("Kit na mesa!");
+        await expect(gate.getByTestId("walk-in-stamp").first()).toBeVisible();
+      });
+      await attendantContext.close();
+
+      const deskContext = await browser.newContext({ ...devices["Pixel 7"] });
+      const desk = await deskContext.newPage();
+      await test.step("a pessoa da mesa treina antes (nada é gravado): errou, a situação volta no fim", async () => {
+        await login(desk, DESK, { keepTraining: true });
+        await expect(desk).toHaveURL(/\/portaria\/mesa\/treino$/);
+        await desk.getByTestId("desk-training-start").click();
+        const mission = desk.getByTestId("desk-training-mission");
+        await expect(mission).toHaveAttribute("data-mission", "basico");
+        // Nome parecido: abrir a pessoa errada é erro (conferir antes).
+        await desk.getByTestId("desk-training-search").fill("Lima");
+        await desk.getByTestId("desk-training-result").filter({ hasText: "Ana Lia Lima Souto" }).click();
+        await expect(desk.getByTestId("desk-training-feedback")).toHaveAttribute("data-right", "false");
+        await desk.getByTestId("desk-training-next").click();
+        let guard = 0;
+        while ((await desk.getByTestId("desk-training-done").count()) === 0 && guard++ < 12) {
+          await expect(desk.getByTestId("desk-training-hint")).toBeVisible();
+          const id = await mission.getAttribute("data-mission");
+          await desk.getByTestId("desk-training-hint").click();
+          await desk.locator('[data-testid="desk-training-result"][data-right="true"]').click();
+          if (id === "ja-pegou" || id === "nao-entrou") {
+            await desk.getByTestId("desk-training-choice-right").click();
+          } else {
+            await desk.getByTestId("desk-deliver").click();
+            if (id === "na-hora" || id === "menor") await desk.getByTestId("desk-training-crate-right").click();
+          }
+          await expect(desk.getByTestId("desk-training-feedback")).toHaveAttribute("data-right", "true");
+          await desk.getByTestId("desk-training-next").click();
+          await expect
+            .poll(async () => (await desk.getByTestId("desk-training-done").count()) > 0 || (await mission.getAttribute("data-mission").catch(() => id)) !== id)
+            .toBe(true);
+        }
+        const score = await desk.getByTestId("desk-training-score").textContent();
+        const [first, total] = (score ?? "").match(/\d+/g)!.map(Number);
+        expect(first).toBe(total! - 1);
+        await expect(desk.getByTestId("desk-training-go")).toBeEnabled();
+        await desk.getByTestId("desk-training-go").click();
+        await expect(desk).toHaveURL(/\/portaria\/mesa$/);
+      });
+
+      await test.step("na mesa: acha quem a portaria liberou, entrega o kit da gordura e não entrega de novo", async () => {
+        await expect(desk.getByTestId("desk-queue-item").filter({ hasText: WALK_IN.name })).toBeVisible();
+        await expect(desk.getByTestId("desk-extra")).toContainText("5");
+        await desk.getByTestId("desk-search-input").fill("Rafaela Hora");
+        await desk.getByTestId("desk-search-result").filter({ hasText: WALK_IN.name }).click();
+        const card = desk.getByTestId("desk-card");
+        await expect(card.getByTestId("desk-status-title")).toHaveText("VALIDADA NA ENTRADA");
+        await expect(card.getByTestId("walk-in-stamp")).toBeVisible();
+        await expect(card.getByTestId("desk-kit")).toHaveAttribute("data-pool", "extra");
+        await card.getByTestId("desk-deliver").click();
+        await expect(desk.getByTestId("desk-status-title")).toHaveText("KIT ENTREGUE");
+        await expect(desk.getByTestId("desk-delivered")).toContainText("Restam 4 na gordura");
+        await expect(desk.getByTestId("desk-extra")).toContainText("4");
+        await expect(desk.getByTestId("desk-queue-item").filter({ hasText: WALK_IN.name })).toHaveCount(0);
+        await desk.getByTestId("desk-next").click();
+        await desk.getByTestId("desk-search-input").fill("Rafaela Hora");
+        await desk.getByTestId("desk-search-result").filter({ hasText: WALK_IN.name }).click();
+        await expect(desk.getByTestId("desk-status-title")).toHaveText("KIT JÁ ENTREGUE");
+        await expect(desk.getByTestId("desk-deliver")).toHaveCount(0);
+        // A pessoa da mesa não chega à tela de registrar entradas.
+        await desk.goto("/portaria");
+        await expect(desk).toHaveURL(/\/portaria\/mesa$/);
+      });
+      await deskContext.close();
+    } finally {
+      await client.query("UPDATE event_config SET registration_closes_at = $1, kits_at_desk = false WHERE id = 1", [rows[0]!.closes]);
+      await client.end();
+      await adminContext.close();
+    }
+  });
 });

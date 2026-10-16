@@ -54,8 +54,10 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
   const isEmployee = card.kind === "EMPLOYEE";
   const category: EmployeeCategory = card.category ?? "STAFF";
   const metal = METAL[category];
-  const accent = isEmployee ? metal.accent : RED;
-  const glowRgb = isEmployee ? metal.rgb : "255,38,38";
+  // Inscrição na hora: voucher amarelo (kit da gordura), para a mesa dos kits reconhecer de longe.
+  const walkIn = Boolean(card.walkIn) && !isEmployee;
+  const accent = isEmployee ? metal.accent : walkIn ? "#ffd23f" : RED;
+  const glowRgb = isEmployee ? metal.rgb : walkIn ? "255,210,63" : "255,38,38";
   // Na faixa do kit, só o primeiro nome: o nome completo já está no voucher de cada pessoa.
   const guestFirst = card.guestName ? firstName(card.guestName) : null;
   const kitLine = isEmployee
@@ -64,7 +66,11 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
       : guestFirst
         ? `2 kits de consumação: o seu e o de ${guestFirst}`
         : "1 kit de consumação"
-    : card.kitWaitlist?.self
+    : walkIn
+      ? isMember && guestFirst
+        ? `Kits da gordura: o seu e o de ${guestFirst}`
+        : "1 kit da gordura (inscrição na hora)"
+      : card.kitWaitlist?.self
       ? `Kit na fila do kit (nº ${card.kitWaitlist.self}): sai se vagar`
       : isMember
         ? card.isTeacher
@@ -136,8 +142,8 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
               >
                 {tag}
               </div>
-              <div style={{ display: "flex", fontFamily: "Pixel", fontSize: 28, letterSpacing: 2, color: isEmployee ? metal.accent : "#a8a49e" }}>
-                {isEmployee ? (category === "COURTESY" ? "CONVITE ESPECIAL" : "PASSE DA CASA") : "ADMIT ONE"}
+              <div style={{ display: "flex", fontFamily: "Pixel", fontSize: 28, letterSpacing: 2, color: isEmployee ? metal.accent : walkIn ? "#ffd23f" : "#a8a49e" }}>
+                {isEmployee ? (category === "COURTESY" ? "CONVITE ESPECIAL" : "PASSE DA CASA") : walkIn ? "NA HORA" : "ADMIT ONE"}
               </div>
             </div>
             <div

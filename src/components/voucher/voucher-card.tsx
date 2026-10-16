@@ -1,5 +1,5 @@
 import { FestaEmblem, UnionLogo } from "@/components/brand/brand";
-import { Calendar, ClipboardNote, Gift, Heart, Hourglass, Info, Login, MapPin, Star, Warning, Whatsapp } from "@/components/icons/pixel";
+import { Calendar, ClipboardNote, Gift, Heart, Hourglass, Info, Login, MapPin, Star, Warning, Whatsapp, Zap } from "@/components/icons/pixel";
 import { PlayerTag } from "@/components/retro/bits";
 import { EMPLOYEE_CATEGORY_LABEL, EMPLOYEE_CATEGORY_TITLE, employeeTitleLine } from "@/domain/labels";
 import type { EmployeeCategory } from "@/domain/types";
@@ -18,6 +18,8 @@ export interface VoucherEventInfo {
   venueName?: string | null;
   /** WhatsApp da organização para dúvidas (aparece no rodapé do voucher). */
   helpWhatsapp?: string | null;
+  /** O kit sai na mesa dos kits, depois da entrada (e não junto com ela). */
+  kitsAtDesk?: boolean;
 }
 
 /** Dados do evento que aparecem no voucher. */
@@ -29,6 +31,7 @@ export function voucherEventFrom(event: EventInfo): VoucherEventInfo {
     kitDeadlineLabel: event.kitDeadline?.label ?? null,
     venueName: event.venue?.name ?? null,
     helpWhatsapp: event.helpWhatsapp,
+    kitsAtDesk: event.kitsAtDesk,
   };
 }
 
@@ -58,16 +61,29 @@ export function VoucherCard({
   return (
     <article
       className={cn(
-        "relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border-2 border-red/60 bg-[#0e0e0f] text-fg shadow-[0_0_46px_-18px_var(--glow),0_30px_60px_-30px_rgb(0_0_0/0.9)] print:border-black print:bg-white print:text-black print:shadow-none",
+        "relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border-2 bg-[#0e0e0f] text-fg print:border-black print:bg-white print:text-black print:shadow-none",
+        // Inscrição na hora: o voucher é amarelo (kit da gordura), para a mesa dos kits reconhecer de longe.
+        card.walkIn
+          ? "border-[#ffd23f]/85 shadow-[0_0_46px_-16px_rgb(255_210_63/0.6),0_30px_60px_-30px_rgb(0_0_0/0.9)]"
+          : "border-red/60 shadow-[0_0_46px_-18px_var(--glow),0_30px_60px_-30px_rgb(0_0_0/0.9)]",
         className,
       )}
       aria-label={`Voucher de ${card.fullName}`}
       data-testid="voucher-card"
+      data-walk-in={card.walkIn ? "true" : undefined}
     >
       <div className="relative bg-ink print:bg-white">
         <FestaEmblem className="mx-auto w-[82%] pt-2" sizes="320px" eager={eager} />
         <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0e0e0f] to-transparent print:hidden" />
       </div>
+      {card.walkIn ? (
+        <p
+          className="pixel relative bg-[#ffd23f] py-2 text-center text-[0.62rem] text-[#1a1033] print:border-y print:border-black"
+          data-testid="voucher-walk-in"
+        >
+          Inscrição na hora · kit da gordura
+        </p>
+      ) : null}
 
       <div className="relative px-5 pt-1 pb-4">
         <div className="flex items-center justify-between gap-2">
@@ -103,6 +119,12 @@ export function VoucherCard({
               Entrada registrada {formatShortDateTime(card.checkedInAt)}
             </Note>
           ) : null}
+          {card.walkIn ? (
+            <Note tone="warning" icon={Zap} testId="voucher-walk-in-note">
+              <strong className="font-bold">Inscrição feita na hora:</strong> o seu kit é o da gordura.{" "}
+              {event.kitsAtDesk ? "Pegue na mesa dos kits, depois da entrada." : "Ele sai na entrada, como o de todo mundo."}
+            </Note>
+          ) : null}
           {isMember ? <MemberNotes card={card} active={active} kitDeadline={event.kitDeadlineLabel} /> : null}
           {!isMember && card.kitWaitlist?.self ? (
             <Note tone="warning" icon={Hourglass} testId="voucher-guest-kit">
@@ -115,8 +137,14 @@ export function VoucherCard({
             </Note>
           ) : !isMember ? (
             <Note tone="red" icon={Gift} testId="voucher-guest-kit">
-              <strong className="font-bold">Você tem direito a um kit de consumação.</strong> Ele é entregue na recepção depois que{" "}
-              {card.hostName ? properName(card.hostName) : "quem te convidou"} chegar.
+              <strong className="font-bold">Você tem direito a um kit de consumação.</strong>{" "}
+              {event.kitsAtDesk ? (
+                "Pegue na mesa dos kits, depois da sua entrada (não precisa esperar quem te convidou)."
+              ) : (
+                <>
+                  Ele é entregue na recepção depois que {card.hostName ? properName(card.hostName) : "quem te convidou"} chegar.
+                </>
+              )}
               {event.kitDeadlineLabel ? ` Seu kit fica guardado até as ${event.kitDeadlineLabel}.` : ""}
             </Note>
           ) : null}

@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CountUp } from "@/components/count-up";
 import { GateSearch } from "@/components/gate/gate-search";
-import { AlarmClock, ArrowRight, Clock, Heart, Login, QrCode, Search, Target, UserPlus, Users } from "@/components/icons/pixel";
+import { AlarmClock, ArrowRight, Clock, Heart, Login, Package, QrCode, Search, Target, UserPlus, Users } from "@/components/icons/pixel";
 import { Panel } from "@/components/retro/bits";
 import { DeadlineTimer } from "@/components/retro/countdown";
 import { LiveRefresh } from "@/components/retro/live-refresh";
 import { SegmentMeter } from "@/components/staff/panel-ui";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { can } from "@/domain/rules";
 import { db } from "@/server/db";
 import { getEventInfo } from "@/server/queries/config";
@@ -19,6 +21,8 @@ export const metadata: Metadata = { title: "Portaria" };
 export default async function GateHomePage() {
   // O layout também verifica, mas páginas podem renderizar em paralelo ao layout.
   const actor = await requireGateActor("viewGate");
+  // Mesa dos kits (entrega kits e não registra entradas): a tela dela é a mesa.
+  if (can(actor.access, "deliverKits") && !can(actor.access, "checkIn")) redirect("/portaria/mesa");
   const [stats, event] = await Promise.all([getDashboardStats(db), getEventInfo()]);
   const notStarted = event ? !event.started : false;
   // Cadastro rápido de quem chegou sem inscrição: quem cuida das inscrições (Atendimento).
@@ -107,6 +111,28 @@ export default async function GateHomePage() {
           courtesyHref={canCourtesy ? "/portaria/cortesia" : null}
         />
       </Panel>
+
+      {can(actor.access, "deliverKits") ? (
+        <Link
+          href="/portaria/mesa"
+          className={cn(
+            "group flex items-center gap-3 rounded-xl border bg-surface px-4 py-3 outline-none hover:border-red/50 focus-visible:ring-2 focus-visible:ring-red",
+            event?.kitsAtDesk ? "border-success/50" : "border-line",
+          )}
+          data-testid="open-kit-desk"
+        >
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-success-text">
+            <Package className="size-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold text-fg">Mesa dos kits</span>
+            <span className="block text-xs text-fg-muted">
+              {event?.kitsAtDesk ? "Hoje o kit sai na mesa: confira quem entrou e entregue" : "Entregue o kit de quem ficou sem kit na entrada"}
+            </span>
+          </span>
+          <ArrowRight className="size-5 text-fg-dim transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      ) : null}
 
       {can(actor.access, "checkIn") ? (
         <Link

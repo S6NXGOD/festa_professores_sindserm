@@ -1,7 +1,7 @@
 export const AFFILIATION_STATUSES = ["PENDING", "AWAITING_SIGNATURE", "CONFIRMED", "REJECTED", "JOINED_AT_EVENT"] as const;
 export type AffiliationStatus = (typeof AFFILIATION_STATUSES)[number];
 
-export const STAFF_ROLES = ["ADMIN", "ATTENDANT", "SECURITY"] as const;
+export const STAFF_ROLES = ["ADMIN", "ATTENDANT", "SECURITY", "KIT_DESK"] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
 /**
@@ -29,7 +29,8 @@ export type GroupKitType = Exclude<KitType, "EMPLOYEE">;
 export type EmployeeKitType = Exclude<KitType, "MEMBER">;
 /** UNIFIED: um estoque só para todos (professoras, professores, convidados, colaboradores e cortesias). */
 export type StockMode = "SINGLE" | "SPLIT" | "UNIFIED";
-export type StockPool = "ALL" | "MEMBER" | "GUEST" | "EMPLOYEE";
+/** EXTRA: a "gordura", estoque separado do oficial para quem se inscreve na hora. */
+export type StockPool = "ALL" | "MEMBER" | "GUEST" | "EMPLOYEE" | "EXTRA";
 export type ParticipantRole = "MEMBER" | "GUEST" | "EMPLOYEE";
 export type CheckInMethod = "QR" | "SEARCH" | "CODE";
 /** De onde veio a inscrição (mesmos valores do banco). */

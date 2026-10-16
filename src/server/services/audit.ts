@@ -43,6 +43,8 @@ export const AUDIT_ACTIONS = {
   KIT_WAITLISTED: "Kit na fila (kits esgotados)",
   KIT_WAITLIST_PROMOTED: "Kit saiu da fila (vagou kit)",
   KIT_LEFTOVER_RELEASED: "Kit de sobra liberado para quem estava na fila",
+  KIT_EXTRA_ASSIGNED: "Inscrição na hora: kit da gordura",
+  KIT_DESK_SETTINGS_UPDATED: "Mesa dos kits e gordura alteradas",
   KIT_PLAN_UPDATED: "Montagem dos kits alterada",
   VOUCHER_REISSUED: "Voucher reemitido",
   PERSON_CORRECTED: "Cadastro corrigido",

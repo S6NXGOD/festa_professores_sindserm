@@ -24,6 +24,7 @@ import type {
 } from "@/domain/types";
 import { type Actor, assertPermission, type StaffActor } from "./actor";
 import { writeAudit } from "./audit";
+import { evaluateDeskKit } from "./desk-kit";
 import { DomainError, isUniqueViolation } from "./errors";
 import {
   cancelDeliveryInTx,
@@ -57,7 +58,7 @@ export async function lockPersonState(tx: Tx, personId: string): Promise<PersonS
  * mesma ordem da entrega de kits (grupo → pessoa), para a entrada e o kit
  * nunca correrem em paralelo com outra operação do grupo.
  */
-async function lockPersonWithGroups(tx: Tx, personId: string): Promise<PersonState> {
+export async function lockPersonWithGroups(tx: Tx, personId: string): Promise<PersonState> {
   const preview = await loadPersonState(tx, personId);
   if (!preview) throw new DomainError("NOT_FOUND", "Pessoa não encontrada.");
   const registrationIds = [preview.ownRegistration?.id, preview.guestOf?.host.id]
@@ -91,7 +92,9 @@ export type EntryKitResult =
   | { kind: "DELIVERED"; kitType: KitType; beneficiaryName: string; available: number; low: boolean; pool: StockPool }
   /** Kit do convidado que chegou antes do(a) professor(a): sai quando ele(a) chegar. */
   | { kind: "WAITING"; message: string }
-  | { kind: "NONE"; message: string };
+  | { kind: "NONE"; message: string }
+  /** Mesa dos kits: a entrada não entrega kit; a pessoa pega na mesa. `extra` = kit da gordura (inscrição na hora). */
+  | { kind: "DESK"; message: string; extra: boolean };
 
 export type CheckInResult =
   | {
@@ -201,6 +204,21 @@ async function deliverEmployeeKitsOnEntry(
   return { kit, guestKit };
 }
 
+/** Mesa dos kits: o que a portaria fala para a pessoa (o kit não sai aqui). */
+function deskEntryKit(state: PersonState, role: ParticipantRole, config: EventConfig, now: Date): EntryKitResult {
+  const desk = evaluateDeskKit(state, config, now, null, { enteringAs: role });
+  if (desk.kind === "READY") {
+    return {
+      kind: "DESK",
+      extra: desk.extra,
+      message: desk.extra ? "Kit da gordura (inscrição na hora): pega na mesa dos kits." : "Pega o kit na mesa dos kits.",
+    };
+  }
+  if (desk.kind === "DELIVERED") return { kind: "NONE", message: ENTRY_KIT_MESSAGE.ALREADY };
+  if (desk.kind === "BLOCKED") return { kind: "NONE", message: desk.message };
+  return { kind: "NONE", message: "Sem kit." };
+}
+
 /**
  * Os kits saem junto com as entradas. Quem convidou (professor(a) ou
  * funcionário(a)) recebe o próprio kit ao entrar. O kit do convidado só sai
@@ -296,13 +314,18 @@ export async function registerCheckIn(
           checkedInByUserId: actor.userId,
         })
         .returning({ id: checkIn.id, checkedInAt: checkIn.checkedInAt });
-      const { kit, guestKit } = await deliverKitsOnEntry(tx, actor, state, role, now);
+      // Mesa dos kits: a segurança só registra a entrada; o kit sai na mesa (cada pessoa pega o seu).
+      const { kit, guestKit } = config?.kitsAtDesk
+        ? { kit: deskEntryKit(state, role, config, now), guestKit: null }
+        : await deliverKitsOnEntry(tx, actor, state, role, now);
       const kitSummary =
         kit.kind === "DELIVERED"
           ? " com kit entregue."
           : kit.kind === "WAITING"
             ? `. O kit fica para a chegada de ${hostName ?? "quem convidou"}.`
-            : `. ${kit.message}`;
+            : kit.kind === "DESK"
+              ? `. O kit${kit.extra ? " (gordura)" : ""} sai na mesa dos kits.`
+              : `. ${kit.message}`;
       const who =
         role === "MEMBER"
           ? "filiado(a)"

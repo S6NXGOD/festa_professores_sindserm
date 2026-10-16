@@ -33,6 +33,16 @@ export function gateTrainingRequired(access: AccessMap): boolean {
   return can(access, "checkIn") && !can(access, "manageUsers");
 }
 
+/** Treino da mesa dos kits obrigatório: quem entrega kits e não administra o acesso ao sistema. */
+export function deskTrainingRequired(access: AccessMap): boolean {
+  return can(access, "deliverKits") && !can(access, "manageUsers");
+}
+
+/** Só a mesa dos kits: entrega kits e não registra entradas (o tutorial pula a portaria). */
+function deskOnly(access: AccessMap): boolean {
+  return can(access, "deliverKits") && !can(access, "checkIn");
+}
+
 function firstNameOf(name: string) {
   return name.trim().split(/\s+/)[0] ?? name;
 }
@@ -124,7 +134,7 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
   );
 
   add(
-    can(access, "viewGate")
+    can(access, "viewGate") && !deskOnly(access)
       ? {
           id: "portaria",
           scene: "gate",
@@ -140,7 +150,7 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
             "A tela diz na hora: LIBERADO, ou o motivo do bloqueio e o que fazer.",
             ...(can(access, "checkIn")
               ? [
-                  "Toque em Confirmar entrada: os kits saem junto e o estoque baixa sozinho.",
+                  "Toque em Confirmar entrada: o kit sai junto (ou, quando a festa usa a mesa dos kits, a tela manda a pessoa para a mesa).",
                   "Antes do horário da festa, o sistema pede uma confirmação a mais.",
                   ...(can(access, "manageGuests") || can(access, "manageEmployees")
                     ? ["Colaborador(a) chegou com alguém sem direito a kit? Abra o nome dele(a) e toque em Convidado sem kit."]
@@ -165,6 +175,26 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
               : "Dá para repetir quando quiser: menu do seu nome → Treino da portaria.",
           ],
           action: { href: "/portaria/treino", label: "Treinar agora" },
+        }
+      : null,
+  );
+
+  add(
+    can(access, "deliverKits")
+      ? {
+          id: "mesa",
+          scene: "training",
+          title: "Mesa dos kits",
+          bullets: [
+            "A segurança registra a entrada; a pessoa vem à mesa buscar o kit.",
+            "Ache a pessoa pelo nome, CPF ou código do voucher (ou toque no nome na fila da mesa) e confira se foi validada na entrada.",
+            "Toque em Entregar kit: o estoque baixa e o kit não sai de novo para ela.",
+            "Voucher amarelo (Inscrição na hora): o kit é o da caixa da gordura.",
+            deskTrainingRequired(access)
+              ? "Antes de abrir a mesa, tem um treino rápido com uma entrega de mentira (nada fica gravado)."
+              : "Tem um treino rápido com uma entrega de mentira (nada fica gravado): Mesa dos kits → Treinar.",
+          ],
+          action: { href: "/portaria/mesa/treino", label: "Treinar a mesa" },
         }
       : null,
   );

@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import {
+  ArrowRight,
   Building,
   Cancel,
   Check,
@@ -11,6 +12,7 @@ import {
   Info,
   Loader,
   Login,
+  Package,
   type PixelIcon,
   Reload,
   Shield,
@@ -29,6 +31,7 @@ import { cn } from "@/lib/utils";
 import type { EntryKitResult } from "@/server/services/checkin";
 import type { GateView, KitOnEntry, KitView } from "@/server/services/gate-view";
 import { Disclosure } from "./disclosure";
+import { WalkInStamp } from "./walk-in-stamp";
 
 type Tone = "success" | "warning" | "danger";
 
@@ -245,6 +248,27 @@ export function KitOnEntryTile({
       </motion.div>
     );
   }
+  if (kit.kind === "AT_DESK") {
+    // Mesa dos kits: a portaria só confirma a entrada e manda a pessoa à mesa.
+    return (
+      <div
+        className={cn("flex items-center gap-3.5 rounded-xl border border-success/50 bg-success-soft px-3.5 py-3", className)}
+        data-testid={testId}
+        data-kit="desk"
+      >
+        <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-lg bg-success text-white">
+          <Package className="size-7" />
+        </span>
+        <div className="min-w-0">
+          <p className="pixel text-[0.5rem] text-success-text">Kit</p>
+          <p className="display mt-0.5 text-[1.65rem] leading-none text-fg">Pega na mesa</p>
+          <p className="mt-1 text-sm leading-snug text-fg-muted">
+            Confirme a entrada e mande para a mesa dos kits{kit.extra ? " (kit da gordura)" : ""}.
+          </p>
+        </div>
+      </div>
+    );
+  }
   const waiting = kit.kind === "WAITING";
   const reason = waiting ? kit.message : reasonText(kit.message);
   return (
@@ -263,6 +287,26 @@ export function KitOnEntryTile({
 
 /** Resultado dos kits na hora da entrada: a recepção vê de longe quantos entregar. */
 function EntryKitBanner({ kit, guestKit, courtesy = false }: { kit: EntryKitResult; guestKit: EntryKitResult | null; courtesy?: boolean }) {
+  if (kit.kind === "DESK") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.6, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 380, damping: 18, delay: 0.15 }}
+        className="relative mt-3 flex items-center gap-3 rounded-xl bg-ink/85 px-4 py-3 text-white"
+        data-testid="entry-kit-result"
+        data-kit="desk"
+      >
+        <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-success text-white">
+          <ArrowRight className="size-6" />
+        </span>
+        <div className="min-w-0">
+          <p className="display text-2xl leading-none">Kit na mesa!</p>
+          <p className="mt-1 text-sm font-semibold opacity-90">{kit.message}</p>
+        </div>
+      </motion.div>
+    );
+  }
   const count = deliveredKitCount(kit, guestKit);
   const waiting = kit.kind === "WAITING";
   const lines: string[] = [];
@@ -404,7 +448,7 @@ function DetailRows({ view }: { view: GateView }) {
       ) : null}
 
       {own && !isGuest ? (
-        <InfoRow icon={Gift} label="Kits de consumação (saem na entrada)">
+        <InfoRow icon={Gift} label={view.kitsAtDesk ? "Kits de consumação (saem na mesa dos kits)" : "Kits de consumação (saem na entrada)"}>
           {own.isTeacher ? (
             <>
               <span className="block">
@@ -429,6 +473,8 @@ function DetailRows({ view }: { view: GateView }) {
             <span className="font-bold text-success-text">Entregue {formatShortDateTime(view.guestKit.deliveredAt)}.</span>
           ) : view.guestKit.deliveredForOther ? (
             <span className="text-fg-muted">O kit de convidado deste grupo já foi entregue a outra pessoa.</span>
+          ) : view.kitsAtDesk ? (
+            <span className="font-semibold text-fg">Pega na mesa dos kits, depois da entrada (não precisa esperar quem convidou).</span>
           ) : view.host && !view.host.checkedIn ? (
             <span className="font-semibold text-fg">
               Sai quando <strong>{view.host.fullName}</strong> chegar
@@ -561,6 +607,7 @@ export function GateResult({
                   MENOR DE 18
                 </ToneBadge>
               ) : null}
+              {view.walkIn ? <WalkInStamp /> : null}
             </div>
           ) : null}
           {/* No painel, o nome já está no cabeçalho do cadastro. */}

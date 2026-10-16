@@ -1,10 +1,11 @@
-import { Clock, Coins, Gift, Package } from "@/components/icons/pixel";
+import { Clock, Coins, Gift, Package, Zap } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { DeadlineTimer } from "@/components/retro/countdown";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { StockSettingsForm } from "@/components/settings/settings-forms";
 import { EmptyState, PageHeader, Pagination, Panel } from "@/components/staff/panel-ui";
+import { KitDeskSettings } from "@/components/staff/kit-desk-settings";
 import { KitRules } from "@/components/staff/kit-rules";
 import { KitWaitlistPanel } from "@/components/staff/kit-waitlist-panel";
 import { PeopleKits } from "@/components/staff/people-kits";
@@ -56,6 +57,13 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
                 <Coins /> Montagem e custo
               </Link>
             </Button>
+            {can(actor.access, "deliverKits") ? (
+              <Button asChild variant={stock?.kitsAtDesk ? "default" : "outline"}>
+                <Link href="/portaria/mesa" data-testid="open-kit-desk-panel">
+                  <Package /> Mesa dos kits
+                </Link>
+              </Button>
+            ) : null}
             <ReportButton type="kits" />
             {event?.kitDeadline ? (
               <span className="flex items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm font-semibold text-fg">
@@ -78,6 +86,20 @@ export default async function KitsPage({ searchParams }: PageProps<"/painel/kits
         canUnify={can(actor.access, "manageSettings")}
       />
       <KitWaitlistPanel queue={queue} shared={supply?.shared ?? true} canPeople={canPeople} canAdvance={can(actor.access, "deliverKits")} />
+      {stock ? (
+        <Panel title="Mesa dos kits e gordura" icon={Zap}>
+          <KitDeskSettings
+            initial={{ kitsAtDesk: stock.kitsAtDesk, extraTotal: stock.extra?.total ?? 0 }}
+            extra={{
+              total: stock.extra?.total ?? 0,
+              delivered: stock.extra?.delivered ?? 0,
+              committed: stock.extra?.committed ?? 0,
+              free: stock.extra?.free ?? 0,
+            }}
+            canEdit={can(actor.access, "manageSettings")}
+          />
+        </Panel>
+      ) : null}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Panel title="Saldo" icon={Gift}>
           {stock ? <StockCard stock={stock} demand={stats.kitDemand} waitlist={stats.kitWaitlist} /> : null}

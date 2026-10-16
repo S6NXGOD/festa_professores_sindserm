@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { can, homePathFor, type Permission, resolveAccess } from "@/domain/access";
-import { gateTrainingRequired } from "@/domain/tutorial";
+import { deskTrainingRequired, gateTrainingRequired } from "@/domain/tutorial";
 import { STAFF_ROLES } from "@/domain/types";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
@@ -24,6 +24,8 @@ export interface SessionActor extends StaffActor {
   tutorialSeen: boolean;
   /** Registra entradas e ainda não fez o treino relâmpago: a portaria abre só depois dele. */
   gateTrainingPending: boolean;
+  /** Entrega kits e ainda não fez o treino da mesa: a mesa dos kits abre só depois dele. */
+  deskTrainingPending: boolean;
 }
 
 export const getActor = cache(async (): Promise<SessionActor | null> => {
@@ -39,6 +41,7 @@ export const getActor = cache(async (): Promise<SessionActor | null> => {
       mustChangePassword: user.mustChangePassword,
       tutorialSeenAt: user.tutorialSeenAt,
       gateTrainingDoneAt: user.gateTrainingDoneAt,
+      deskTrainingDoneAt: user.deskTrainingDoneAt,
       deletedAt: user.deletedAt,
     })
     .from(user)
@@ -54,6 +57,7 @@ export const getActor = cache(async (): Promise<SessionActor | null> => {
     mustChangePassword: row.mustChangePassword,
     tutorialSeen: row.tutorialSeenAt !== null,
     gateTrainingPending: row.gateTrainingDoneAt === null && gateTrainingRequired(access),
+    deskTrainingPending: row.deskTrainingDoneAt === null && deskTrainingRequired(access),
   };
 });
 
@@ -73,6 +77,13 @@ export async function requirePageActor(permission?: Permission, options: { passw
 export async function requireGateActor(permission?: Permission): Promise<SessionActor> {
   const actor = await requirePageActor(permission);
   if (actor.gateTrainingPending) redirect("/portaria/treino");
+  return actor;
+}
+
+/** Mesa dos kits: quem ainda deve o treino da mesa faz antes (uma entrega de mentira, 1 minuto). */
+export async function requireDeskActor(): Promise<SessionActor> {
+  const actor = await requirePageActor("deliverKits");
+  if (actor.deskTrainingPending) redirect("/portaria/mesa/treino");
   return actor;
 }
 

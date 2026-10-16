@@ -180,7 +180,7 @@ export async function saveAffiliationForm(actor: Actor, rawInput: AffiliationFor
           await tx.update(registration).set({ isTeacher: data.isTeacher }).where(eq(registration.id, state.id));
           // Passou a ser professor(a): o kit dela(e) entra na conta (ou na fila, se acabaram).
           if (data.isTeacher) await allocateKitSlots(tx, actor, state.id, { member: true, guest: false });
-          else await tx.update(registration).set({ memberKitWaitlistedAt: null }).where(eq(registration.id, state.id));
+          else await tx.update(registration).set({ memberKitWaitlistedAt: null, memberKitExtraAt: null }).where(eq(registration.id, state.id));
         }
         if (data.documents) await linkDocumentsToForm(tx, form.id, data.documents);
         await writeAudit(tx, actor, {

@@ -8,6 +8,7 @@ import {
   employeeStockPool,
   isActiveMember,
   isLowEmployeeStock,
+  isLowExtraStock,
   isLowStock,
   kitAvailability,
   type KitRegistrationInput,
@@ -105,15 +106,25 @@ export async function hasEmployeeStock(tx: Tx): Promise<boolean> {
  * no grupo do(a) professor(a) e audita. Supõe a inscrição já travada e a
  * disponibilidade já conferida. Estoque zerado: DomainError OUT_OF_STOCK.
  */
+/** Onde a entrega aconteceu (vai para a auditoria). */
+export type DeliveryContext = "ENTRY" | "MANUAL" | "DESK";
+
+const WHERE_LABEL: Record<DeliveryContext, string> = { ENTRY: " na entrada", MANUAL: "", DESK: " na mesa dos kits" };
+
+/** De qual estoque sai um kit do grupo do(a) professor(a): gordura (inscrição na hora) ou o oficial do modo configurado. */
+export function registrationKitPool(state: RegistrationState, kitType: GroupKitType, config: Pick<EventConfig, "stockMode">): StockPool {
+  return state.kitExtra[kitType] ? "EXTRA" : stockPoolFor(config.stockMode, kitType);
+}
+
 export async function recordKitDelivery(
   tx: Tx,
   actor: StaffActor,
   state: RegistrationState,
   kitType: GroupKitType,
   config: EventConfig,
-  context: "ENTRY" | "MANUAL",
+  context: DeliveryContext,
 ): Promise<DeliveryResult> {
-  const pool = stockPoolFor(config.stockMode, kitType);
+  const pool = registrationKitPool(state, kitType, config);
   const stock = await takeFromStock(tx, pool);
 
   const beneficiary =
@@ -134,7 +145,7 @@ export async function recordKitDelivery(
     })
     .returning({ id: kitDelivery.id });
 
-  const where = context === "ENTRY" ? " na entrada" : "";
+  const where = WHERE_LABEL[context] + (pool === "EXTRA" ? " (gordura)" : "");
   await writeAudit(tx, actor, {
     action: "KIT_DELIVERED",
     entityType: "kit_delivery",
@@ -147,11 +158,12 @@ export async function recordKitDelivery(
   });
 
   const available = stock.total - stock.delivered;
+  const low = pool === "EXTRA" ? isLowExtraStock(available, stock.total) : isLowStock(available, config.lowStockThreshold);
   return {
     deliveryId: delivery!.id,
     kitType,
     beneficiaryName: beneficiary.fullName,
-    stock: { pool, ...stock, available, low: isLowStock(available, config.lowStockThreshold) },
+    stock: { pool, ...stock, available, low },
   };
 }
 
@@ -164,7 +176,7 @@ export async function recordEmployeeKitDelivery(
   actor: StaffActor,
   group: EmployeeGroupState,
   kitType: EmployeeKitType,
-  context: "ENTRY" | "MANUAL",
+  context: DeliveryContext,
 ): Promise<DeliveryResult> {
   const config = await getEventConfig(tx);
   // Estoque dos colaboradores ou, no estoque único para todos, o geral.
@@ -187,7 +199,7 @@ export async function recordEmployeeKitDelivery(
       deliveredByUserId: actor.userId,
     })
     .returning({ id: kitDelivery.id });
-  const where = context === "ENTRY" ? " na entrada" : "";
+  const where = WHERE_LABEL[context];
   await writeAudit(tx, actor, {
     action: "KIT_DELIVERED",
     entityType: "kit_delivery",
@@ -218,7 +230,10 @@ async function deliverEmployeeGroupKit(tx: Tx, actor: StaffActor, employeeId: st
   const group = await lockEmployeeGroupWithPeople(tx, employeeId);
   const config = await getEventConfig(tx);
   if (!config) throw new DomainError("INVALID_STATE", "Estoque não configurado.");
-  const availability = employeeKitAvailability(employeeKitInput(group, isKitDeadlinePassed(config, now)), kitType);
+  const availability = employeeKitAvailability(
+    employeeKitInput(group, isKitDeadlinePassed(config, now), { guestIndependent: config.kitsAtDesk }),
+    kitType,
+  );
   if (availability.kind === "DELIVERED") {
     throw new DomainError(
       "ALREADY_DELIVERED",
@@ -290,7 +305,8 @@ export async function deliverKit(
               : `Kit de sobra liberado para o convidado ${state.guest?.fullName ?? ""} (grupo de ${state.member.fullName}), que estava na fila do kit.`,
         });
       }
-      const availability = kitAvailability(kitInput(state, isKitDeadlinePassed(config, now)), kitType);
+      // Na mesa dos kits, o kit do convidado não espera quem convidou.
+      const availability = kitAvailability(kitInput(state, isKitDeadlinePassed(config, now), { guestIndependent: config.kitsAtDesk }), kitType);
       if (availability.kind === "DELIVERED") {
         throw new DomainError(
           "ALREADY_DELIVERED",
@@ -320,8 +336,8 @@ export async function cancelDeliveryInTx(tx: Tx, actor: StaffActor, deliveryId: 
     .update(kitDelivery)
     .set({ cancelledAt: new Date(), cancelledByUserId: actor.userId, cancelReason: reason })
     .where(eq(kitDelivery.id, delivery.id));
-  // Kits do grupo de funcionário(a) voltam para o estoque dos funcionários.
-  const pool = stockPoolFor(config.stockMode, delivery.kitType, Boolean(delivery.employeeId));
+  // Kits do grupo de funcionário(a) voltam para o estoque dos funcionários; os da gordura, para a gordura.
+  const pool = delivery.stockPool === "EXTRA" ? "EXTRA" : stockPoolFor(config.stockMode, delivery.kitType, Boolean(delivery.employeeId));
   await tx
     .update(kitStock)
     .set({ delivered: sql`${kitStock.delivered} - 1` })

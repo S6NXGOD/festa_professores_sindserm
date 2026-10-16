@@ -22,6 +22,7 @@ export default async function GateTrainingPage() {
         resolve: can(actor.access, "validateAffiliation"),
         kitDeadline: event?.kitDeadline?.label ?? null,
         minorKit: Boolean(plan?.minor),
+        kitsAtDesk: event?.kitsAtDesk ?? false,
       }}
     />
   );

@@ -11,6 +11,7 @@ import { enforceRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
 import {
   createStaffUser,
   deleteStaffUser,
+  finishDeskTraining,
   finishGateTraining,
   markPasswordChanged,
   markTutorialSeen,
@@ -33,6 +34,14 @@ export async function finishTutorialAction(): Promise<ActionResult> {
 export async function finishGateTrainingAction(): Promise<ActionResult> {
   return runAction(async () => {
     await finishGateTraining(db, await requireActionActor());
+    revalidatePath("/portaria", "layout");
+  });
+}
+
+/** Treino da mesa dos kits terminado (a entrega do treino não grava nada; só que a pessoa treinou). */
+export async function finishDeskTrainingAction(): Promise<ActionResult> {
+  return runAction(async () => {
+    await finishDeskTraining(db, await requireActionActor());
     revalidatePath("/portaria", "layout");
   });
 }

@@ -69,6 +69,8 @@ const EXPECTED: Record<StaffRole, Permission[]> = {
     "reissueVoucher",
   ],
   SECURITY: ["checkIn", "search"],
+  // Mesa dos kits: acha a pessoa (busca da portaria, só ver) e entrega o kit; não registra entradas.
+  KIT_DESK: ["search", "viewPanel", "deliverKits"],
 };
 
 async function expectDomainError(promise: Promise<unknown>, code: DomainError["code"]) {
@@ -94,6 +96,7 @@ describe("perfis-modelo = regras de antes", () => {
     expect(homePathFor(ROLE_PRESETS.ADMIN)).toBe("/painel");
     expect(homePathFor(ROLE_PRESETS.ATTENDANT)).toBe("/painel");
     expect(homePathFor(ROLE_PRESETS.SECURITY)).toBe("/portaria");
+    expect(homePathFor(ROLE_PRESETS.KIT_DESK)).toBe("/portaria/mesa");
   });
 
   it("permissões gravadas não dão acesso a mais: nível inválido vira 'sem acesso'; JSON quebrado cai no perfil", () => {

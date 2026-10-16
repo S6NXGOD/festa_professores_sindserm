@@ -8,7 +8,15 @@ import { COLLABORATOR_CATEGORIES, type CollaboratorCategory, type StockMode, typ
  * quem já entrou. A previsão por estoque é a mesma conta do cartão de estoque.
  */
 
-export type PeopleGroupId = "TEACHERS" | "TEACHER_GUESTS" | "OTHER_MEMBERS" | "EMPLOYEES" | "EMPLOYEE_GUESTS" | "COURTESIES" | "WITHOUT_KIT";
+export type PeopleGroupId =
+  | "TEACHERS"
+  | "TEACHER_GUESTS"
+  | "WALK_INS"
+  | "OTHER_MEMBERS"
+  | "EMPLOYEES"
+  | "EMPLOYEE_GUESTS"
+  | "COURTESIES"
+  | "WITHOUT_KIT";
 
 export interface PeopleGroupRow {
   id: PeopleGroupId;
@@ -42,6 +50,7 @@ export interface PeopleKitComparison {
 export const PEOPLE_GROUP_LABEL: Record<PeopleGroupId, string> = {
   TEACHERS: "Professoras e professores",
   TEACHER_GUESTS: "Convidados das professoras e professores",
+  WALK_INS: "Inscritos na hora (kit da gordura)",
   OTHER_MEMBERS: "Outras pessoas filiadas",
   EMPLOYEES: "Colaboradores do SINDSERM",
   EMPLOYEE_GUESTS: "Convidados dos colaboradores",
@@ -59,6 +68,8 @@ export function peopleGroupDetail(row: PeopleGroupRow, comparison: PeopleKitComp
       return "1 kit cada, com a filiação confirmada";
     case "TEACHER_GUESTS":
       return "1 kit cada, depois que quem convidou chega";
+    case "WALK_INS":
+      return "Inscrição feita na hora: 1 kit cada, do estoque gordura (fora da conta do oficial)";
     case "OTHER_MEMBERS":
       return "Não são professoras nem professores: entram sem kit";
     case "EMPLOYEES": {
@@ -128,6 +139,8 @@ export function kitDemandOf(comparison: PeopleKitComparison): Required<KitDemand
 export function poolDemand(pool: StockPool, demand: KitDemand, mode?: StockMode): number {
   if (pool === "ALL") return demand.member + demand.guest + (mode === "UNIFIED" ? (demand.employee ?? 0) : 0);
   if (pool === "EMPLOYEE") return demand.employee ?? 0;
+  // A gordura não entra na previsão do oficial: é de quem se inscreve na hora.
+  if (pool === "EXTRA") return 0;
   return pool === "MEMBER" ? demand.member : demand.guest;
 }
 
@@ -136,6 +149,7 @@ export const POOL_SHORT_LABEL: Record<StockPool, string> = {
   MEMBER: "de professoras e professores",
   GUEST: "de convidados",
   EMPLOYEE: "dos colaboradores",
+  EXTRA: "da gordura",
 };
 
 /** Previsão x estoque cadastrado, por estoque: quanto sobra (positivo) ou falta (negativo). */

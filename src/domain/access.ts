@@ -53,9 +53,9 @@ export const MODULE_INFO: Record<AccessModule, { label: string; levels: readonly
     label: "Portaria",
     levels: ["none", "view", "edit"],
     view: "Buscar pessoas e ver a situação de cada uma",
-    edit: "Registrar entradas (os kits saem junto)",
+    edit: "Registrar entradas (o kit sai junto ou na mesa dos kits, como estiver configurado)",
   },
-  kits: { label: "Kits e estoque", levels: ["none", "view", "edit"], view: "Ver entregas e estoque", edit: "Entregar kits fora da entrada" },
+  kits: { label: "Kits e estoque", levels: ["none", "view", "edit"], view: "Ver entregas e estoque", edit: "Entregar kits (mesa dos kits e fora da entrada)" },
   inscricoes: {
     label: "Inscrições",
     levels: ["none", "view", "edit"],
@@ -122,6 +122,12 @@ export const ROLE_PRESETS: Record<StaffRole, AccessMap> = {
     gateCourtesy: false,
   },
   SECURITY: { modules: allModules((module) => (module === "portaria" ? "edit" : "none")), fullCpf: false, gateCourtesy: false },
+  // Mesa dos kits: acha a pessoa (busca e QR da portaria, só ver) e entrega o kit. Não registra entradas.
+  KIT_DESK: {
+    modules: allModules((module) => (module === "kits" ? "edit" : module === "portaria" ? "view" : "none")),
+    fullCpf: false,
+    gateCourtesy: false,
+  },
 };
 
 const RANK: Record<AccessLevel, number> = { none: 0, view: 1, edit: 2 };
@@ -246,9 +252,11 @@ export function isCustomAccess(role: StaffRole, stored: string | null | undefine
 
 /** Onde a pessoa cai ao entrar: a primeira área que ela pode ver. */
 export function homePathFor(access: AccessMap): string {
+  // Quem entrega kits e não registra entradas (mesa dos kits) cai direto na mesa.
+  const deskOnly = atLeast(access.modules.kits, "edit") && !atLeast(access.modules.portaria, "edit");
   const order: [AccessModule, string][] = [
     ["placar", "/painel"],
-    ["portaria", "/portaria"],
+    ["portaria", deskOnly ? "/portaria/mesa" : "/portaria"],
     ["entradas", "/painel/entradas"],
     ["inscricoes", "/painel/inscricoes"],
     ["fichas", "/painel/filiacoes"],

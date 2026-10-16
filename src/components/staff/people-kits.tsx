@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { CountUp } from "@/components/count-up";
-import { Building, Copy, Heart, Human, Login, type PixelIcon, Teach, Users, Whatsapp } from "@/components/icons/pixel";
+import { Building, Copy, Heart, Human, Login, type PixelIcon, Teach, Users, Whatsapp, Zap } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import {
   GROUPS_WITHOUT_KIT,
@@ -29,6 +29,7 @@ import { StockMath } from "./stock-math";
 const GROUP_STYLE: Record<PeopleGroupId, { icon: PixelIcon; badge: string }> = {
   TEACHERS: { icon: Teach, badge: "bg-red text-white shadow-[0_2px_0_0_var(--brand-strong)]" },
   TEACHER_GUESTS: { icon: Users, badge: "border border-red/45 bg-brand-soft text-red" },
+  WALK_INS: { icon: Zap, badge: "border border-[#ffd23f]/60 bg-[#ffd23f]/15 text-[#ffd23f]" },
   OTHER_MEMBERS: { icon: Human, badge: "border border-line-strong bg-surface-3 text-fg-muted" },
   EMPLOYEES: { icon: Building, badge: "border border-warning/50 bg-warning/15 text-warning" },
   EMPLOYEE_GUESTS: { icon: Users, badge: "border border-warning/35 bg-warning-soft text-warning" },
@@ -76,7 +77,7 @@ export function PeopleKits({
   const demand = kitDemandOf(comparison);
   const planned = demand.member + demand.guest + demand.employee;
   const hrefFor = (id: PeopleGroupId) =>
-    id === "TEACHERS" || id === "TEACHER_GUESTS" || id === "OTHER_MEMBERS"
+    id === "TEACHERS" || id === "TEACHER_GUESTS" || id === "WALK_INS" || id === "OTHER_MEMBERS"
       ? links.registrations
         ? "/painel/inscricoes?filtro=todas"
         : null

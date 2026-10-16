@@ -480,6 +480,7 @@ export async function listStaffUsers() {
       permissions: user.permissions,
       mustChangePassword: user.mustChangePassword,
       gateTrainingDoneAt: user.gateTrainingDoneAt,
+      deskTrainingDoneAt: user.deskTrainingDoneAt,
       createdAt: user.createdAt,
     })
     .from(user)

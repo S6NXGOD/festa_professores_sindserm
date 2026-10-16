@@ -122,11 +122,11 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
                OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS entitled_guest,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${EXPECTED_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL
+        WHERE r.status IN ${EXPECTED_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL AND r.guest_kit_extra_at IS NULL
           AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
                OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS demand_guest,
-      (SELECT count(*) FROM registration WHERE status IN ${EXPECTED_STATUSES} AND is_teacher AND member_kit_waitlisted_at IS NULL)::int AS demand_member,
+      (SELECT count(*) FROM registration WHERE status IN ${EXPECTED_STATUSES} AND is_teacher AND member_kit_waitlisted_at IS NULL AND member_kit_extra_at IS NULL)::int AS demand_member,
       (SELECT count(*) FROM registration WHERE status IN ${EXPECTED_STATUSES} AND is_teacher AND member_kit_waitlisted_at IS NOT NULL)::int AS waitlist_member,
       (SELECT count(*) FROM registration r
         WHERE r.status IN ${EXPECTED_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL
@@ -205,13 +205,25 @@ export async function getPeopleKitComparison(ex: Executor): Promise<PeopleKitCom
       SELECT DISTINCT person_id FROM check_in WHERE cancelled_at IS NULL
     ),
     expected_regs AS (
-      SELECT id, member_person_id, status, is_teacher, member_kit_waitlisted_at, guest_kit_waitlisted_at FROM registration WHERE status IN ${EXPECTED_STATUSES}
+      SELECT id, member_person_id, status, is_teacher, member_kit_waitlisted_at, guest_kit_waitlisted_at, member_kit_extra_at, guest_kit_extra_at
+        FROM registration WHERE status IN ${EXPECTED_STATUSES}
     ),
+    -- Inscritos na hora com kit da gordura: linha própria (fora da conta do oficial).
     teacher_guests AS (
       SELECT gl.guest_person_id AS person_id
         FROM guest_link gl
         JOIN expected_regs r ON r.id = gl.registration_id
-       WHERE gl.status = 'ACTIVE'
+       WHERE gl.status = 'ACTIVE' AND r.guest_kit_extra_at IS NULL
+    ),
+    walk_in_people AS (
+      SELECT r.member_person_id AS person_id, r.status
+        FROM expected_regs r
+       WHERE r.is_teacher AND r.member_kit_extra_at IS NOT NULL
+      UNION ALL
+      SELECT gl.guest_person_id, r.status
+        FROM guest_link gl
+        JOIN expected_regs r ON r.id = gl.registration_id
+       WHERE gl.status = 'ACTIVE' AND r.guest_kit_extra_at IS NOT NULL
     ),
     active_employees AS (
       SELECT id, person_id, category, with_kit, host_employee_id FROM employee WHERE removed_at IS NULL
@@ -229,28 +241,34 @@ export async function getPeopleKitComparison(ex: Executor): Promise<PeopleKitCom
        WHERE kd.cancelled_at IS NULL
     )
     SELECT
-      (SELECT count(*) FROM expected_regs WHERE is_teacher)::int AS teachers,
-      (SELECT count(*) FROM expected_regs WHERE is_teacher AND status IN ${ACTIVE_STATUSES} AND member_kit_waitlisted_at IS NULL)::int AS teachers_with_kit,
-      (SELECT count(*) FROM expected_regs WHERE is_teacher AND status IN ${WAITING_STATUSES} AND member_kit_waitlisted_at IS NULL)::int AS teachers_pending,
+      (SELECT count(*) FROM expected_regs WHERE is_teacher AND member_kit_extra_at IS NULL)::int AS teachers,
+      (SELECT count(*) FROM expected_regs WHERE is_teacher AND member_kit_extra_at IS NULL AND status IN ${ACTIVE_STATUSES} AND member_kit_waitlisted_at IS NULL)::int AS teachers_with_kit,
+      (SELECT count(*) FROM expected_regs WHERE is_teacher AND member_kit_extra_at IS NULL AND status IN ${WAITING_STATUSES} AND member_kit_waitlisted_at IS NULL)::int AS teachers_pending,
       (SELECT count(*) FROM expected_regs WHERE is_teacher AND member_kit_waitlisted_at IS NOT NULL)::int AS teachers_waitlist,
-      (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'MEMBER')::int AS teachers_delivered,
-      (SELECT count(*) FROM expected_regs r JOIN active_checkins c ON c.person_id = r.member_person_id WHERE r.is_teacher)::int AS teachers_present,
+      (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'MEMBER' AND stock_pool <> 'EXTRA')::int AS teachers_delivered,
+      (SELECT count(*) FROM expected_regs r JOIN active_checkins c ON c.person_id = r.member_person_id WHERE r.is_teacher AND r.member_kit_extra_at IS NULL)::int AS teachers_present,
+
+      (SELECT count(*) FROM walk_in_people)::int AS walk_ins,
+      (SELECT count(*) FROM walk_in_people WHERE status IN ${ACTIVE_STATUSES})::int AS walk_ins_with_kit,
+      (SELECT count(*) FROM walk_in_people WHERE status IN ${WAITING_STATUSES})::int AS walk_ins_pending,
+      (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND stock_pool = 'EXTRA')::int AS walk_ins_delivered,
+      (SELECT count(*) FROM walk_in_people w JOIN active_checkins c ON c.person_id = w.person_id)::int AS walk_ins_present,
 
       (SELECT count(*) FROM teacher_guests)::int AS guests,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${ACTIVE_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL
+        WHERE r.status IN ${ACTIVE_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL AND r.guest_kit_extra_at IS NULL
           AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
                OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS guests_with_kit,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${WAITING_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL
+        WHERE r.status IN ${WAITING_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL AND r.guest_kit_extra_at IS NULL
           AND EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
       )::int AS guests_pending,
       (SELECT count(*) FROM registration r
         WHERE r.status IN ${EXPECTED_STATUSES} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL
           AND EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
       )::int AS guests_waitlist,
-      (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'GUEST' AND employee_id IS NULL)::int AS guests_delivered,
+      (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'GUEST' AND employee_id IS NULL AND stock_pool <> 'EXTRA')::int AS guests_delivered,
       (SELECT count(*) FROM teacher_guests g JOIN active_checkins c ON c.person_id = g.person_id)::int AS guests_present,
 
       (SELECT count(*) FROM expected_regs WHERE NOT is_teacher)::int AS others,
@@ -298,6 +316,7 @@ export async function getPeopleKitComparison(ex: Executor): Promise<PeopleKitCom
     registrations: [
       group("TEACHERS", "teachers", n("teachers_with_kit"), n("teachers_pending"), n("teachers_waitlist")),
       group("TEACHER_GUESTS", "guests", n("guests_with_kit"), n("guests_pending"), n("guests_waitlist")),
+      group("WALK_INS", "walk_ins", n("walk_ins_with_kit"), n("walk_ins_pending")),
       group("OTHER_MEMBERS", "others", 0, 0, 0),
     ],
     house: [

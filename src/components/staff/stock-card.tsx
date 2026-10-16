@@ -1,4 +1,4 @@
-import { Package, Warning } from "@/components/icons/pixel";
+import { Package, Warning, Zap } from "@/components/icons/pixel";
 import { type KitDemand, poolDemand } from "@/domain/kit-comparison";
 import { STOCK_POOL_LABEL } from "@/domain/labels";
 import { plural } from "@/lib/plural";
@@ -77,6 +77,30 @@ export function StockCard({
         <p className="flex items-center gap-2 text-sm text-fg-muted">
           <Package className="size-4" /> Estoque não configurado.
         </p>
+      ) : null}
+      {/* A gordura: estoque separado do oficial para quem se inscreve na hora. */}
+      {stock.extra ? (
+        <div data-testid="stock-extra">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                <Zap className="size-4 text-[#ffd23f]" /> Gordura (inscrições na hora)
+              </p>
+              <p className="text-xs text-fg-muted tabular">
+                {stock.extra.delivered} entregues de {stock.extra.total} · {plural(stock.extra.committed, "prometido", "prometidos")}
+              </p>
+            </div>
+            <p className={cn("display text-4xl leading-none tabular", stock.extra.low ? "text-red neon-red" : "text-[#ffd23f]")}>
+              {stock.extra.available}
+              <span className="ml-1.5 font-sans text-xs font-semibold tracking-normal text-fg-muted normal-case [font-stretch:100%]">na caixa</span>
+            </p>
+          </div>
+          <SegmentMeter className="mt-3" value={stock.extra.available} max={stock.extra.total} invert label={`Gordura: ${stock.extra.available} de ${stock.extra.total}`} />
+          <p className="mt-2 text-xs text-fg-muted">
+            {stock.extra.total} na gordura − {plural(stock.extra.committed, "prometido", "prometidos")} ={" "}
+            <strong className="text-fg">{plural(stock.extra.free, "livre", "livres")}</strong> para novas inscrições na hora.
+          </p>
+        </div>
       ) : null}
     </div>
   );

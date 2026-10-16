@@ -333,7 +333,7 @@ export async function setTeacherStatus(actor: Actor, rawInput: TeacherStatusInpu
     await tx.update(registration).set({ isTeacher: input.isTeacher }).where(eq(registration.id, state.id));
     // Passou a ser professor(a): o kit entra na conta (ou na fila). Deixou de ser: sai da fila.
     if (input.isTeacher) await allocateKitSlots(tx, actor, state.id, { member: true, guest: false });
-    else await tx.update(registration).set({ memberKitWaitlistedAt: null }).where(eq(registration.id, state.id));
+    else await tx.update(registration).set({ memberKitWaitlistedAt: null, memberKitExtraAt: null }).where(eq(registration.id, state.id));
     // Mantém a ficha em aberto coerente com a inscrição.
     await tx
       .update(affiliationForm)

@@ -1,15 +1,15 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { eq, ne, sql } from "drizzle-orm";
 import type { Executor } from "@/server/db";
 import { eventConfig, kitDelivery, kitStock } from "@/server/db/schema";
 import type { EventSettingsData, HelpSettingsData, SigningSettingsData, StockSettingsData } from "@/domain/schemas";
 import { STOCK_MODE_LABEL } from "@/domain/labels";
-import { employeeStockPool, isLowEmployeeStock, isLowStock, poolsForMode } from "@/domain/rules";
+import { employeeStockPool, isLowEmployeeStock, isLowExtraStock, isLowStock, poolsForMode } from "@/domain/rules";
 import type { StockMode, StockPool } from "@/domain/types";
 import { zonedLocalToUtc } from "@/lib/datetime";
 import { type Actor, assertPermission } from "./actor";
 import { writeAudit } from "./audit";
-import { promoteKitWaitlist } from "./kit-waitlist";
+import { loadExtraBalance, moveWalkInsToExtra, promoteKitWaitlist } from "./kit-waitlist";
 import { DomainError } from "./errors";
 import { withTx } from "./tx";
 
@@ -77,6 +77,11 @@ function desiredTotals(stock: StockSettingsData): Partial<Record<StockPool, numb
     : { MEMBER: stock.totalMember ?? 0, GUEST: stock.totalGuest ?? 0, ...employees };
 }
 
+/** Os estoques oficiais do modo (a gordura fica à parte). */
+function officialPools(mode: StockMode): Exclude<StockPool, "EXTRA">[] {
+  return poolsForMode(mode).filter((pool): pool is Exclude<StockPool, "EXTRA"> => pool !== "EXTRA");
+}
+
 /** Conclui o wizard: cria a configuração do evento e o estoque inicial. */
 export async function completeSetup(actor: Actor, input: { event: EventSettingsData; stock: StockSettingsData }) {
   assertPermission(actor, "manageSettings");
@@ -141,12 +146,13 @@ export async function updateEventSettings(actor: Actor, data: EventSettingsData)
  * o estoque dos funcionários (EMPLOYEE: o kit do funcionário e o do convidado dele).
  */
 async function deliveredByGroup(ex: Executor) {
+  // Os kits da gordura (inscrição na hora) têm estoque próprio: não entram nos do oficial.
   const result = await ex.execute<{ member: number; guest: number; employee: number }>(sql`
     SELECT count(*) FILTER (WHERE ${kitDelivery.employeeId} IS NULL AND ${kitDelivery.kitType} = 'MEMBER')::int AS member,
            count(*) FILTER (WHERE ${kitDelivery.employeeId} IS NULL AND ${kitDelivery.kitType} = 'GUEST')::int AS guest,
            count(*) FILTER (WHERE ${kitDelivery.employeeId} IS NOT NULL)::int AS employee
       FROM ${kitDelivery}
-     WHERE ${kitDelivery.cancelledAt} IS NULL
+     WHERE ${kitDelivery.cancelledAt} IS NULL AND ${kitDelivery.stockPool} <> 'EXTRA'
   `);
   const row = result.rows[0];
   return { MEMBER: Number(row?.member ?? 0), GUEST: Number(row?.guest ?? 0), EMPLOYEE: Number(row?.employee ?? 0) };
@@ -164,21 +170,21 @@ export async function updateStockSettings(actor: Actor, stock: StockSettingsData
     const previousPools = await tx.select().from(kitStock).for("update");
     const delivered = await deliveredByGroup(tx);
     const totals = desiredTotals(stock);
-    const deliveredPerPool: Record<StockPool, number> = {
+    const deliveredPerPool: Record<Exclude<StockPool, "EXTRA">, number> = {
       // No estoque único para todos, o geral também conta os kits de colaboradores e cortesias.
       ALL: delivered.MEMBER + delivered.GUEST + (stock.stockMode === "UNIFIED" ? delivered.EMPLOYEE : 0),
       MEMBER: delivered.MEMBER,
       GUEST: delivered.GUEST,
       EMPLOYEE: delivered.EMPLOYEE,
     };
-    const fieldFor: Record<StockPool, string> = {
+    const fieldFor: Record<Exclude<StockPool, "EXTRA">, string> = {
       ALL: "totalAll",
       MEMBER: "totalMember",
       GUEST: "totalGuest",
       EMPLOYEE: "totalEmployee",
     };
     const fieldErrors: Record<string, string> = {};
-    for (const pool of poolsForMode(stock.stockMode)) {
+    for (const pool of officialPools(stock.stockMode)) {
       if ((totals[pool] ?? 0) < deliveredPerPool[pool]) {
         fieldErrors[fieldFor[pool]] = `Já foram entregues ${deliveredPerPool[pool]} kits; o total não pode ser menor.`;
       }
@@ -186,8 +192,9 @@ export async function updateStockSettings(actor: Actor, stock: StockSettingsData
     if (Object.keys(fieldErrors).length) {
       throw new DomainError("VALIDATION", "Quantidade menor do que os kits já entregues.", fieldErrors);
     }
-    await tx.delete(kitStock);
-    for (const pool of poolsForMode(stock.stockMode)) {
+    // A gordura tem quantidade própria (Mesa dos kits e gordura): não muda aqui.
+    await tx.delete(kitStock).where(ne(kitStock.pool, "EXTRA"));
+    for (const pool of officialPools(stock.stockMode)) {
       await tx.insert(kitStock).values({ pool, total: totals[pool] ?? 0, delivered: deliveredPerPool[pool] });
     }
     await tx
@@ -208,6 +215,55 @@ export async function updateStockSettings(actor: Actor, stock: StockSettingsData
     // Mais kits no estoque: a fila do kit anda (por ordem).
     const promoted = await promoteKitWaitlist(tx, actor);
     return { promoted: promoted.length };
+  });
+}
+
+/**
+ * Mesa dos kits e gordura (decisão da organização para a festa):
+ * - onde o kit sai: na portaria, junto com a entrada, ou na mesa dos kits, depois da entrada;
+ * - gordura: kits separados do oficial para quem se inscreve na hora.
+ * A gordura não pode ficar abaixo do que já foi entregue nem do que já foi prometido.
+ * Com mais gordura, quem se inscreveu na hora e ainda está no oficial (ou na fila) passa para ela.
+ */
+export async function updateKitDeskSettings(actor: Actor, input: { kitsAtDesk: boolean; extraTotal: number }, now = new Date()) {
+  assertPermission(actor, "manageSettings");
+  const extraTotal = Math.trunc(Number(input.extraTotal));
+  if (!Number.isFinite(extraTotal) || extraTotal < 0 || extraTotal > 100000) {
+    throw new DomainError("VALIDATION", "Quantidade da gordura inválida.", { extraTotal: "Informe um número de 0 a 100000" });
+  }
+  const kitsAtDesk = input.kitsAtDesk === true;
+  return withTx(async (tx) => {
+    const [config] = await tx.select().from(eventConfig).where(eq(eventConfig.id, 1)).for("update");
+    if (!config) throw new DomainError("INVALID_STATE", "Conclua a configuração inicial primeiro.");
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('kit_allocation'))`);
+    const balance = await loadExtraBalance(tx);
+    const floor = Math.max(balance.delivered, balance.committed);
+    if (extraTotal < floor) {
+      throw new DomainError("VALIDATION", "Gordura menor do que os kits dela já prometidos.", {
+        extraTotal: `Já tem ${floor} ${floor === 1 ? "kit prometido" : "kits prometidos"} a quem se inscreveu na hora; o total não pode ser menor.`,
+      });
+    }
+    await tx
+      .insert(kitStock)
+      .values({ pool: "EXTRA", total: extraTotal, delivered: balance.delivered })
+      .onConflictDoUpdate({ target: kitStock.pool, set: { total: extraTotal } });
+    if (config.kitsAtDesk !== kitsAtDesk) {
+      await tx.update(eventConfig).set({ kitsAtDesk }).where(eq(eventConfig.id, 1));
+    }
+    const changes = [
+      config.kitsAtDesk !== kitsAtDesk ? (kitsAtDesk ? "os kits passam a sair na mesa dos kits" : "os kits voltam a sair na portaria, com a entrada") : null,
+      balance.total !== extraTotal ? `gordura de ${balance.total} para ${extraTotal} kits` : null,
+    ].filter(Boolean);
+    await writeAudit(tx, actor, {
+      action: "KIT_DESK_SETTINGS_UPDATED",
+      entityType: "stock",
+      summary: changes.length ? `Mesa dos kits e gordura: ${changes.join("; ")}.` : "Mesa dos kits e gordura: sem mudanças.",
+      before: { kitsAtDesk: config.kitsAtDesk, extraTotal: balance.total },
+      after: { kitsAtDesk, extraTotal },
+    });
+    // Mais gordura: quem se inscreveu na hora e ficou no oficial (ou na fila) passa para ela.
+    const moved = extraTotal > balance.total ? await moveWalkInsToExtra(tx, actor, now) : 0;
+    return { moved };
   });
 }
 
@@ -302,10 +358,28 @@ export async function countEmployeesAwaitingKit(ex: Executor): Promise<number> {
   return Number(result.rows[0]?.total ?? 0);
 }
 
+/** A gordura: estoque separado do oficial para quem se inscreve na hora. */
+export interface ExtraStockView {
+  total: number;
+  delivered: number;
+  /** Ainda na caixa. */
+  available: number;
+  /** Prometidos a quem se inscreveu na hora (inclui os entregues). */
+  committed: number;
+  /** Sem dono: dá para mais inscrições na hora. */
+  free: number;
+  low: boolean;
+}
+
 export interface StockOverview {
   mode: StockMode;
   threshold: number;
+  /** Os estoques oficiais (a gordura fica em `extra`). */
   pools: StockPoolView[];
+  /** Gordura cadastrada (nula quando nunca teve kits). */
+  extra: ExtraStockView | null;
+  /** Onde o kit sai: na mesa dos kits (verdadeiro) ou na portaria, com a entrada. */
+  kitsAtDesk: boolean;
   totalStock: number;
   totalDelivered: number;
   totalAvailable: number;
@@ -321,7 +395,7 @@ export function employeePoolOf(stock: StockOverview | null): StockPoolView | nul
 export async function getStockOverview(ex: Executor): Promise<StockOverview | null> {
   const config = await getEventConfig(ex);
   if (!config) return null;
-  const rows = await ex.select().from(kitStock);
+  const [rows, extraBalance] = await Promise.all([ex.select().from(kitStock), loadExtraBalance(ex)]);
   const order: StockPool[] = ["ALL", "MEMBER", "GUEST", "EMPLOYEE"];
   const visible = rows
     .filter((r) => poolsForMode(config.stockMode).includes(r.pool))
@@ -336,10 +410,24 @@ export async function getStockOverview(ex: Executor): Promise<StockOverview | nu
     }
     return { pool: r.pool, total: r.total, delivered: r.delivered, available, low: isLowStock(available, config.lowStockThreshold) };
   });
+  const extraRow = rows.find((r) => r.pool === "EXTRA");
+  const extra: ExtraStockView | null =
+    extraRow && (extraRow.total > 0 || extraRow.delivered > 0)
+      ? {
+          total: extraRow.total,
+          delivered: extraRow.delivered,
+          available: extraRow.total - extraRow.delivered,
+          committed: extraBalance.committed,
+          free: extraBalance.free,
+          low: isLowExtraStock(extraRow.total - extraRow.delivered, extraRow.total),
+        }
+      : null;
   return {
     mode: config.stockMode,
     threshold: config.lowStockThreshold,
     pools,
+    extra,
+    kitsAtDesk: config.kitsAtDesk,
     totalStock: pools.reduce((s, p) => s + p.total, 0),
     totalDelivered: pools.reduce((s, p) => s + p.delivered, 0),
     totalAvailable: pools.reduce((s, p) => s + p.available, 0),

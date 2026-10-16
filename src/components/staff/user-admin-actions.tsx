@@ -55,8 +55,8 @@ export function RequireTrainingButton() {
           <Gamepad /> Pedir o treino de novo
         </Button>
       }
-      title="Pedir o treino da portaria de novo?"
-      description="Todo mundo que registra entradas (menos os administradores) faz o treino relâmpago antes de abrir a portaria de novo. Leva 1 minuto."
+      title="Pedir os treinos de novo?"
+      description="Todo mundo que registra entradas ou entrega kits (menos os administradores) faz o treino de novo antes de abrir a portaria ou a mesa dos kits. Leva 1 minuto."
       confirmLabel="Pedir o treino"
       tone="success"
       onConfirm={async () => {
@@ -67,8 +67,8 @@ export function RequireTrainingButton() {
       onDone={() => {
         toast.success(
           people.current === 1
-            ? "Pronto: 1 pessoa faz o treino antes de abrir a portaria."
-            : `Pronto: ${people.current} pessoas fazem o treino antes de abrir a portaria.`,
+            ? "Pronto: 1 pessoa faz o treino antes de abrir a portaria ou a mesa."
+            : `Pronto: ${people.current} pessoas fazem o treino antes de abrir a portaria ou a mesa.`,
         );
         router.refresh();
       }}

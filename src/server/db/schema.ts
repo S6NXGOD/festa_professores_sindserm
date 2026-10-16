@@ -33,7 +33,8 @@ const updatedAt = () =>
 // Enums
 // ---------------------------------------------------------------------------
 
-export const staffRoleEnum = pgEnum("staff_role", ["ADMIN", "ATTENDANT", "SECURITY"]);
+/** KIT_DESK: mesa dos kits (confere quem entrou e entrega o kit; não registra entradas). */
+export const staffRoleEnum = pgEnum("staff_role", ["ADMIN", "ATTENDANT", "SECURITY", "KIT_DESK"]);
 /**
  * PENDING: declarou ser filiado(a), aguarda conferência.
  * AWAITING_SIGNATURE: não era filiado(a) e preencheu a ficha antes da festa;
@@ -65,7 +66,8 @@ export const stockModeEnum = pgEnum("stock_mode", ["SINGLE", "SPLIT", "UNIFIED"]
  * EMPLOYEE: estoque dos funcionários do SINDSERM (kit do funcionário e do
  * convidado dele), sempre separado dos kits de professoras, professores e convidados.
  */
-export const stockPoolEnum = pgEnum("stock_pool", ["ALL", "MEMBER", "GUEST", "EMPLOYEE"]);
+/** EXTRA: a "gordura", estoque separado do oficial para quem se inscreve na hora (depois que as inscrições fecham). */
+export const stockPoolEnum = pgEnum("stock_pool", ["ALL", "MEMBER", "GUEST", "EMPLOYEE", "EXTRA"]);
 export const participantRoleEnum = pgEnum("participant_role", ["MEMBER", "GUEST", "EMPLOYEE"]);
 /** Documentos exigidos na ficha de filiação: cópia do RG e do contracheque. */
 /** SIGNED_FORM: a ficha assinada digitalmente pelo gov.br (anexada pela equipe). */
@@ -113,6 +115,8 @@ export const user = pgTable("user", {
    * administradores) faz o treino antes de abrir a portaria.
    */
   gateTrainingDoneAt: timestamptz("gate_training_done_at"),
+  /** Treino da mesa dos kits feito. Nulo = quem entrega kits (fora os administradores) treina antes de abrir a mesa. */
+  deskTrainingDoneAt: timestamptz("desk_training_done_at"),
   /**
    * Usuário apagado que já tinha histórico (entradas, kits, fichas): sem acesso
    * e fora da lista, mas o nome continua nos registros. Sem histórico, a linha some.
@@ -210,6 +214,11 @@ export const eventConfig = pgTable(
     lowStockThreshold: integer("low_stock_threshold").notNull(),
     /** O que vem em cada kit (itens, quantidades e preços): a conta de quanto a consumação custa. Nulo = não montado. */
     kitPlan: jsonb("kit_plan"),
+    /**
+     * Onde o kit sai: falso = na portaria, junto com a entrada; verdadeiro = na
+     * mesa dos kits, depois da entrada (a segurança só registra a entrada).
+     */
+    kitsAtDesk: boolean("kits_at_desk").notNull().default(false),
     setupCompletedAt: timestamptz("setup_completed_at").notNull().defaultNow(),
     updatedAt: updatedAt(),
   },
@@ -343,6 +352,13 @@ export const registration = pgTable(
      */
     memberKitWaitlistedAt: timestamptz("member_kit_waitlisted_at"),
     guestKitWaitlistedAt: timestamptz("guest_kit_waitlisted_at"),
+    /**
+     * Kit da gordura: inscrição (ou convidado) feita na hora, depois que as
+     * inscrições fecharam. O kit sai do estoque gordura, separado do oficial.
+     * Nulo = estoque oficial (garantido ou na fila).
+     */
+    memberKitExtraAt: timestamptz("member_kit_extra_at"),
+    guestKitExtraAt: timestamptz("guest_kit_extra_at"),
     createdByUserId: text("created_by_user_id").references(() => user.id, {
       onDelete: "set null",
     }),
