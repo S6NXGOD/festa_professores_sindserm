@@ -7,7 +7,7 @@
  *   o convidado pega o kit sem esperar quem convidou.
  * Sem gordura e com o kit na portaria, tudo segue como antes.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { eventConfig, kitDelivery, kitStock } from "@/server/db/schema";
@@ -25,6 +25,7 @@ import { cancelKitDelivery, deliverKit } from "@/server/services/kits";
 import { getStockOverview, updateKitDeskSettings, updateStockSettings } from "@/server/services/settings";
 import { getDashboardStats, getPeopleKitComparison } from "@/server/services/stats";
 import { loadVoucherForStaff } from "@/server/queries/vouchers";
+import { type DeskEvent, subscribeDeskEvents } from "@/server/realtime";
 import { configureEvent, createStaff, personName, randomCpf, registerMember, reload, resetDatabase } from "../helpers/factories";
 
 let admin: StaffActor;
@@ -231,6 +232,34 @@ describe("mesa dos kits: a segurança registra a entrada, a mesa entrega", () =>
     expect(hostEntry).toMatchObject({ kit: { kind: "DELIVERED" }, guestKit: { kind: "DELIVERED" } });
     // Entrega manual continua com a regra antiga.
     await refused(deliverKit(desk, { personId: paulo.state.member.id, kitType: "MEMBER" }));
+  });
+
+  it("a mesa fica sabendo na hora: a entrada e o kit avisam pelo banco (tempo real)", async () => {
+    await configureEvent(admin, { totalAll: 10 });
+    await updateKitDeskSettings(admin, { kitsAtDesk: true, extraTotal: 0 });
+    const ana = await registerMember({ memberName: "Ana Ao Vivo" });
+    await decideAffiliation(attendant, { registrationId: ana.registrationId, decision: "CONFIRM" });
+    const personId = ana.state.member.id;
+    const events: DeskEvent[] = [];
+    const stop = subscribeDeskEvents((event) => events.push(event));
+    try {
+      // A escuta liga em segundo plano: um aviso de teste confirma que já está ouvindo.
+      await expect
+        .poll(
+          async () => {
+            await db.execute(sql`SELECT pg_notify('desk_queue', '{"t":"kit","p":"teste"}')`);
+            return events.some((event) => event.personId === "teste");
+          },
+          { timeout: 10_000, interval: 200 },
+        )
+        .toBe(true);
+      await registerCheckIn(security, { personId, method: "SEARCH" });
+      await expect.poll(() => events.some((event) => event.kind === "entry" && event.personId === personId), { timeout: 5_000 }).toBe(true);
+      await deliverAtDesk(desk, { personId });
+      await expect.poll(() => events.some((event) => event.kind === "kit" && event.personId === personId), { timeout: 5_000 }).toBe(true);
+    } finally {
+      stop();
+    }
   });
 
   it("convidado que virou filiado depois de entrar pega o kit de filiado na mesa (vale o cadastro de agora)", async () => {

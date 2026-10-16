@@ -1751,7 +1751,6 @@ test.describe.serial("festa das professoras e professores", () => {
         await expect(gate.getByTestId("entry-kit-result")).toContainText("Kit na mesa!");
         await expect(gate.getByTestId("walk-in-stamp").first()).toBeVisible();
       });
-      await attendantContext.close();
 
       const deskContext = await browser.newContext({ ...devices["Pixel 7"] });
       const desk = await deskContext.newPage();
@@ -1815,6 +1814,30 @@ test.describe.serial("festa das professoras e professores", () => {
         await desk.goto("/portaria");
         await expect(desk).toHaveURL(/\/portaria\/mesa$/);
       });
+
+      await test.step("tempo real: a portaria confirma uma entrada e a mesa vê na hora, sem recarregar", async () => {
+        const SECOND = { name: "Bruno Chegou Agora", cpf: "85296374100" };
+        await expect(desk.getByTestId("desk-live")).toHaveAttribute("data-live", "true");
+        await gate.goto(`/portaria/cadastro?nome=${encodeURIComponent(SECOND.name)}`);
+        await gate.getByTestId("quick-cpf").fill(SECOND.cpf);
+        await gate.getByTestId("quick-whatsapp").fill("86966665555");
+        await gate.getByTestId("quick-registration-number").fill("AGORA-2026");
+        await gate.getByTestId("quick-workplace").fill("Escola Municipal Agora");
+        await gate.getByTestId("teacher-yes").click();
+        await gate.locator("label[for=quick-consent]").click();
+        await gate.getByTestId("quick-submit").click();
+        await expect(gate.getByTestId("gate-person-name")).toHaveText(SECOND.name);
+        await gate.getByTestId("confirm-affiliation").click();
+        await gate.getByTestId("confirm-dialog-action").click();
+        await gate.getByTestId("entry-prompt").getByTestId("prompt-confirm-entry").click();
+        await confirmEarlyEntry(gate);
+        await expect(gate.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
+        // A mesa só consulta a fila a cada 20 s quando está ao vivo: aparecer em segundos é o aviso do servidor.
+        const arrived = desk.getByTestId("desk-queue-item").filter({ hasText: SECOND.name });
+        await expect(arrived).toBeVisible({ timeout: 6_000 });
+        await expect(arrived).toHaveAttribute("data-new", "true");
+      });
+      await attendantContext.close();
       await deskContext.close();
     } finally {
       await client.query("UPDATE event_config SET registration_closes_at = $1, kits_at_desk = false WHERE id = 1", [rows[0]!.closes]);

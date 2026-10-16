@@ -19,6 +19,7 @@ import type { PersonSearchResult } from "@/server/services/people";
 import { useDebouncedSearch } from "@/components/gate/use-debounced-search";
 import { DeskCard } from "./desk-card";
 import { QrSheet } from "./qr-sheet";
+import { type DeskLiveEvent, useDeskLive } from "./use-desk-live";
 
 export interface DeskQueueRow {
   personId: string;
@@ -38,7 +39,11 @@ export interface DeskSnapshot {
   stock: DeskStock;
 }
 
-const POLL_MS = 6000;
+/** Com os avisos ao vivo, a consulta da fila é só de reserva; sem eles, mais frequente. */
+const POLL_LIVE_MS = 20_000;
+const POLL_OFFLINE_MS = 4_000;
+/** Quanto tempo quem acabou de chegar fica destacado na fila. */
+const FRESH_MS = 12_000;
 const NUMERIC = /^[\d.\-\s]+$/;
 
 /** Sem CPF completo na tela, a busca por CPF pede os 11 dígitos (o servidor aplica a mesma regra). */
@@ -60,7 +65,11 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
   const [snapshot, setSnapshot] = useState(initial);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<DeskView | null>(null);
-  const [justDelivered, setJustDelivered] = useState<{ available: number; extra: boolean; low: boolean } | null>(null);
+  const [justDelivered, setJustDelivered] = useState<{
+    available: number;
+    extra: boolean;
+    low: boolean;
+  } | null>(null);
   const [confirmLeftover, setConfirmLeftover] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [opening, setOpening] = useState<string | null>(null);
@@ -69,22 +78,91 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
   const inputRef = useRef<HTMLInputElement>(null);
   const search = useCallback((text: string) => deskSearchAction(text), []);
   const { results, loading, run } = useDebouncedSearch<PersonSearchResult>(search);
+  /** Quem acabou de entrar (destaque por alguns segundos), com a hora em que apareceu. */
+  const [fresh, setFresh] = useState<Record<string, number>>({});
+  const knownRef = useRef<Set<string> | null>(null);
+  const refreshTimer = useRef<number | undefined>(undefined);
+  /** O cartão aberto (enquanto não foi entregue agora): um aviso sobre essa pessoa recarrega o cartão. */
+  const openRef = useRef<string | null>(null);
+  const deliveringRef = useRef(false);
+
+  useEffect(() => {
+    knownRef.current = new Set(initial.items.map((item) => item.personId));
+  }, [initial]);
+
+  useEffect(() => {
+    openRef.current = selected && !justDelivered ? selected.personId : null;
+    deliveringRef.current = delivering;
+  }, [selected, justDelivered, delivering]);
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch("/portaria/mesa/fila", { cache: "no-store" });
-      if (response.ok) setSnapshot((await response.json()) as DeskSnapshot);
+      const response = await fetch("/portaria/mesa/fila", {
+        cache: "no-store",
+      });
+      if (!response.ok) return;
+      const next = (await response.json()) as DeskSnapshot;
+      const known = knownRef.current;
+      const arrived = known ? next.items.filter((item) => !known.has(item.personId)).map((item) => item.personId) : [];
+      knownRef.current = new Set(next.items.map((item) => item.personId));
+      setSnapshot(next);
+      if (arrived.length) {
+        const now = Date.now();
+        setFresh((current) => ({
+          ...current,
+          ...Object.fromEntries(arrived.map((id) => [id, now])),
+        }));
+        playSound("blip");
+        vibrate(40);
+      }
     } catch {
       // Sem rede por um instante: a próxima rodada tenta de novo.
     }
   }, []);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refresh();
-    }, POLL_MS);
-    return () => window.clearInterval(timer);
+  /** Vários avisos juntos (ex.: professor(a) e convidado entrando) viram uma consulta só. */
+  const refreshSoon = useCallback(() => {
+    window.clearTimeout(refreshTimer.current);
+    refreshTimer.current = window.setTimeout(() => void refresh(), 150);
   }, [refresh]);
+
+  const reloadCard = useCallback(async (personId: string) => {
+    const result = await callAction(deskViewAction(personId));
+    if (result.ok && openRef.current === personId) setSelected(result.data);
+  }, []);
+
+  const live = useDeskLive((event: DeskLiveEvent) => {
+    refreshSoon();
+    // Outra pessoa da mesa entregou (ou a entrada foi estornada) enquanto o cartão estava aberto aqui.
+    if (event.personId && event.personId === openRef.current && !deliveringRef.current) void reloadCard(event.personId);
+  });
+
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => {
+        if (document.visibilityState === "visible") void refresh();
+      },
+      live ? POLL_LIVE_MS : POLL_OFFLINE_MS,
+    );
+    return () => window.clearInterval(timer);
+  }, [refresh, live]);
+
+  useEffect(() => () => window.clearTimeout(refreshTimer.current), []);
+
+  // O destaque de quem chegou some sozinho.
+  useEffect(() => {
+    const ids = Object.keys(fresh);
+    if (!ids.length) return;
+    const oldest = Math.min(...Object.values(fresh));
+    const timer = window.setTimeout(
+      () => {
+        const now = Date.now();
+        setFresh((current) => Object.fromEntries(Object.entries(current).filter(([, at]) => now - at < FRESH_MS)));
+      },
+      Math.max(250, FRESH_MS - (Date.now() - oldest)),
+    );
+    return () => window.clearTimeout(timer);
+  }, [fresh]);
 
   function show(view: DeskView) {
     setSelected(view);
@@ -154,8 +232,13 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
       playSound("coin");
       vibrate([40, 30, 90]);
       setSelected(result.data.view);
-      setJustDelivered({ available: result.data.delivered.available, extra: result.data.delivered.extra, low: result.data.delivered.low });
-      if (result.data.delivered.low) toast.warning(`Atenção: restam ${result.data.delivered.available} ${result.data.delivered.extra ? "na gordura" : "na caixa"}.`);
+      setJustDelivered({
+        available: result.data.delivered.available,
+        extra: result.data.delivered.extra,
+        low: result.data.delivered.low,
+      });
+      if (result.data.delivered.low)
+        toast.warning(`Atenção: restam ${result.data.delivered.available} ${result.data.delivered.extra ? "na gordura" : "na caixa"}.`);
       void refresh();
     });
   }
@@ -195,8 +278,19 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="desk-counters">
         <Counter label="Esperando kit" value={snapshot.pending} icon={Hourglass} tone="text-warning" testId="desk-pending" />
         <Counter label="Entregues" value={snapshot.delivered} icon={Gift} tone="text-success-text" />
-        <Counter label="Caixa oficial" value={stock.official?.available ?? null} icon={Package} tone={stock.official?.low ? "text-danger" : "text-red"} />
-        <Counter label="Gordura" value={stock.extra?.available ?? null} icon={Package} tone={stock.extra?.low ? "text-danger" : "text-[#ffd23f]"} testId="desk-extra" />
+        <Counter
+          label="Caixa oficial"
+          value={stock.official?.available ?? null}
+          icon={Package}
+          tone={stock.official?.low ? "text-danger" : "text-red"}
+        />
+        <Counter
+          label="Gordura"
+          value={stock.extra?.available ?? null}
+          icon={Package}
+          tone={stock.extra?.low ? "text-danger" : "text-[#ffd23f]"}
+          testId="desk-extra"
+        />
       </div>
 
       <div className="space-y-2">
@@ -264,7 +358,12 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
       <div ref={cardRef} className="scroll-mt-20">
         <AnimatePresence mode="wait">
           {selected ? (
-            <motion.div key={`${selected.personId}-${justDelivered ? "ok" : selected.kit.kind}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <motion.div
+              key={`${selected.personId}-${justDelivered ? "ok" : selected.kit.kind}`}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
               <DeskCard
                 view={selected}
                 delivering={delivering}
@@ -274,7 +373,10 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
                 onNext={next}
               />
               {confirmLeftover ? (
-                <div className="mt-2 space-y-2 rounded-xl border border-warning/50 bg-warning-soft p-3 text-sm text-fg" data-testid="desk-leftover-confirm">
+                <div
+                  className="mt-2 space-y-2 rounded-xl border border-warning/50 bg-warning-soft p-3 text-sm text-fg"
+                  data-testid="desk-leftover-confirm"
+                >
                   <p className="font-semibold">
                     Kit de sobra: só quando a organização liberar. A pessoa sai da fila do kit e o kit sai do estoque agora.
                   </p>
@@ -295,8 +397,16 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
 
       <section className="space-y-2" data-testid="desk-queue">
         <h2 className="flex items-center gap-2 text-[0.72rem] font-bold tracking-[0.1em] text-fg-muted uppercase">
-          <Hourglass className="size-4 text-warning" /> Entraram e ainda não pegaram o kit
-          <span className="pixel ml-auto text-[0.55rem] text-fg-dim">ao vivo</span>
+          <Hourglass className="size-4 shrink-0 text-warning" /> Entraram e ainda não pegaram o kit
+          <span
+            className={cn("pixel ml-auto inline-flex shrink-0 items-center gap-1.5 text-[0.55rem]", live ? "text-success-text" : "text-warning")}
+            data-testid="desk-live"
+            data-live={live ? "true" : "false"}
+            title={live ? "A fila atualiza na hora em que a segurança registra a entrada" : "Reconectando: a fila confere a cada 4 s"}
+          >
+            <span className={cn("size-2 rounded-full", live ? "animate-pulse bg-success" : "bg-warning")} aria-hidden />
+            {live ? "Ao vivo" : "Reconectando"}
+          </span>
         </h2>
         {snapshot.items.length === 0 ? (
           <p className="rounded-xl border-2 border-dashed border-line px-4 py-6 text-center text-sm text-fg-muted">
@@ -304,32 +414,59 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
           </p>
         ) : (
           <ul className="space-y-2">
-            {snapshot.items.map((item) => (
-              <li key={item.personId}>
-                <button
-                  type="button"
-                  onClick={() => void open(item.personId)}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-xl border bg-surface p-3 text-left outline-none hover:border-red/60 focus-visible:ring-[3px] focus-visible:ring-red/50",
-                    item.extra ? "border-[#ffd23f]/50" : "border-line",
-                  )}
-                  data-testid="desk-queue-item"
-                >
-                  <span className="pixel w-12 shrink-0 text-center text-[0.6rem] text-fg-dim tabular">{formatTime(new Date(item.checkedInAt))}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-bold text-fg">{item.fullName}</span>
-                    <span className="block truncate text-xs text-fg-muted">{item.roleLabel}</span>
-                  </span>
-                  {item.extra ? <WalkInStamp className="hidden min-[420px]:inline-flex" /> : null}
-                  {item.waitlisted ? <span className="pixel rounded bg-surface-3 px-1.5 py-1 text-[0.5rem] text-fg-muted">Fila</span> : null}
-                  <ChevronRight className={cn("size-5 shrink-0 text-fg-dim", opening === item.personId && "animate-pulse")} />
-                </button>
-              </li>
-            ))}
+            <AnimatePresence initial={false}>
+              {snapshot.items.map((item) => {
+                const isNew = Boolean(fresh[item.personId]);
+                return (
+                  <motion.li
+                    key={item.personId}
+                    layout
+                    initial={{ opacity: 0, y: -12, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 40 }}
+                    transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => void open(item.personId)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-xl border bg-surface p-3 text-left outline-none transition-[border-color,box-shadow] duration-700 hover:border-red/60 focus-visible:ring-[3px] focus-visible:ring-red/50",
+                        isNew
+                          ? "border-success shadow-[0_0_0_2px_rgb(34_197_94/0.35),0_0_28px_-6px_rgb(34_197_94/0.7)]"
+                          : item.extra
+                            ? "border-[#ffd23f]/50"
+                            : "border-line",
+                      )}
+                      data-testid="desk-queue-item"
+                      data-new={isNew ? "true" : undefined}
+                    >
+                      {isNew ? (
+                        <span className="pixel w-12 shrink-0 animate-pulse text-center text-[0.55rem] text-success-text" data-testid="desk-queue-new">
+                          Chegou
+                        </span>
+                      ) : (
+                        <span className="pixel w-12 shrink-0 text-center text-[0.6rem] text-fg-dim tabular">
+                          {formatTime(new Date(item.checkedInAt))}
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-bold text-fg">{item.fullName}</span>
+                        <span className="block truncate text-xs text-fg-muted">{item.roleLabel}</span>
+                      </span>
+                      {item.extra ? <WalkInStamp className="hidden min-[420px]:inline-flex" /> : null}
+                      {item.waitlisted ? <span className="pixel rounded bg-surface-3 px-1.5 py-1 text-[0.5rem] text-fg-muted">Fila</span> : null}
+                      <ChevronRight className={cn("size-5 shrink-0 text-fg-dim", opening === item.personId && "animate-pulse")} />
+                    </button>
+                  </motion.li>
+                );
+              })}
+            </AnimatePresence>
           </ul>
         )}
         {snapshot.pending > snapshot.items.length ? (
-          <p className="text-center text-xs text-fg-dim">Mostrando os {snapshot.items.length} mais recentes de {snapshot.pending}. Use a busca para os outros.</p>
+          <p className="text-center text-xs text-fg-dim">
+            Mostrando os {snapshot.items.length} mais recentes de {snapshot.pending}. Use a busca para os outros.
+          </p>
         ) : null}
       </section>
 
