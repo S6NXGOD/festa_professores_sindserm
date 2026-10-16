@@ -5,6 +5,7 @@ import { registration } from "@/server/db/schema";
 import type { AccessMap } from "@/domain/access";
 import { formatTime } from "@/lib/datetime";
 import { isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
+import { type DeskCategory, deskCategoryOf } from "@/domain/desk-category";
 import { EMPLOYEE_CATEGORY_LABEL } from "@/domain/labels";
 import { can, employeeKitAvailability, isActiveMember, kitAvailability, type KitAvailability } from "@/domain/rules";
 import type { EmployeeCategory, GroupKitType, KitType, ParticipantRole, StockPool } from "@/domain/types";
@@ -33,6 +34,8 @@ export interface DeskView {
   isMinor: boolean;
   /** Quem é: "Professor(a) filiado(a)", "Convidado(a) de Carla Mendes", "Cortesia da organização"... */
   roleLabel: string;
+  /** O grupo (cor e etiqueta na mesa). */
+  category: DeskCategory;
   /** Validada na entrada (pela segurança): quando e por quem. */
   entry: { at: Date; byName: string } | null;
   /** Inscrição feita na hora: o kit é o da gordura. */
@@ -58,6 +61,15 @@ export function deskRoleLabel(state: PersonState): string {
   return "Sem inscrição";
 }
 
+/** O grupo da pessoa pelo cadastro de agora (a mesma ordem da entrada). */
+export function deskCategoryOfState(state: PersonState): DeskCategory {
+  const role = deskRoleOf(state);
+  if (role === "EMPLOYEE") return state.employee!.category;
+  if (role === "GUEST_OF_MEMBER") return "TEACHER_GUEST";
+  if (role === "GUEST_OF_EMPLOYEE") return "EMPLOYEE_GUEST";
+  return state.ownRegistration?.isTeacher ? "TEACHER" : "MEMBER";
+}
+
 export function buildDeskView(
   state: PersonState,
   access: AccessMap,
@@ -73,6 +85,7 @@ export function buildDeskView(
     voucherCode: state.voucher ? formatVoucherCode(state.voucher.code) : null,
     isMinor: state.person.isMinor,
     roleLabel: deskRoleLabel(state),
+    category: deskCategoryOfState(state),
     entry: state.checkIn ? { at: state.checkIn.checkedInAt, byName: state.checkIn.checkedInByName } : null,
     walkIn: walkInOf(state),
     kit: evaluateDeskKit(state, config, now, stock),
@@ -201,6 +214,10 @@ export interface DeskQueueItem {
   role: ParticipantRole;
   /** "Convidado(a) de Carla Mendes", "Cortesia", "Professor(a)". */
   roleLabel: string;
+  /** O grupo (cor e etiqueta na mesa). */
+  category: DeskCategory;
+  /** Convidado(a): quem convidou. */
+  hostName: string | null;
   /** Kit da gordura (inscrição na hora). */
   extra: boolean;
   /** Na fila do kit (pode não sair agora). */
@@ -300,6 +317,13 @@ export async function listDeskQueue(ex: Executor, limit = 40): Promise<DeskQueue
       checkedInByName: row.checked_in_by,
       role: row.role,
       roleLabel,
+      category: deskCategoryOf({
+        role: row.role,
+        isTeacher: row.is_teacher,
+        guestOfEmployee: !row.host_name && Boolean(row.host_employee_name),
+        employeeCategory: row.employee_category,
+      }),
+      hostName: row.role === "GUEST" ? (row.host_name ?? row.host_employee_name) : null,
       extra: row.extra,
       waitlisted: row.waitlisted,
       voucherCode: row.voucher_code ? formatVoucherCode(row.voucher_code) : null,

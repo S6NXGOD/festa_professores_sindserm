@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { formatTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import type { DeskView } from "@/server/services/desk";
+import { DeskCategoryChip } from "./category-chip";
+import { DESK_CATEGORY_STYLE } from "./category-style";
 
 /**
  * Cartão da mesa dos kits: em cima, se a pessoa foi validada na entrada; no
@@ -101,9 +103,12 @@ export function DeskCard({
         ) : null}
       </motion.div>
 
-      <div className="space-y-3 p-4">
+      <div className="relative space-y-3 p-4 pl-5">
+        {/* A cor do grupo, na lateral (a mesma da fila e da legenda). */}
+        <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: DESK_CATEGORY_STYLE[view.category].color }} aria-hidden />
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
+            <DeskCategoryChip category={view.category} size="md" />
             {view.walkIn ? <WalkInStamp size="lg" /> : null}
             {view.isMinor ? (
               <span className="pixel inline-flex items-center gap-1 rounded-[4px] bg-warning px-1.5 py-1 text-[0.5rem] text-warning-foreground">

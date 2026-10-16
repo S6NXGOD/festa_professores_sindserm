@@ -16,6 +16,7 @@ import type { StaffActor } from "@/server/services/actor";
 import { decideAffiliation } from "@/server/services/affiliation";
 import { registerCheckIn } from "@/server/services/checkin";
 import { deliverAtDesk, listDeskQueue, loadDeskView } from "@/server/services/desk";
+import { createEmployee } from "@/server/services/employees";
 import { DomainError } from "@/server/services/errors";
 import { loadGateView } from "@/server/services/gate-view";
 import { addGuest } from "@/server/services/group";
@@ -259,6 +260,37 @@ describe("mesa dos kits: a segurança registra a entrada, a mesa entrega", () =>
       await expect.poll(() => events.some((event) => event.kind === "kit" && event.personId === personId), { timeout: 5_000 }).toBe(true);
     } finally {
       stop();
+    }
+  });
+
+  it("cada grupo com a sua cor na mesa: professor(a), convidado(a), funcionário(a), convidado(a) da casa e cortesia", async () => {
+    await configureEvent(admin, { totalAll: 10, totalEmployee: 10 });
+    await updateKitDeskSettings(admin, { kitsAtDesk: true, extraTotal: 0 });
+    const teacher = await registerMember({ memberName: "Tina Professora Lima", guest: true, guestName: personName(5, "Gui") });
+    await decideAffiliation(attendant, { registrationId: teacher.registrationId, decision: "CONFIRM" });
+    const staff = await createEmployee(admin, {
+      fullName: "Rosa Colaboradora Dias",
+      cpf: "",
+      whatsapp: "",
+      jobTitle: "Financeiro",
+      category: "STAFF",
+      guest: { fullName: personName(6, "Caio"), cpf: "", isMinor: false },
+    });
+    const courtesy = await createEmployee(admin, { fullName: "Cora Cortesia Lima", cpf: "", whatsapp: "", jobTitle: "Presidência", category: "COURTESY", guest: null });
+    const expected = {
+      [teacher.state.member.id]: "TEACHER",
+      [teacher.state.guest!.personId]: "TEACHER_GUEST",
+      [staff.personId]: "STAFF",
+      [staff.guest!.personId]: "EMPLOYEE_GUEST",
+      [courtesy.personId]: "COURTESY",
+    };
+    for (const personId of Object.keys(expected)) await registerCheckIn(security, { personId, method: "SEARCH" });
+
+    const queue = await listDeskQueue(db);
+    expect(Object.fromEntries(queue.items.map((item) => [item.personId, item.category]))).toEqual(expected);
+    expect(queue.items.find((item) => item.personId === staff.guest!.personId)?.hostName).toBe("Rosa Colaboradora Dias");
+    for (const [personId, category] of Object.entries(expected)) {
+      expect((await loadDeskView(db, personId, desk.access))?.category).toBe(category);
     }
   });
 

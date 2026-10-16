@@ -66,6 +66,7 @@ function view(input: Partial<DeskView> & Pick<DeskView, "personId" | "fullName" 
     voucherCode: null,
     isMinor: false,
     roleLabel: "Professor(a) filiado(a)",
+    category: "TEACHER",
     entry: { at: today(19, 42), byName: "Carlos (segurança)" },
     walkIn: false,
     kitsAtDesk: true,
@@ -74,14 +75,16 @@ function view(input: Partial<DeskView> & Pick<DeskView, "personId" | "fullName" 
   };
 }
 
-function queueRow(personId: string, fullName: string, voucherCode: string, at: Date): DeskQueueRow {
+function queueRow(personId: string, fullName: string, voucherCode: string, at: Date, guestOf: string | null = null): DeskQueueRow {
   return {
     personId,
     fullName,
     isMinor: false,
     checkedInAt: at.toISOString(),
     checkedInByName: "Carlos (segurança)",
-    roleLabel: "Professor(a) filiado(a)",
+    roleLabel: guestOf ? `Convidado(a) de ${guestOf}` : "Professor(a) filiado(a)",
+    category: guestOf ? "TEACHER_GUEST" : "TEACHER",
+    hostName: guestOf,
     extra: false,
     waitlisted: false,
     voucherCode,
@@ -119,7 +122,7 @@ export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
       queue: [
         { right: false, fresh: true, row: queueRow("t-jpl", "João Paulo Lima", "QW7E-3RTY", today(20, 2)) },
         { right: true, fresh: true, row: queueRow("t-jp", "João Pedro Alves", "JP26-4XKA", today(20, 1)) },
-        { right: false, fresh: false, row: queueRow("t-mc", "Maria Clara Souza", "MC55-8ZPD", today(19, 57)) },
+        { right: false, fresh: false, row: queueRow("t-mc", "Maria Clara Souza", "MC55-8ZPD", today(19, 57), "Paulo Reis") },
       ],
       view: view({
         personId: "t-jp",
@@ -197,6 +200,7 @@ export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
         cpf: "Sem CPF",
         voucherCode: "J2KF-6WPS",
         roleLabel: "Convidado(a) de Carla Mendes",
+        category: "TEACHER_GUEST",
         entry: { at: today(19, 58), byName: "Carlos (segurança)" },
         kit: { kind: "READY", kitType: "GUEST", pool: "ALL", extra: false, minor: false },
       }),
@@ -217,6 +221,7 @@ export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
         voucherCode: "T9MN-3BXQ",
         isMinor: true,
         roleLabel: "Convidado(a) de André Barros",
+        category: "TEACHER_GUEST",
         kit: { kind: "READY", kitType: "GUEST", pool: "ALL", extra: false, minor: true },
       }),
       action: { kind: "deliver", crate: { right: "Kit de menor de 18", wrong: "Kit comum" } },

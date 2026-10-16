@@ -6,7 +6,10 @@ import { ChevronRight, Gift, Loader, Package, Warning } from "@/components/icons
 import { Button } from "@/components/ui/button";
 import { formatTime } from "@/lib/datetime";
 import { firstName } from "@/lib/text";
+import type { DeskCategory } from "@/domain/desk-category";
 import { cn } from "@/lib/utils";
+import { DeskCategoryChip } from "./category-chip";
+import { DESK_CATEGORY_STYLE } from "./category-style";
 
 /** Uma pessoa na fila da mesa (quem passou pela entrada e ainda não pegou o kit). */
 export interface DeskQueueRow {
@@ -16,6 +19,10 @@ export interface DeskQueueRow {
   checkedInAt: string;
   checkedInByName: string;
   roleLabel: string;
+  /** O grupo (cor e etiqueta). */
+  category: DeskCategory;
+  /** Convidado(a): quem convidou. */
+  hostName: string | null;
   /** Kit da gordura (inscrição na hora). */
   extra: boolean;
   /** Na fila do kit. */
@@ -63,7 +70,7 @@ export function DeskQueueItemRow({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border bg-surface transition-[border-color,box-shadow] duration-700",
+        "relative overflow-hidden rounded-xl border bg-surface pl-1.5 transition-[border-color,box-shadow] duration-700",
         isNew
           ? "border-success shadow-[0_0_0_2px_rgb(34_197_94/0.35),0_0_28px_-6px_rgb(34_197_94/0.7)]"
           : confirming
@@ -75,7 +82,10 @@ export function DeskQueueItemRow({
       data-testid="desk-queue-item"
       data-new={isNew ? "true" : undefined}
       data-right={right === undefined ? undefined : right ? "true" : "false"}
+      data-category={item.category}
     >
+      {/* A cor do grupo, na lateral: professor(a), convidado(a), diretoria, cortesia... */}
+      <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: DESK_CATEGORY_STYLE[item.category].color }} aria-hidden />
       <div className="flex items-center">
         <button
           type="button"
@@ -92,7 +102,10 @@ export function DeskQueueItemRow({
           )}
           <span className="min-w-0 flex-1">
             <span className="block truncate font-bold text-fg">{item.fullName}</span>
-            <span className="block truncate text-xs text-fg-muted">{item.roleLabel}</span>
+            <span className="mt-1 flex min-w-0 items-center gap-1.5">
+              <DeskCategoryChip category={item.category} />
+              {item.hostName ? <span className="truncate text-xs text-fg-muted">de {item.hostName}</span> : null}
+            </span>
           </span>
           {yellow && !item.quick ? <WalkInStamp className="hidden min-[420px]:inline-flex" /> : null}
           {item.waitlisted && !item.quick ? <span className="pixel rounded bg-surface-3 px-1.5 py-1 text-[0.5rem] text-fg-muted">Fila</span> : null}

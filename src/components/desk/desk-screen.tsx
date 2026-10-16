@@ -16,6 +16,7 @@ import { deliverAtDeskAction, deskScanAction, deskSearchAction, deskViewAction, 
 import type { DeskStock, DeskView } from "@/server/services/desk";
 import type { PersonSearchResult } from "@/server/services/people";
 import { useDebouncedSearch } from "@/components/gate/use-debounced-search";
+import { DeskCategoryLegend } from "./category-chip";
 import { DeskCard } from "./desk-card";
 import { type DeskQueueRow, DeskQueueItemRow } from "./queue-row";
 import { QrSheet } from "./qr-sheet";
@@ -430,6 +431,7 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
             {live ? "Ao vivo" : "Reconectando"}
           </span>
         </h2>
+        <DeskCategoryLegend />
         {snapshot.items.length === 0 ? (
           <p className="rounded-xl border-2 border-dashed border-line px-4 py-6 text-center text-sm text-fg-muted">
             Ninguém esperando kit agora. Quem a segurança liberar aparece aqui sozinho.
