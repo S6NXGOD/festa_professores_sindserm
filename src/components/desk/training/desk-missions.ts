@@ -1,5 +1,6 @@
 import { toSearchText } from "@/lib/text";
 import type { DeskView } from "@/server/services/desk";
+import type { DeskQueueRow } from "../queue-row";
 
 /*
  * Treino da mesa dos kits: cada missão é uma pessoa que chega na mesa. A
@@ -35,7 +36,9 @@ export type MissionAction =
   /** Tocar em Entregar kit (no cartão de verdade). `crate`: depois, pegar o kit da caixa certa. */
   | { kind: "deliver"; crate?: { right: string; wrong: string } }
   /** O cartão não deixa entregar: escolher o que fazer. */
-  | { kind: "choose"; right: string; wrong: string };
+  | { kind: "choose"; right: string; wrong: string }
+  /** Botão rápido da fila da mesa: Entregar, conferir na própria linha e confirmar. */
+  | { kind: "quick" };
 
 export interface DeskMission {
   id: string;
@@ -45,6 +48,8 @@ export interface DeskMission {
   roster: RosterPerson[];
   view: DeskView;
   action: MissionAction;
+  /** Missão do botão rápido: a fila da mesa (`right` = quem chegou). */
+  queue?: { row: DeskQueueRow; right: boolean; fresh: boolean }[];
   /** A regra, numa frase: aparece depois de responder e na cola do fim. */
   lesson: string;
 }
@@ -69,6 +74,21 @@ function view(input: Partial<DeskView> & Pick<DeskView, "personId" | "fullName" 
   };
 }
 
+function queueRow(personId: string, fullName: string, voucherCode: string, at: Date): DeskQueueRow {
+  return {
+    personId,
+    fullName,
+    isMinor: false,
+    checkedInAt: at.toISOString(),
+    checkedInByName: "Carlos (segurança)",
+    roleLabel: "Professor(a) filiado(a)",
+    extra: false,
+    waitlisted: false,
+    voucherCode,
+    quick: true,
+  };
+}
+
 export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
   const deadline = ctx.kitDeadline ? { label: ctx.kitDeadline, passed: false } : null;
   const missions: DeskMission[] = [
@@ -90,6 +110,25 @@ export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
       }),
       action: { kind: "deliver" },
       lesson: "Achou, conferiu, entregou: o estoque baixa e o kit não sai de novo para ela.",
+    },
+    {
+      id: "rapido",
+      title: "O jeito rápido",
+      arrival: { says: "Oi! Sou o João Pedro, a segurança acabou de me liberar.", shows: { kind: "voucher", code: "JP26-4XKA" }, hint: "" },
+      roster: [],
+      queue: [
+        { right: false, fresh: true, row: queueRow("t-jpl", "João Paulo Lima", "QW7E-3RTY", today(20, 2)) },
+        { right: true, fresh: true, row: queueRow("t-jp", "João Pedro Alves", "JP26-4XKA", today(20, 1)) },
+        { right: false, fresh: false, row: queueRow("t-mc", "Maria Clara Souza", "MC55-8ZPD", today(19, 57)) },
+      ],
+      view: view({
+        personId: "t-jp",
+        fullName: "João Pedro Alves",
+        voucherCode: "JP26-4XKA",
+        kit: { kind: "READY", kitType: "MEMBER", pool: "ALL", extra: false, minor: false },
+      }),
+      action: { kind: "quick" },
+      lesson: "Acabou de passar pela segurança? Já está no topo da fila: Entregar, confira nome e voucher e confirme.",
     },
     {
       id: "na-hora",

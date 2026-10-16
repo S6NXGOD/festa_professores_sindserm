@@ -6,7 +6,7 @@ import { deskTrainingRequired, gateTrainingRequired } from "@/domain/tutorial";
 
 describe("treino da mesa dos kits", () => {
   it("as pessoas da mesa: o básico, voucher amarelo, já pegou, não entrou e convidada sozinha (+ menor, se houver kit de menor)", () => {
-    expect(deskMissions({ kitDeadline: null, minorKit: false }).map((m) => m.id)).toEqual(["basico", "na-hora", "ja-pegou", "nao-entrou", "convidada"]);
+    expect(deskMissions({ kitDeadline: null, minorKit: false }).map((m) => m.id)).toEqual(["basico", "rapido", "na-hora", "ja-pegou", "nao-entrou", "convidada"]);
     const withMinor = deskMissions({ kitDeadline: "22:00", minorKit: true });
     expect(withMinor.map((m) => m.id)).toContain("menor");
     const walkIn = withMinor.find((m) => m.id === "na-hora")!;
@@ -16,12 +16,20 @@ describe("treino da mesa dos kits", () => {
   });
 
   it("a busca do treino acha pelo nome (sem acento), pelo código do voucher e pelo CPF", () => {
-    const [basic, walkIn, again] = deskMissions({ kitDeadline: null, minorKit: false });
+    const missions = deskMissions({ kitDeadline: null, minorKit: false });
+    const [basic, walkIn, again] = ["basico", "na-hora", "ja-pegou"].map((id) => missions.find((m) => m.id === id));
     expect(searchRoster(basic!.roster, "ana lima").map((p) => p.personId)).toEqual(["t-ana"]);
     expect(searchRoster(basic!.roster, "Lima").length).toBe(2);
     expect(searchRoster(walkIn!.roster, "z4wd2hne")[0]?.fullName).toBe("Rafael Souza");
     expect(searchRoster(again!.roster, "12345678909")[0]?.fullName).toBe("Beatriz Costa");
     expect(searchRoster(again!.roster, "x")).toEqual([]);
+  });
+
+  it("o jeito rápido: a fila tem quem chegou e um nome parecido para conferir", () => {
+    const quick = deskMissions({ kitDeadline: null, minorKit: false }).find((m) => m.id === "rapido")!;
+    expect(quick.action).toEqual({ kind: "quick" });
+    expect(quick.queue?.filter((entry) => entry.right).map((entry) => entry.row.fullName)).toEqual(["João Pedro Alves"]);
+    expect(quick.queue?.map((entry) => entry.row.fullName)).toContain("João Paulo Lima");
   });
 
   it("a mesa dos kits é obrigatória para quem entrega kits (fora os administradores)", () => {

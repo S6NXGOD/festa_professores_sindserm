@@ -14,7 +14,7 @@ import { formatVoucherCode } from "@/server/crypto";
 import { type Actor, assertPermission } from "./actor";
 import { writeAudit } from "./audit";
 import { lockPersonWithGroups } from "./checkin";
-import { DESK_BLOCK_MESSAGE, type DeskKit, deskRoleOf, evaluateDeskKit, walkInOf } from "./desk-kit";
+import { DESK_BLOCK_MESSAGE, type DeskKit, deskRoleOf, evaluateDeskKit, hasMinorKit, walkInOf } from "./desk-kit";
 import { DomainError, isUniqueViolation } from "./errors";
 import { employeeKitInput, hasEmployeeStock, kitInput, recordEmployeeKitDelivery, recordKitDelivery } from "./kits";
 import { getEventConfig, getStockOverview } from "./settings";
@@ -205,6 +205,10 @@ export interface DeskQueueItem {
   extra: boolean;
   /** Na fila do kit (pode não sair agora). */
   waitlisted: boolean;
+  /** Código do voucher, para conferir com o que a pessoa mostra. */
+  voucherCode: string | null;
+  /** Dá para entregar direto da lista (botão rápido); senão, abre o cartão e ele explica por quê. */
+  quick: boolean;
 }
 
 export interface DeskQueue {
@@ -213,6 +217,8 @@ export interface DeskQueue {
   pending: number;
   /** Kits entregues na festa até agora. */
   delivered: number;
+  /** A montagem tem kit de menor de 18: a confirmação rápida avisa. */
+  minorKit: boolean;
 }
 
 /**
@@ -233,10 +239,16 @@ export async function listDeskQueue(ex: Executor, limit = 40): Promise<DeskQueue
     is_teacher: boolean | null;
     extra: boolean;
     waitlisted: boolean;
+    voucher_code: string | null;
+    host_in: boolean;
     total: number;
   }>(sql`
     WITH waiting AS (
       SELECT ci.person_id, p.full_name, p.is_minor, ci.checked_in_at, u.name AS checked_in_by, ci.role::text AS role,
+             (SELECT v.code FROM voucher v WHERE v.person_id = ci.person_id AND v.revoked_at IS NULL LIMIT 1) AS voucher_code,
+             -- Convidado: quem convidou já entrou? (com o kit na portaria, o do convidado espera essa chegada)
+             EXISTS (SELECT 1 FROM check_in hc
+                      WHERE hc.cancelled_at IS NULL AND hc.person_id = COALESCE(hr.member_person_id, he.person_id)) AS host_in,
              hp.full_name AS host_name, hep.full_name AS host_employee_name, e.category::text AS employee_category, r.is_teacher,
              COALESCE(CASE WHEN ci.role = 'MEMBER' THEN r.member_kit_extra_at IS NOT NULL
                            WHEN ci.role = 'GUEST' THEN hr.guest_kit_extra_at IS NOT NULL END, false) AS extra,
@@ -265,7 +277,12 @@ export async function listDeskQueue(ex: Executor, limit = 40): Promise<DeskQueue
     )
     SELECT *, count(*) OVER ()::int AS total FROM waiting ORDER BY checked_in_at DESC LIMIT ${limit}
   `);
-  const delivered = await ex.execute<{ total: number }>(sql`SELECT count(*)::int AS total FROM kit_delivery WHERE cancelled_at IS NULL`);
+  const [delivered, config] = await Promise.all([
+    ex.execute<{ total: number }>(sql`SELECT count(*)::int AS total FROM kit_delivery WHERE cancelled_at IS NULL`),
+    getEventConfig(ex),
+  ]);
+  const deadlinePassed = isKitDeadlinePassed(config);
+  const atDesk = Boolean(config?.kitsAtDesk);
   const items = result.rows.map((row): DeskQueueItem => {
     const roleLabel =
       row.role === "EMPLOYEE"
@@ -285,9 +302,17 @@ export async function listDeskQueue(ex: Executor, limit = 40): Promise<DeskQueue
       roleLabel,
       extra: row.extra,
       waitlisted: row.waitlisted,
+      voucherCode: row.voucher_code ? formatVoucherCode(row.voucher_code) : null,
+      // Fila do kit antes do horário e convidado esperando quem convidou (kit na portaria): abre o cartão.
+      quick: !(row.waitlisted && !deadlinePassed) && !(row.role === "GUEST" && !atDesk && !row.host_in),
     };
   });
-  return { items, pending: Number(result.rows[0]?.total ?? 0), delivered: Number(delivered.rows[0]?.total ?? 0) };
+  return {
+    items,
+    pending: Number(result.rows[0]?.total ?? 0),
+    delivered: Number(delivered.rows[0]?.total ?? 0),
+    minorKit: hasMinorKit(config),
+  };
 }
 
 /** Kits entregues por uma pessoa da equipe (o placar da mesa). */

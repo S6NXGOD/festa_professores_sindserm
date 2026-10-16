@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DeskCard } from "@/components/desk/desk-card";
+import { DeskQueueItemRow } from "@/components/desk/queue-row";
 import { shuffled } from "@/components/gate/training/scenarios";
 import { WalkInStamp } from "@/components/gate/walk-in-stamp";
 import { Check, Close, Gamepad, Gift, Info, Loader, MemberCard, Package, QrCode, Reload, Search, Star, Trophy } from "@/components/icons/pixel";
@@ -203,11 +204,20 @@ export function DeskTraining({ context, required }: { context: DeskTrainingConte
             >
               <ArrivalPanel mission={mission} />
 
-              {step === "find" && !answer ? (
+              {mission.action.kind === "quick" && !answer ? (
+                <QuickStep
+                  mission={mission}
+                  onDeliver={(right) =>
+                    settle(right, "Era o João Pedro Alves (JP26-4XKA): confira o nome e o código do voucher antes de confirmar.")
+                  }
+                />
+              ) : null}
+
+              {step === "find" && !answer && mission.action.kind !== "quick" ? (
                 <FindStep mission={mission} query={query} results={results} onQuery={setQuery} onPick={pick} />
               ) : null}
 
-              {step !== "find" || answer?.right ? (
+              {mission.action.kind !== "quick" && (step !== "find" || answer?.right) ? (
                 <DeskCard
                   view={mission.view}
                   onDeliver={step === "card" && !answer && mission.action.kind === "deliver" ? deliver : undefined}
@@ -248,6 +258,35 @@ export function DeskTraining({ context, required }: { context: DeskTrainingConte
           </AnimatePresence>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** O jeito rápido: a fila da mesa de verdade (a mesma linha), com o botão Entregar em cada pessoa. */
+function QuickStep({ mission, onDeliver }: { mission: DeskMission; onDeliver: (right: boolean) => void }) {
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <div className="space-y-2 rounded-2xl border border-red/40 bg-brand-soft/40 p-3.5" data-testid="desk-training-queue">
+      <p className="display text-xl leading-none text-fg">Ele já está na fila da mesa</p>
+      <p className="text-sm text-fg-muted">Toque em Entregar na pessoa certa, confira o nome e o voucher e confirme.</p>
+      <div className="space-y-2">
+        {(mission.queue ?? []).map(({ row, right, fresh }) => (
+          <DeskQueueItemRow
+            key={row.personId}
+            item={row}
+            isNew={fresh}
+            confirming={open === row.personId}
+            onOpen={() => setOpen(row.personId)}
+            onQuick={() => {
+              setOpen(row.personId);
+              playSound("blip");
+            }}
+            onCancel={() => setOpen(null)}
+            onConfirm={() => onDeliver(right)}
+            right={right}
+          />
+        ))}
+      </div>
     </div>
   );
 }

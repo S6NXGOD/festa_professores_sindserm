@@ -1767,11 +1767,22 @@ test.describe.serial("festa das professoras e professores", () => {
         await desk.getByTestId("desk-training-next").click();
         let guard = 0;
         while ((await desk.getByTestId("desk-training-done").count()) === 0 && guard++ < 12) {
-          await expect(desk.getByTestId("desk-training-hint")).toBeVisible();
+          // A situação anterior sai com animação: espera a nova (sem resposta) antes de ler qual é.
+          await expect(desk.getByTestId("desk-training-feedback")).toHaveCount(0);
+          if ((await desk.getByTestId("desk-training-done").count()) > 0) break;
+          await expect(mission).toBeVisible();
           const id = await mission.getAttribute("data-mission");
-          await desk.getByTestId("desk-training-hint").click();
-          await desk.locator('[data-testid="desk-training-result"][data-right="true"]').click();
-          if (id === "ja-pegou" || id === "nao-entrou") {
+          if (id === "rapido") {
+            // O jeito rápido: Entregar na linha da pessoa certa e confirmar ali mesmo.
+            await desk.locator('[data-testid="desk-queue-item"][data-right="true"] [data-testid="desk-quick-deliver"]').click();
+            await desk.getByTestId("desk-quick-confirm").click();
+          } else {
+            await desk.getByTestId("desk-training-hint").click();
+            await desk.locator('[data-testid="desk-training-result"][data-right="true"]').click();
+          }
+          if (id === "rapido") {
+            // Já respondido acima.
+          } else if (id === "ja-pegou" || id === "nao-entrou") {
             await desk.getByTestId("desk-training-choice-right").click();
           } else {
             await desk.getByTestId("desk-deliver").click();
@@ -1836,6 +1847,12 @@ test.describe.serial("festa das professoras e professores", () => {
         const arrived = desk.getByTestId("desk-queue-item").filter({ hasText: SECOND.name });
         await expect(arrived).toBeVisible({ timeout: 6_000 });
         await expect(arrived).toHaveAttribute("data-new", "true");
+        // Botão rápido: Entregar na linha, conferir e confirmar; a pessoa sai da fila.
+        await arrived.getByTestId("desk-quick-deliver").click();
+        await expect(arrived.getByTestId("desk-quick-confirm-box")).toContainText(SECOND.name);
+        await arrived.getByTestId("desk-quick-confirm").click();
+        await expect(desk.getByText(`Kit entregue a ${SECOND.name}`)).toBeVisible();
+        await expect(desk.getByTestId("desk-queue-item").filter({ hasText: SECOND.name })).toHaveCount(0);
       });
       await attendantContext.close();
       await deskContext.close();

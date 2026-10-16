@@ -20,6 +20,7 @@ export async function GET() {
         now: new Date().toISOString(),
         pending: queue.pending,
         delivered: queue.delivered,
+        minorKit: queue.minorKit,
         items: queue.items.map((item) => ({ ...item, checkedInAt: item.checkedInAt.toISOString() })),
         stock: deskStockOf(stock),
       },

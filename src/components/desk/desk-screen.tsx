@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { WalkInStamp } from "@/components/gate/walk-in-stamp";
 import { ChevronRight, Gift, Hourglass, Info, Login, Package, QrCode, Search, Target, Users } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,25 +17,19 @@ import type { DeskStock, DeskView } from "@/server/services/desk";
 import type { PersonSearchResult } from "@/server/services/people";
 import { useDebouncedSearch } from "@/components/gate/use-debounced-search";
 import { DeskCard } from "./desk-card";
+import { type DeskQueueRow, DeskQueueItemRow } from "./queue-row";
 import { QrSheet } from "./qr-sheet";
 import { type DeskLiveEvent, useDeskLive } from "./use-desk-live";
 
-export interface DeskQueueRow {
-  personId: string;
-  fullName: string;
-  isMinor: boolean;
-  checkedInAt: string;
-  checkedInByName: string;
-  roleLabel: string;
-  extra: boolean;
-  waitlisted: boolean;
-}
+export type { DeskQueueRow } from "./queue-row";
 
 export interface DeskSnapshot {
   pending: number;
   delivered: number;
   items: DeskQueueRow[];
   stock: DeskStock;
+  /** A montagem tem kit de menor de 18. */
+  minorKit: boolean;
 }
 
 /** Com os avisos ao vivo, a consulta da fila é só de reserva; sem eles, mais frequente. */
@@ -80,6 +73,9 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
   const { results, loading, run } = useDebouncedSearch<PersonSearchResult>(search);
   /** Quem acabou de entrar (destaque por alguns segundos), com a hora em que apareceu. */
   const [fresh, setFresh] = useState<Record<string, number>>({});
+  /** Botão rápido da fila: quem está com a confirmação aberta e quem está sendo entregue agora. */
+  const [quickOpen, setQuickOpen] = useState<string | null>(null);
+  const [quickBusy, setQuickBusy] = useState<string | null>(null);
   const knownRef = useRef<Set<string> | null>(null);
   const refreshTimer = useRef<number | undefined>(undefined);
   /** O cartão aberto (enquanto não foi entregue agora): um aviso sobre essa pessoa recarrega o cartão. */
@@ -213,6 +209,32 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
   }, []);
 
   const closeQr = useCallback(() => setQrOpen(false), []);
+
+  /** Entrega direto da fila (depois da confirmação na própria linha). */
+  async function quickDeliver(item: DeskQueueRow) {
+    setQuickBusy(item.personId);
+    const result = await callAction(deliverAtDeskAction({ personId: item.personId }));
+    setQuickBusy(null);
+    setQuickOpen(null);
+    if (!result.ok) {
+      playSound("error");
+      vibrate([80, 60, 80]);
+      toast.error(result.error);
+      void refresh();
+      return;
+    }
+    const done = result.data.delivered;
+    playSound("coin");
+    vibrate([40, 30, 90]);
+    toast.success(`Kit entregue a ${item.fullName}${done.extra ? " (gordura)" : ""}. Restam ${done.available} ${done.extra ? "na gordura" : "na caixa"}.`);
+    if (done.low) toast.warning(`Atenção: restam ${done.available} ${done.extra ? "na gordura" : "na caixa"}.`);
+    // O cartão aberto era dessa pessoa: mostra que saiu.
+    if (selected?.personId === item.personId) {
+      setSelected(result.data.view);
+      setJustDelivered({ available: done.available, extra: done.extra, low: done.low });
+    }
+    void refresh();
+  }
 
   function deliver(leftover = false) {
     if (!selected) return;
@@ -426,37 +448,21 @@ export function DeskScreen({ initial, fullCpf }: { initial: DeskSnapshot; fullCp
                     exit={{ opacity: 0, x: 40 }}
                     transition={{ type: "spring", stiffness: 420, damping: 32 }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => void open(item.personId)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-xl border bg-surface p-3 text-left outline-none transition-[border-color,box-shadow] duration-700 hover:border-red/60 focus-visible:ring-[3px] focus-visible:ring-red/50",
-                        isNew
-                          ? "border-success shadow-[0_0_0_2px_rgb(34_197_94/0.35),0_0_28px_-6px_rgb(34_197_94/0.7)]"
-                          : item.extra
-                            ? "border-[#ffd23f]/50"
-                            : "border-line",
-                      )}
-                      data-testid="desk-queue-item"
-                      data-new={isNew ? "true" : undefined}
-                    >
-                      {isNew ? (
-                        <span className="pixel w-12 shrink-0 animate-pulse text-center text-[0.55rem] text-success-text" data-testid="desk-queue-new">
-                          Chegou
-                        </span>
-                      ) : (
-                        <span className="pixel w-12 shrink-0 text-center text-[0.6rem] text-fg-dim tabular">
-                          {formatTime(new Date(item.checkedInAt))}
-                        </span>
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-bold text-fg">{item.fullName}</span>
-                        <span className="block truncate text-xs text-fg-muted">{item.roleLabel}</span>
-                      </span>
-                      {item.extra ? <WalkInStamp className="hidden min-[420px]:inline-flex" /> : null}
-                      {item.waitlisted ? <span className="pixel rounded bg-surface-3 px-1.5 py-1 text-[0.5rem] text-fg-muted">Fila</span> : null}
-                      <ChevronRight className={cn("size-5 shrink-0 text-fg-dim", opening === item.personId && "animate-pulse")} />
-                    </button>
+                    <DeskQueueItemRow
+                      item={item}
+                      isNew={isNew}
+                      minorKit={snapshot.minorKit}
+                      confirming={quickOpen === item.personId}
+                      busy={quickBusy === item.personId}
+                      opening={opening === item.personId}
+                      onOpen={() => void open(item.personId)}
+                      onQuick={() => {
+                        setQuickOpen(item.personId);
+                        playSound("blip");
+                      }}
+                      onCancel={() => setQuickOpen(null)}
+                      onConfirm={() => void quickDeliver(item)}
+                    />
                   </motion.li>
                 );
               })}
