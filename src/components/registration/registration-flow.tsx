@@ -49,7 +49,7 @@ export function RegistrationFlow({
             <p className="pixel text-[0.62rem] text-red neon-red">
               {GAME.pressStart}<span className="animate-blink">_</span>
             </p>
-            <h1 className="display mt-4 text-[2.6rem] text-fg sm:text-5xl">Você é filiado(a) ao SINDSERM?</h1>
+            <h1 className="display brush mt-4 text-[2.6rem] text-fg sm:text-5xl">Você é filiado(a) ao SINDSERM?</h1>
             <p className="mt-3 text-fg-muted">A inscrição é feita por quem é filiado(a), que também cadastra o seu convidado.</p>
             {kitsSoldOut(kitSupply) ? (
               <div className="mt-6">

@@ -192,11 +192,11 @@ export const EDITIONS: Record<EditionId, Edition> = {
     defaultEventName: "Festa das Servidoras e Servidores – SINDSERMTHE",
     emblem: {
       raster: "/brand/servidores/emblema.png",
-      alt: "Quem luta não fica na sombra — Festa do Servidor Público Municipal",
+      alt: "Quem luta também se diverte — Festa do Servidor Público Municipal",
       transparent: true,
     },
-    themeColor: "#0b1026",
-    tagline: "Quem luta não fica na sombra!",
+    themeColor: "#0b1330",
+    tagline: "Quem luta também se diverte!",
     terms: {
       person: "servidor(a)",
       Person: "Servidor(a)",

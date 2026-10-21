@@ -106,6 +106,18 @@
   --animate-bubble: bubble-rise 14s linear infinite;
   --animate-twinkle: twinkle 3.6s ease-in-out infinite;
   --animate-bob: bob 2.4s ease-in-out infinite;
+  /* Gaivotas atravessando o céu (verão), batendo as asas. */
+  --animate-fly: fly 46s linear infinite;
+  --animate-flap: flap 0.9s ease-in-out infinite;
+
+  @keyframes fly {
+    from { transform: translateX(-14vw); }
+    to { transform: translateX(114vw); }
+  }
+  @keyframes flap {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.5); }
+  }
 
   @keyframes wave-drift {
     from { transform: translateX(0); }
@@ -258,37 +270,38 @@
 }
 
 /*
- * Verão (festa das servidoras e servidores): fim de tarde na piscina. Azul do
- * céu escurecendo, coral do pôr do sol como cor principal e turquesa da água.
- * As outras cores (verde, amarelo, vermelho de aviso) continuam as mesmas.
+ * Verão (festa das servidoras e servidores, "Quem luta também se diverte"):
+ * as cores da logo — vermelho e laranja do pôr do sol, amarelo do sol, ciano
+ * da piscina e o creme das letras — sobre o azul da noite chegando. As outras
+ * cores (verde, amarelo, vermelho de aviso) continuam as mesmas.
  */
 [data-tema="verao"] {
-  --ink: #0a1630;
-  --ink-2: #0d1b3a;
-  --surface: #13224a;
-  --surface-2: #182a57;
-  --surface-3: #213567;
-  --line: #2a3d72;
-  --line-strong: #3a5090;
-  --paper: #ffe8c2;
-  --paper-ink: #3a2410;
+  --ink: #0b1330;
+  --ink-2: #0e1738;
+  --surface: #141f46;
+  --surface-2: #192654;
+  --surface-3: #223064;
+  --line: #2b3a72;
+  --line-strong: #3b4c90;
+  --paper: #fff1d6;
+  --paper-ink: #2a0c08;
 
-  --fg: #fff9f0;
-  --fg-muted: #c1c6e0;
-  --fg-dim: #8590b8;
+  --fg: #fff6e8;
+  --fg-muted: #c8c6dc;
+  --fg-dim: #8b8eb4;
 
-  --red: #ff6a4d;
-  --brand: #ff5233;
-  --brand-strong: #b8341a;
+  --red: #ff5a2e;
+  --brand: #f23c1c;
+  --brand-strong: #a8200d;
   --brand-foreground: #ffffff;
-  --brand-soft: rgb(255 106 77 / 0.14);
-  --glow: rgb(255 130 80 / 0.55);
+  --brand-soft: rgb(242 60 28 / 0.15);
+  --glow: rgb(255 120 40 / 0.55);
 
-  --info: #e9f4ff;
-  --info-foreground: #0a1630;
-  --info-soft: rgb(31 214 201 / 0.12);
+  --info: #e6f7ff;
+  --info-foreground: #0b1330;
+  --info-soft: rgb(28 184 242 / 0.13);
 
-  --chart-4: #1fd6c9;
+  --chart-4: #1cb8f2;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -313,12 +326,12 @@
       repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.018) 0 1px, transparent 1px 3px);
     background-attachment: fixed;
   }
-  /* Verão: céu do fim de tarde (azul escurecendo para o roxo, com o brilho do sol no horizonte). */
+  /* Verão: o céu logo depois do pôr do sol (azul da noite em cima, vinho e o brilho laranja no horizonte). */
   [data-tema="verao"] body {
     background-image:
-      radial-gradient(120% 55% at 50% 108%, rgb(255 120 80 / 0.26), transparent 62%),
-      radial-gradient(90% 40% at 50% 100%, rgb(255 201 74 / 0.16), transparent 60%),
-      linear-gradient(180deg, #0a1630 0%, #1b1747 58%, #3a1d4f 100%);
+      radial-gradient(120% 55% at 50% 108%, rgb(255 110 30 / 0.32), transparent 62%),
+      radial-gradient(90% 40% at 50% 100%, rgb(255 210 58 / 0.16), transparent 60%),
+      linear-gradient(180deg, #0b1330 0%, #241448 55%, #4c1236 100%);
   }
   ::selection {
     background: var(--brand);
@@ -513,80 +526,91 @@
   }
 
   /* ----------------------------------------------------------------------- */
-  /* Verão: as mesmas peças do tema, com cara de piscina e pôr do sol.         */
+  /* Verão, no visual da logo "Quem luta também se diverte". Títulos e números */
+  /* seguem na condensada forte (como "FESTA DO SERVIDOR PÚBLICO MUNICIPAL"); */
+  /* o pincel da logo fica para os títulos de impacto (.brush e a capa).      */
   /* Só fonte, cor e brilho mudam (tamanho e espaçamento seguem os da tela).  */
   /* ----------------------------------------------------------------------- */
-  [data-tema="verao"] .display {
-    font-family: var(--font-summer-display), var(--font-display);
+  [data-tema="verao"] .pixel {
+    font-family: var(--font-saira), var(--font-pixel);
+    font-stretch: 75%;
+    font-weight: 800;
+    font-size-adjust: cap-height 0.78;
+    letter-spacing: 0.09em;
+  }
+  /* Pincel da logo ("QUEM LUTA ... DIVERTE"). Nos anos 80, a classe não muda nada. */
+  [data-tema="verao"] .brush {
+    font-family: var(--font-summer-brush), var(--font-display);
     font-stretch: normal;
     font-weight: 400;
-    letter-spacing: 0.012em;
-  }
-  [data-tema="verao"] .pixel {
-    font-family: var(--font-summer-label), var(--font-pixel);
-    font-weight: 600;
-    font-size-adjust: cap-height 0.8;
-    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    line-height: 1;
   }
   [data-tema="verao"] .neon {
     color: #fff;
     text-shadow:
       0 0 2px #fff,
       0 0 10px var(--red),
-      0 0 26px rgb(255 201 74 / 0.55),
-      0 0 52px rgb(255 82 51 / 0.35);
+      0 0 26px rgb(255 210 58 / 0.5),
+      0 0 52px rgb(242 60 28 / 0.35);
   }
   [data-tema="verao"] .neon-red {
     color: var(--red);
     text-shadow:
-      0 0 8px rgb(255 106 77 / 0.75),
-      0 0 22px rgb(255 201 74 / 0.32);
+      0 0 8px rgb(255 90 46 / 0.75),
+      0 0 22px rgb(255 210 58 / 0.3);
   }
   [data-tema="verao"] .neon-box {
     box-shadow:
-      0 0 0 1px rgb(255 106 77 / 0.6),
+      0 0 0 1px rgb(255 90 46 / 0.6),
       0 0 18px -2px var(--glow),
       inset 0 0 14px -6px var(--glow);
   }
   [data-tema="verao"] .neon-line {
-    background: linear-gradient(90deg, transparent, #1fd6c9 18%, #fff7d6 50%, #ff6a4d 82%, transparent);
-    box-shadow: 0 0 12px rgb(31 214 201 / 0.5);
+    background: linear-gradient(90deg, transparent, #1cb8f2 18%, #fff3dc 50%, #ff5a2e 82%, transparent);
+    box-shadow: 0 0 12px rgb(28 184 242 / 0.5);
   }
-  /* Título em degradê de pôr do sol (no lugar do cromado). */
+  /* Título da capa: o pincel da logo em degradê de pôr do sol, com a sombra preta das letras dela. */
   [data-tema="verao"] .chrome {
-    background: linear-gradient(180deg, #fff7d1 0%, #ffd36b 30%, #ff9a4d 55%, #ff5c7a 80%, #ff3d8b 100%);
+    font-family: var(--font-summer-brush), var(--font-display);
+    font-stretch: normal;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    background: linear-gradient(180deg, #fff3dc 0%, #ffd23a 38%, #ff8a1f 66%, #e8191f 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    filter: drop-shadow(0 3px 0 #1b1747) drop-shadow(0 0 18px rgb(255 120 80 / 0.4));
+    filter: drop-shadow(0 4px 0 #000) drop-shadow(0 0 20px rgb(255 110 30 / 0.4));
   }
   @media (max-width: 639px) {
     [data-tema="verao"] .chrome {
       background: none;
-      color: #ffd36b;
-      -webkit-text-fill-color: #ffd36b;
+      color: #ffd23a;
+      -webkit-text-fill-color: #ffd23a;
     }
   }
   [data-tema="verao"] .halftone {
-    background-image: radial-gradient(rgb(31 214 201 / 0.45) 1.1px, transparent 1.6px);
+    background-image: radial-gradient(rgb(28 184 242 / 0.45) 1.1px, transparent 1.6px);
   }
   /* O chão quadriculado vira o azulejo do fundo da piscina, mais calmo. */
   [data-tema="verao"] .retro-floor {
     background-image:
-      linear-gradient(to right, rgb(31 214 201 / 0.4) 1.5px, transparent 1.5px),
-      linear-gradient(to bottom, rgb(31 214 201 / 0.4) 1.5px, transparent 1.5px);
+      linear-gradient(to right, rgb(28 184 242 / 0.4) 1.5px, transparent 1.5px),
+      linear-gradient(to bottom, rgb(28 184 242 / 0.4) 1.5px, transparent 1.5px);
     animation-duration: 3.2s;
   }
-  /* O sol listrado dos anos 80 vira o sol se pondo (amarelo → coral → rosa). */
+  /* O sol listrado vira o sol da logo se pondo (amarelo → laranja → vermelho). */
   [data-tema="verao"] .retro-sun {
-    background: linear-gradient(to bottom, #fff2a8 0%, #ffd24a 28%, #ff9a3d 52%, #ff5c6a 76%, #d9387f 100%);
+    background: linear-gradient(to bottom, #ffe45c 0%, #ffc12e 26%, #ff8a1f 52%, #f2471c 76%, #c9141a 100%);
   }
   [data-tema="verao"] .animate-sun-glow {
     animation-name: sun-glow-verao;
   }
   @keyframes sun-glow-verao {
-    0%, 100% { filter: drop-shadow(0 0 30px rgb(255 190 80 / 0.45)); }
-    50% { filter: drop-shadow(0 0 60px rgb(255 140 80 / 0.7)); }
+    0%, 100% { filter: drop-shadow(0 0 30px rgb(255 170 40 / 0.45)); }
+    50% { filter: drop-shadow(0 0 60px rgb(255 110 30 / 0.7)); }
   }
   /* Sem linhas de TV no verão. */
   [data-tema="verao"] .scanlines {

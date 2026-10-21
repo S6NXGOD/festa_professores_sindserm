@@ -44,28 +44,28 @@ export function PoolProgress({
         >
           <defs>
             <linearGradient id={`${id}-agua`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#3fe3d6" />
-              <stop offset="1" stopColor="#1a7cff" />
+              <stop offset="0" stopColor="#3cc8f5" />
+              <stop offset="1" stopColor="#0a6fd1" />
             </linearGradient>
             <pattern id={`${id}-azulejo`} width="11" height="11" patternUnits="userSpaceOnUse">
               <path d="M11 0H0V11" fill="none" stroke="rgb(255 255 255 / 0.16)" strokeWidth="1" />
             </pattern>
           </defs>
           {/* borda de pedra e a água, com o azulejo do fundo */}
-          <rect x="2" y="2" width="216" height="108" rx="14" fill="#ffe8c2" stroke="#e9c48c" strokeWidth="2" />
+          <rect x="2" y="2" width="216" height="108" rx="14" fill="#fff1d6" stroke="#e9c48c" strokeWidth="2" />
           <rect x="11" y="11" width="198" height="90" rx="8" fill={`url(#${id}-agua)`} />
           <rect x="11" y="11" width="198" height="90" rx="8" fill={`url(#${id}-azulejo)`} />
           {/* faixa do fundo da raia do meio, com a marca de cada etapa */}
-          <line x1={markX(0)} x2={markX(last)} y1="56" y2="56" stroke="#0b3f8f" strokeOpacity="0.45" strokeWidth="4" strokeLinecap="round" />
+          <line x1={markX(0)} x2={markX(last)} y1="56" y2="56" stroke="#08417f" strokeOpacity="0.45" strokeWidth="4" strokeLinecap="round" />
           {steps.map((name, index) => (
             <circle
               key={name}
               cx={markX(index)}
               cy="56"
               r="5"
-              fill={index <= current ? "#ffd24a" : "#0b3f8f"}
+              fill={index <= current ? "#ffd23a" : "#08417f"}
               fillOpacity={index <= current ? 1 : 0.6}
-              stroke="#fff9f0"
+              stroke="#fff3dc"
               strokeWidth={index === current ? 1.5 : 0}
             />
           ))}
@@ -116,7 +116,7 @@ function Rope({ y }: { y: number }) {
     <g>
       <line x1="13" x2="207" y1={y} y2={y} stroke="#fff" strokeOpacity="0.45" strokeWidth="0.8" />
       {Array.from({ length: 28 }, (_, index) => (
-        <circle key={index} cx={15 + index * 7.1} cy={y} r="2.4" fill={index % 2 ? "#fff9f0" : "#ff5233"} />
+        <circle key={index} cx={15 + index * 7.1} cy={y} r="2.4" fill={index % 2 ? "#fff3dc" : "#f23c1c"} />
       ))}
     </g>
   );
@@ -126,8 +126,8 @@ function Rope({ y }: { y: number }) {
 function FloatRing({ cx, cy }: { cx: number; cy: number }) {
   return (
     <g style={{ transformBox: "fill-box", transformOrigin: "center" }} className="animate-reel">
-      <circle cx={cx} cy={cy} r="7.8" fill="none" stroke="#fff9f0" strokeWidth="6.4" />
-      <circle cx={cx} cy={cy} r="7.8" fill="none" stroke="#ff5233" strokeWidth="6.4" strokeDasharray="6.13 6.13" />
+      <circle cx={cx} cy={cy} r="7.8" fill="none" stroke="#fff3dc" strokeWidth="6.4" />
+      <circle cx={cx} cy={cy} r="7.8" fill="none" stroke="#f23c1c" strokeWidth="6.4" strokeDasharray="6.13 6.13" />
       <circle cx={cx} cy={cy} r="11" fill="none" stroke="#0a1630" strokeOpacity="0.25" strokeWidth="0.8" />
     </g>
   );
@@ -138,11 +138,11 @@ export function FloatLoader({ label = "Carregando", className }: { label?: strin
   return (
     <div role="status" className={cn("flex flex-col items-center gap-3 text-fg-muted", className)}>
       <svg viewBox="0 0 64 32" className="w-20" aria-hidden>
-        <path d="M0 23q8-5 16 0t16 0t16 0t16 0V32H0Z" fill="#1fd6c9" fillOpacity="0.55" />
+        <path d="M0 23q8-5 16 0t16 0t16 0t16 0V32H0Z" fill="#1cb8f2" fillOpacity="0.55" />
         <g className="animate-bob">
           <FloatRing cx={32} cy={15} />
         </g>
-        <path d="M0 26q8-5 16 0t16 0t16 0t16 0V32H0Z" fill="#2e78ff" fillOpacity="0.75" />
+        <path d="M0 26q8-5 16 0t16 0t16 0t16 0V32H0Z" fill="#0a6fd1" fillOpacity="0.75" />
       </svg>
       <span className="pixel text-[0.6rem]">
         {label}

@@ -78,7 +78,7 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
           <p className="pixel mt-5 text-[0.62rem] text-red neon-red">
             {isNew ? (cards.length > 1 ? `${GAME.player1Name} + ${GAME.player2Name} prontos` : `${GAME.player1Name} pronto`) : recovered ? GAME.recovered : "Seus vouchers"}
           </p>
-          <h1 className="display mt-3 text-5xl text-fg sm:text-6xl">
+          <h1 className="display brush mt-3 text-5xl text-fg sm:text-6xl">
             {isNew ? (awaitingSignature ? "Ficha gravada!" : `Você está na ${GAME.floor}!`) : recovered ? "Achamos seus vouchers!" : "Vouchers da inscrição"}
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-fg-muted">

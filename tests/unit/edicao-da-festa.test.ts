@@ -27,7 +27,7 @@ describe("edição da festa (um sistema por festa)", () => {
     expect(servidores.terms.ofPerson).toBe("do(a) servidor(a)");
     expect(servidores.game.player[1]).toBe("TITULAR");
     expect(servidores.emblem).toMatchObject({ raster: "/brand/servidores/emblema.png", transparent: true });
-    expect(servidores.tagline).toBe("Quem luta não fica na sombra!");
+    expect(servidores.tagline).toBe("Quem luta também se diverte!");
     expect(servidores.defaultEventName).toBe("Festa das Servidoras e Servidores – SINDSERMTHE");
     // Mesmas chaves nas duas edições: nenhum texto fica faltando.
     expect(Object.keys(servidores.terms).sort()).toEqual(Object.keys(EDITIONS.professores.terms).sort());

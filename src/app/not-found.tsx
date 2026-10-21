@@ -11,7 +11,7 @@ export default function NotFound() {
       <RetroBackdrop />
       <div className="text-center">
         <p className="pixel text-[0.62rem] text-fg-muted">Erro 404</p>
-        <h1 className="pixel mt-4 animate-flicker text-3xl leading-tight text-red neon-red sm:text-5xl">{GAME.gameOver}</h1>
+        <h1 className="pixel brush mt-4 animate-flicker text-3xl leading-tight text-red neon-red sm:text-5xl">{GAME.gameOver}</h1>
         <p className="mx-auto mt-6 max-w-sm text-fg-muted">
           {GAME.notFoundLine} O endereço pode estar errado ou o conteúdo saiu do ar.
         </p>
@@ -21,7 +21,7 @@ export default function NotFound() {
           </Link>
         </Button>
         <HelpLine lead="Se perdeu?" topic="achar uma página do site" className="mt-6 justify-center" />
-        <p className="pixel mt-8 text-[0.55rem] text-fg-dim">
+        <p className="pixel mt-8 text-[0.55rem] text-fg-muted [text-shadow:0_1px_3px_rgb(0_0_0/0.9)]">
           {GAME.insertCoin}<span className="animate-blink">_</span>
         </p>
       </div>

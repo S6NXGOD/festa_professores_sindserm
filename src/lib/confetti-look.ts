@@ -1,8 +1,8 @@
 import type { Options } from "canvas-confetti";
 import { EDITION } from "@/domain/edition";
 
-/** As cores do verão: pôr do sol, sol, água da piscina, mar e espuma. */
-const SUMMER_COLORS = ["#ff5233", "#ffd24a", "#1fd6c9", "#2e78ff", "#fff9f0", "#ff7ab6"];
+/** As cores da logo do verão: vermelho e laranja do pôr do sol, amarelo do sol, ciano da piscina e o creme das letras. */
+const SUMMER_COLORS = ["#f23c1c", "#ff8a1f", "#ffd23a", "#1cb8f2", "#fff1d6"];
 
 /**
  * O visual do confete da festa: quadradinhos "pixelados" nas cores pedidas

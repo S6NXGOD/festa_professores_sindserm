@@ -145,4 +145,4 @@ Na festa das servidoras e servidores não existe a pergunta "é professor(a)?": 
 
 Não vêm inscrições, convidados (os com kit, dos colaboradores, também não), entradas, kits, documentos e configurações. Quem já existe no destino (mesmo e-mail, mesmo CPF ou mesmo nome na lista) fica como está, então importar de novo não duplica ninguém. O arquivo é cifrado com a senha (AES-256-GCM): sem ela, não abre. Apague o arquivo depois.
 
-**Arte da festa** ("Quem luta não fica na sombra"): a original fica em `public/sunset_sindserm.png`, de fundo transparente. O `npm run brand` gera `public/brand/servidores/emblema.webp` e `emblema.png`, usados pelo site, pela prévia do link, pelo voucher em imagem, pelos PDFs e pelo ícone padrão. Arte nova: troque o arquivo original (mesmo nome) e rode o comando.
+**Arte da festa** ("Quem luta também se diverte"): a original fica em `public/quem_luta_se_diverte.png`, de fundo transparente. O `npm run brand` gera `public/brand/servidores/emblema.webp` e `emblema.png`, usados pelo site, pela prévia do link, pelo voucher em imagem, pelos PDFs e pelo ícone padrão. Arte nova: troque o arquivo original (mesmo nome) e rode o comando.

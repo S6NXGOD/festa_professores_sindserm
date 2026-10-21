@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fredoka, Lilita_One, Permanent_Marker, Saira, Tiny5 } from "next/font/google";
+import { Knewave, Permanent_Marker, Saira, Tiny5 } from "next/font/google";
 import { SiteIconProvider } from "@/components/brand/site-icon";
 import { HelpProvider } from "@/components/help/help";
 import { Providers } from "@/components/providers";
@@ -23,9 +23,9 @@ const marker = Permanent_Marker({
   display: "swap",
   preload: false,
 });
-// Verão (festa das servidoras e servidores): títulos redondos e etiquetas de boia, com acentos. Só baixam quando usadas.
-const summerDisplay = Lilita_One({ subsets: ["latin"], weight: "400", variable: "--font-summer-display", display: "swap", preload: false });
-const summerLabel = Fredoka({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-summer-label", display: "swap", preload: false });
+// Verão (festa das servidoras e servidores): o pincel da logo "Quem luta também se diverte", com acentos.
+// Só baixa quando usada (os títulos de impacto do verão); "block" evita piscar a letra comum antes do pincel.
+const summerBrush = Knewave({ subsets: ["latin"], weight: "400", variable: "--font-summer-brush", display: "block", preload: false });
 
 export async function generateMetadata(): Promise<Metadata> {
   const [config, event, window, icon] = await Promise.all([getConfig(), getEventInfo(), getRegistrationWindow(), getSiteIcon()]);
@@ -65,7 +65,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="pt-BR"
       data-tema={EDITION.theme}
-      className={cn(saira.variable, pixel.variable, marker.variable, summerDisplay.variable, summerLabel.variable)}
+      className={cn(saira.variable, pixel.variable, marker.variable, summerBrush.variable)}
     >
       <body className="min-h-dvh antialiased">
         <Providers>

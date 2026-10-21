@@ -1,7 +1,7 @@
 /**
  * Gera as versões otimizadas das artes a partir dos arquivos originais em
  * /public (logo_festa.png, logo_base.png, logo_base_branca.png e, da festa
- * das servidoras e servidores, sunset_sindserm.png).
+ * das servidoras e servidores, quem_luta_se_diverte.png).
  *
  *   npm run brand
  *
@@ -27,7 +27,7 @@ await sharp("src/app/icon.svg", { density: 300 }).resize(180, 180).png().toFile(
 
 // Festa das servidoras e servidores (verão): a arte oficial, de fundo transparente,
 // recortada e centralizada no mesmo quadro do emblema (904 × 776), sem ampliar.
-const SERVIDORES_ART = "public/sunset_sindserm.png";
+const SERVIDORES_ART = "public/quem_luta_se_diverte.png";
 if (existsSync(SERVIDORES_ART)) {
   mkdirSync(`${OUT}/servidores`, { recursive: true });
   const art = await sharp(SERVIDORES_ART)

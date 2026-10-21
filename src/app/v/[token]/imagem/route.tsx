@@ -17,25 +17,25 @@ const assetsPromise = Promise.all([
   readFile(join(fontsDir, "saira-latin-500-normal.woff")),
   readFile(join(fontsDir, "saira-latin-700-normal.woff")),
   readFile(join(fontsDir, "saira-condensed-latin-900-normal.woff")),
-  // Selos do voucher: letreiro pixel (anos 80) ou letras redondas (verão).
-  readFile(join(fontsDir, EDITION.theme === "verao" ? "fredoka-latin-600-normal.woff" : "tiny5-latin-400-normal.woff")),
+  // Selos do voucher: letreiro pixel (anos 80) ou a condensada forte da logo (verão).
+  readFile(join(fontsDir, EDITION.theme === "verao" ? "saira-condensed-latin-900-normal.woff" : "tiny5-latin-400-normal.woff")),
   readFile(join(process.cwd(), "public", EDITION.emblem.raster)),
   readFile(join(process.cwd(), "public/brand/sindserm-branca.png")),
 ]);
 const EMBLEM_MIME = EDITION.emblem.raster.endsWith(".png") ? "image/png" : "image/jpeg";
 
 const { width: WIDTH, height: HEIGHT } = VOUCHER_IMAGE;
-// Cores da festa desta edição: vermelho e preto (anos 80) ou coral e azul do fim de tarde (verão).
+// Cores da festa desta edição: vermelho e preto (anos 80) ou as da logo do verão (vermelho do pôr do sol sobre o azul da noite).
 const SUMMER = EDITION.theme === "verao";
-const RED = SUMMER ? "#ff6a4d" : "#ff2626";
-const RED_RGB = SUMMER ? "255,106,77" : "255,38,38";
-const CARD = SUMMER ? "#13224a" : "#0e0e0f";
-const TAG_MEMBER = SUMMER ? "#ff5233" : "#e3000f";
-const TAG_GUEST = SUMMER ? "#213567" : "#232326";
-const FG = SUMMER ? "#fff9f0" : "#f5f4f1";
-const MUTED = SUMMER ? "#c1c6e0" : "#a8a49e";
-const LINE = SUMMER ? "#3a5090" : "#3b3b41";
-const LINE_SOFT = SUMMER ? "#2a3d72" : "#26262a";
+const RED = SUMMER ? "#ff5a2e" : "#ff2626";
+const RED_RGB = SUMMER ? "255,90,46" : "255,38,38";
+const CARD = SUMMER ? "#141f46" : "#0e0e0f";
+const TAG_MEMBER = SUMMER ? "#f23c1c" : "#e3000f";
+const TAG_GUEST = SUMMER ? "#223064" : "#232326";
+const FG = SUMMER ? "#fff6e8" : "#f5f4f1";
+const MUTED = SUMMER ? "#c8c6dc" : "#a8a49e";
+const LINE = SUMMER ? "#3b4c90" : "#3b3b41";
+const LINE_SOFT = SUMMER ? "#2b3a72" : "#26262a";
 const AMBER = "#f8c000";
 
 /** O "metal" do passe da casa por categoria (o mesmo do voucher na tela). */
@@ -45,7 +45,7 @@ const METAL: Record<EmployeeCategory, { accent: string; rgb: string; tagText: st
   CONTRACTOR: { accent: "#22d3ee", rgb: "34,211,238", tagText: "#0e0e0f", tag: "PRESTADOR(A)" },
   COURTESY: { accent: "#ff4fb4", rgb: "255,79,180", tagText: "#1a0010", tag: "CORTESIA" },
 };
-const INK = SUMMER ? "#0a1630" : "#080808";
+const INK = SUMMER ? "#0b1330" : "#080808";
 /** Nenhum bloco encolhe: a altura de cada um é garantida pela conta do layout. */
 const KEEP = { flexShrink: 0 } as const;
 
