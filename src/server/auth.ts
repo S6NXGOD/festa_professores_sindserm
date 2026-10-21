@@ -8,10 +8,11 @@ import { DEFAULT_EVENT_NAME } from "@/domain/labels";
 import { db } from "@/server/db";
 import { account, session, user, verification } from "@/server/db/schema";
 import { publicBaseUrl } from "@/server/public-url";
+import { localNetworkAddresses } from "@/lib/local-network";
 
 const baseURL = publicBaseUrl();
-// Rodando na própria máquina, o login funciona em qualquer porta (3000, 3200...):
-// antes, abrir o sistema numa porta diferente da do BETTER_AUTH_URL dava "Invalid origin".
+// Rodando na própria máquina, o login funciona em qualquer porta (3000, 3200...) e também pelo endereço
+// da máquina na rede local (o celular na mesma rede): antes, isso dava "Invalid origin".
 // Publicado com um domínio de verdade, só valem o BETTER_AUTH_URL e o TRUSTED_ORIGINS.
 const isLocalBase = !baseURL || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(baseURL);
 const extraOrigins = [
@@ -19,7 +20,7 @@ const extraOrigins = [
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
-  ...(isLocalBase ? ["http://localhost:*", "http://127.0.0.1:*"] : []),
+  ...(isLocalBase ? ["http://localhost:*", "http://127.0.0.1:*", ...localNetworkAddresses().map((address) => `http://${address}:*`)] : []),
 ];
 
 const DAY_SECONDS = 60 * 60 * 24;

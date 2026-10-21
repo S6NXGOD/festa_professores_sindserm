@@ -68,10 +68,11 @@ Caracteres especiais da senha devem ser codificados na URL (ex.: `@` → `%40`).
 
 ```bash
 npm run dev                  # desenvolvimento: http://localhost:3000
+npm run dev:servidores       # a festa das servidoras e servidores, com banco próprio (seção 7)
 npm run build && npm start   # produção
 ```
 
-Porta 3000 ocupada? Use `npm run dev -- -p 3200`. Rodando em `localhost`, o login funciona em qualquer porta; publicado com domínio, vale o `BETTER_AUTH_URL` (e o `TRUSTED_ORIGINS`).
+Porta 3000 ocupada? Use `npm run dev -- -p 3200`. Ao ligar, o servidor aplica sozinho as migrations pendentes no banco do `.env.local` (não precisa rodar `db:migrate` depois de atualizar o código). Rodando no computador, o login funciona em qualquer porta e também pelo endereço da máquina na rede (o "Network" que aparece ao ligar, para testar no celular); publicado com domínio, vale o `BETTER_AUTH_URL` (e o `TRUSTED_ORIGINS`).
 
 **Primeiro administrador:** pelo navegador em `/setup` (com o `SETUP_TOKEN`) ou pelo terminal:
 
@@ -134,6 +135,8 @@ Antes do primeiro `test:e2e`: `npx playwright install chromium`. O E2E simula a 
 Cada festa tem o próprio sistema publicado (um serviço e um banco por festa), com o mesmo código. A variável `NEXT_PUBLIC_FESTA_EDICAO` escolhe a festa: vazia ou `professores`, a das professoras e professores (anos 80); `servidores`, a das servidoras e servidores (verão). Ela entra no build: mudou, faça um deploy novo.
 
 Na festa das servidoras e servidores não existe a pergunta "é professor(a)?": **toda pessoa filiada tem 1 kit e leva 1 convidado com kit**. O resto funciona igual (ficha de filiação, conferência, vouchers, portaria, mesa dos kits, gordura, colaboradores, cortesias e relatórios), com textos, cores, fontes, sons e arte do verão.
+
+**No computador:** `npm run dev:servidores` (outra porta: `npm run dev:servidores -- -p 3001`). Usa um banco só desta festa, `<nome>_servidores`, criado e atualizado sozinho, então os dados da festa dos professores (`npm run dev`) ficam como estão. No primeiro acesso, abra `/setup` com o `SETUP_TOKEN` do `.env.local` e depois `/setup/evento`. Para testar a mudança entre festas, gere o pacote no `npm run dev` e traga no `npm run dev:servidores` (um de cada vez).
 
 **No Railway:** no mesmo projeto, **New → Database → PostgreSQL** (banco novo) e **New → GitHub Repo** (este repositório de novo). No serviço novo, gere o domínio e cole as variáveis do passo 4 da seção 4, com o banco novo, **segredos novos** (`npm run env:secrets`) e `NEXT_PUBLIC_FESTA_EDICAO="servidores"`. Depois, `/setup/evento` com a data, o local, os horários e o estoque desta festa.
 

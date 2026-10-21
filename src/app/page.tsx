@@ -52,7 +52,7 @@ export default async function HomePage() {
           <h1 className="display mt-4 text-4xl text-fg">Inscrições em breve</h1>
           <p className="mt-3 text-fg-muted">A festa ainda está sendo preparada pela organização do SINDSERM. Volte mais tarde.</p>
           {!usersExist ? (
-            <Button asChild variant="outline" className="mt-6">
+            <Button asChild variant="outline" className="mt-6 bg-ink/85 backdrop-blur-sm">
               <Link href="/setup">
                 <Settings /> Configurar o sistema
               </Link>

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { localNetworkAddresses } from "./src/lib/local-network";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -52,6 +53,9 @@ const nextConfig: NextConfig = {
   env: { APP_BUILD_COMMIT: process.env.RAILWAY_GIT_COMMIT_SHA ?? "" },
   // O selo "N" do modo de desenvolvimento cobria o rodapé do menu do painel.
   devIndicators: false,
+  // Em desenvolvimento, o Next só libera localhost: sem isto, abrir pelo endereço da rede (ex.: 192.168.1.36:3000,
+  // no celular) dava tela preta, porque os arquivos internos do Next eram bloqueados.
+  allowedDevOrigins: localNetworkAddresses(),
   // Quem pede /favicon.ico direto (favoritos, leitores de link) recebe o ícone atual do site.
   async rewrites() {
     return [{ source: "/favicon.ico", destination: "/icone?s=48" }];
