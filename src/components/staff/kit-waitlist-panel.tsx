@@ -6,6 +6,7 @@ import { plural } from "@/lib/plural";
 import type { WaitingSlot } from "@/server/services/kit-waitlist";
 import { AdvanceWaitlistButton } from "./advance-waitlist-button";
 import { Panel } from "./panel-ui";
+import { T } from "@/domain/edition";
 
 /**
  * Fila do kit: quem se inscreveu depois que os kits acabaram, na ordem em que
@@ -66,8 +67,8 @@ export function KitWaitlistPanel({
                   )}
                 </p>
                 <p className="truncate text-xs text-fg-muted">
-                  {slot.kitType === "MEMBER" ? "Kit do(a) professor(a)" : `Kit de convidado · de ${slot.memberName}`}
-                  {shared ? "" : slot.kitType === "MEMBER" ? " · fila dos professores" : " · fila dos convidados"} · desde{" "}
+                  {slot.kitType === "MEMBER" ? `Kit ${T.ofPerson}` : `Kit de convidado · de ${slot.memberName}`}
+                  {shared ? "" : slot.kitType === "MEMBER" ? ` · fila de ${T.person}` : " · fila de convidado"} · desde{" "}
                   {formatShortDateTime(slot.since)}
                 </p>
               </div>

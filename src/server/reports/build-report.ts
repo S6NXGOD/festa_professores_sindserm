@@ -24,6 +24,7 @@ import { type EmployeeRow, listEmployees } from "@/server/services/employees";
 import { getKitCounts, getKitPlan } from "@/server/services/kit-plan";
 import { listKitWaitlist } from "@/server/services/kit-waitlist";
 import { getDashboardStats, getPeopleKitComparison } from "@/server/services/stats";
+import { T } from "@/domain/edition";
 
 /*
  * O conteúdo de cada relatório em PDF: as mesmas contas das telas do painel,
@@ -175,7 +176,7 @@ async function kitsReport(report: ReportPdf, deadline: ReportContext["kitDeadlin
         ? "no estoque único"
         : "no estoque geral"
       : pool === "MEMBER"
-        ? "no estoque de professor(a)"
+        ? `no estoque de ${T.person}`
         : pool === "GUEST"
           ? "no estoque de convidado"
           : "no estoque dos colaboradores";
@@ -424,11 +425,11 @@ async function registrationsReport(report: ReportPdf) {
   const waitlisted = rows.filter((row) => row.member_kit_waitlisted_at).length + rows.filter((row) => row.guest_kit_waitlisted_at).length;
 
   report.stats([
-    { label: "Inscrições", value: n(rows.length), hint: `${n(teachers)} de professoras e professores` },
+    { label: "Inscrições", value: n(rows.length), hint: `${n(teachers)} de ${T.people}` },
     { label: "Confirmadas", value: n(count("CONFIRMED") + count("JOINED_AT_EVENT")), tone: "success", hint: count("JOINED_AT_EVENT") ? `${n(count("JOINED_AT_EVENT"))} pela ficha` : undefined },
     { label: "Para conferir", value: n(count("PENDING")), tone: count("PENDING") ? "warning" : undefined, hint: count("AWAITING_SIGNATURE") ? `+ ${plural(count("AWAITING_SIGNATURE"), "ficha", "fichas")} para assinar` : undefined },
     { label: "Não confirmadas", value: n(count("REJECTED")), tone: count("REJECTED") ? "danger" : undefined, hint: "Fora da conta dos kits" },
-    { label: "Convidados", value: n(guests), hint: "1 por professor(a)" },
+    { label: "Convidados", value: n(guests), hint: `1 por ${T.person}` },
     { label: "Já entraram", value: n(entered), tone: entered ? "success" : undefined, hint: "Inscritos e convidados" },
     { label: "Kits na fila", value: n(waitlisted), tone: waitlisted ? "warning" : undefined, hint: "Inscrições depois que acabaram" },
   ]);
@@ -444,7 +445,7 @@ async function registrationsReport(report: ReportPdf) {
       { header: "Entrada", width: 1.7 },
     ],
     rows.map((row): Cell[] => [
-      { text: row.full_name, bold: true, sub: `${row.cpf ? `CPF ${maskCpf(row.cpf)}` : "Sem CPF"} · ${row.is_teacher ? "professor(a)" : "filiado(a)"}` },
+      { text: row.full_name, bold: true, sub: `${row.cpf ? `CPF ${maskCpf(row.cpf)}` : "Sem CPF"} · ${row.is_teacher ? T.person : "filiado(a)"}` },
       statusChip(row.status),
       kitCell(row, "MEMBER"),
       row.guest_name ? { text: row.guest_name, sub: row.guest_minor ? "menor de 18" : undefined } : none,

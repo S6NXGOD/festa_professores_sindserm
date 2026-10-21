@@ -16,10 +16,10 @@ import {
   type PixelIcon,
   Reload,
   Shield,
-  Teach,
   Users,
   Warning,
 } from "@/components/icons/pixel";
+import { PersonIcon } from "@/components/icons/person-icon";
 import { PlayerTag } from "@/components/retro/bits";
 import { ScrollHint } from "@/components/retro/scroll-hint";
 import { CATEGORY_STYLE } from "@/components/staff/employee-category";
@@ -32,22 +32,23 @@ import type { EntryKitResult } from "@/server/services/checkin";
 import type { GateView, KitOnEntry, KitView } from "@/server/services/gate-view";
 import { Disclosure } from "./disclosure";
 import { WalkInStamp } from "./walk-in-stamp";
+import { EDITION, GAME, T } from "@/domain/edition";
 
 type Tone = "success" | "warning" | "danger";
 
 function headerFor(view: GateView, justCheckedIn: boolean): { tone: Tone; icon: PixelIcon; kicker: string; title: string; detail?: string } {
   if (justCheckedIn && view.entry.kind === "ALREADY_IN") {
-    return { tone: "success", icon: Check, kicker: "1UP", title: "ENTRADA CONFIRMADA", detail: `Registrada às ${formatTime(view.entry.at)}.` };
+    return { tone: "success", icon: Check, kicker: GAME.oneUp, title: "ENTRADA CONFIRMADA", detail: `Registrada às ${formatTime(view.entry.at)}.` };
   }
   switch (view.entry.kind) {
     case "ALLOWED":
       // Quem é a pessoa vem logo abaixo do nome: a faixa fica curta e a decisão cabe na tela.
-      return { tone: "success", icon: Shield, kicker: "Ready", title: "LIBERADO PARA ENTRADA" };
+      return { tone: "success", icon: Shield, kicker: GAME.ready, title: "LIBERADO PARA ENTRADA" };
     case "ALREADY_IN":
       return {
         tone: "warning",
         icon: Reload,
-        kicker: "Continue?",
+        kicker: GAME.again,
         title: "ENTRADA JÁ REGISTRADA",
         detail: `Em ${formatShortDateTime(view.entry.at)} por ${view.entry.byName} (${CHECK_IN_METHOD_LABEL[view.entry.method]}).`,
       };
@@ -56,7 +57,7 @@ function headerFor(view: GateView, justCheckedIn: boolean): { tone: Tone; icon: 
       return {
         tone: soft ? "warning" : "danger",
         icon: soft ? Clock : Cancel,
-        kicker: "Stop",
+        kicker: GAME.stop,
         title: view.entry.title.toUpperCase(),
         detail: view.entry.detail,
       };
@@ -95,9 +96,9 @@ function roleLine(view: GateView): { icon: PixelIcon; iconClass: string; text: s
   const own = view.ownRegistration;
   if (own) {
     return {
-      icon: own.isTeacher ? Teach : Human,
+      icon: own.isTeacher ? PersonIcon : Human,
       iconClass: own.isTeacher ? "text-red" : "text-fg-muted",
-      text: `${own.isTeacher ? "Professor(a)" : "Filiado(a)"} · ${AFFILIATION_STATUS_LABEL[own.status]}`,
+      text: `${own.isTeacher ? T.Person : "Filiado(a)"} · ${AFFILIATION_STATUS_LABEL[own.status]}`,
     };
   }
   return null;
@@ -318,7 +319,7 @@ function EntryKitBanner({ kit, guestKit, courtesy = false }: { kit: EntryKitResu
           ? courtesy
             ? `Kit da cortesia${kit.pool === "EMPLOYEE" ? " (estoque dos colaboradores)" : ""}.`
             : `Kit de colaborador(a)${kit.pool === "EMPLOYEE" ? " (estoque dos colaboradores)" : ""}.`
-          : "Kit de consumação do(a) professor(a).",
+          : `Kit de consumação ${T.ofPerson}.`,
     );
   } else {
     lines.push(count > 0 ? `Kit de quem chegou: ${reasonText(kit.message, true)}` : reasonText(kit.message));
@@ -424,7 +425,7 @@ function DetailRows({ view }: { view: GateView }) {
       ) : null}
 
       {isGuest && view.host ? (
-        <InfoRow icon={Users} label={view.host.kind === "EMPLOYEE" ? "Colaborador(a) que convidou" : "Professor(a) responsável"}>
+        <InfoRow icon={Users} label={view.host.kind === "EMPLOYEE" ? "Colaborador(a) que convidou" : `${T.Person} responsável`}>
           <span className="font-bold">{view.host.fullName}</span>
           <span className="mt-1.5 flex flex-wrap gap-2">
             {view.host.status ? (
@@ -442,7 +443,7 @@ function DetailRows({ view }: { view: GateView }) {
       ) : null}
 
       {own ? (
-        <InfoRow icon={own.isTeacher ? Teach : Human} label={isGuest ? "Filiação própria" : "Filiação"}>
+        <InfoRow icon={own.isTeacher ? PersonIcon : Human} label={isGuest ? "Filiação própria" : "Filiação"}>
           <AffiliationBadge status={own.status} />
         </InfoRow>
       ) : null}
@@ -462,7 +463,7 @@ function DetailRows({ view }: { view: GateView }) {
               {deadline}
             </>
           ) : (
-            <span className="text-fg-muted">Sem kit — exclusivo para professoras e professores.</span>
+            <span className="text-fg-muted">Sem kit — exclusivo para {T.people}.</span>
           )}
         </InfoRow>
       ) : null}
@@ -541,7 +542,8 @@ export function GateResult({
   const quick = mode === "gate" && (allowed || justCheckedIn || view.entry.kind === "BLOCKED");
   const inlineConfirm = Boolean(onConfirm) && canConfirmEntry(view) && !justCheckedIn;
   const canResolve = view.entry.kind === "BLOCKED" && view.permissions.validateAffiliation;
-  const teacherCheck = Boolean(own?.isTeacher) && view.role === "MEMBER" && deciding;
+  // Só na festa com a pergunta "é professor(a)?": a resposta foi declarada e a portaria confere.
+  const teacherCheck = EDITION.askTeacher && Boolean(own?.isTeacher) && view.role === "MEMBER" && deciding;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-line-strong bg-surface shadow-[0_24px_60px_-28px_rgb(0_0_0/0.95)]" data-testid="gate-result">
@@ -581,7 +583,7 @@ export function GateResult({
             className="pixel pointer-events-none absolute top-4 right-5 text-lg"
             aria-hidden
           >
-            1UP
+            {GAME.oneUp}
           </motion.span>
         ) : null}
       </motion.div>
@@ -639,7 +641,7 @@ export function GateResult({
             data-testid="teacher-check-reminder"
           >
             <Warning className="mt-0.5 size-4 shrink-0" />
-            Declarou ser professor(a): confira antes de confirmar.
+            Declarou ser {T.person}: confira antes de confirmar.
           </p>
         ) : null}
 

@@ -6,6 +6,7 @@ import { ArrowLeft, Warning } from "@/components/icons/pixel";
 import { PageHeader } from "@/components/staff/panel-ui";
 import { Button } from "@/components/ui/button";
 import { nextMonthValue } from "@/domain/affiliation-text";
+import { EDITION } from "@/domain/edition";
 import { isActiveMember } from "@/domain/rules";
 import type { AffiliationFormInput } from "@/domain/schemas";
 import { formatCpf } from "@/lib/cpf";
@@ -49,7 +50,7 @@ export default async function NewAffiliationPage({ searchParams }: PageProps<"/p
     jobTitle: "",
     admissionDate: "",
     contributionStartMonth: nextMonthValue(today),
-    isTeacher: (state?.ownRegistration?.isTeacher ?? null) as unknown as boolean,
+    isTeacher: (state?.ownRegistration?.isTeacher ?? (EDITION.askTeacher ? null : true)) as unknown as boolean,
     authorizationAccepted: false,
   };
 

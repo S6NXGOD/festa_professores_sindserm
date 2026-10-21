@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { DeskView } from "@/server/services/desk";
 import { DeskCategoryChip } from "./category-chip";
 import { DESK_CATEGORY_STYLE } from "./category-style";
+import { GAME } from "@/domain/edition";
 
 /**
  * Cartão da mesa dos kits: em cima, se a pessoa foi validada na entrada; no
@@ -43,7 +44,7 @@ export function DeskCard({
       ? {
           tone: "bg-danger text-white",
           icon: DoorClosed,
-          kicker: "Stop",
+          kicker: GAME.stop,
           title: "AINDA NÃO PASSOU PELA ENTRADA",
           detail: "Mande para a segurança registrar a entrada. Depois a pessoa volta aqui.",
         }
@@ -58,7 +59,7 @@ export function DeskCard({
         : {
             tone: "bg-success text-success-foreground",
             icon: Login,
-            kicker: "Ready",
+            kicker: GAME.ready,
             title: "VALIDADA NA ENTRADA",
             detail: view.entry ? `Entrou às ${formatTime(view.entry.at)} · registrado por ${view.entry.byName}` : undefined,
           };

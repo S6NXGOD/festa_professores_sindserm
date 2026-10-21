@@ -2,6 +2,8 @@
 
 Inscrição pública de professoras e professores filiados(as) e do seu convidado, ficha de filiação online para quem ainda não é filiado(a), vouchers individuais com QR Code, portaria com leitor de QR, conferência de filiação, kits entregues junto com a entrada (com horário limite), local da festa (foto, descrição e mapa) e painel administrativo. Visual anos 80 nas cores do SINDSERM.
 
+O mesmo código atende também a **Festa das Servidoras e Servidores** (tema verão: sol, piscina e pôr do sol), cada festa no seu sistema: veja [Outra festa com o mesmo sistema](#7-outra-festa-com-o-mesmo-sistema).
+
 Stack: Next.js (App Router) · TypeScript · PostgreSQL + Drizzle · Better Auth · Tailwind + shadcn/ui · Motion · React Hook Form + Zod · ZXing · Vitest · Playwright.
 
 ## Regras da festa
@@ -126,3 +128,21 @@ npm run test:e2e     # Playwright: build + fluxos completos no banco <nome>_e2e,
 ```
 
 Antes do primeiro `test:e2e`: `npx playwright install chromium`. O E2E simula a câmera com um vídeo do QR Code do voucher e exercita o leitor ZXing de verdade. `npm run check` executa lint, typecheck, testes e build em sequência.
+
+## 7. Outra festa com o mesmo sistema
+
+Cada festa tem o próprio sistema publicado (um serviço e um banco por festa), com o mesmo código. A variável `NEXT_PUBLIC_FESTA_EDICAO` escolhe a festa: vazia ou `professores`, a das professoras e professores (anos 80); `servidores`, a das servidoras e servidores (verão). Ela entra no build: mudou, faça um deploy novo.
+
+Na festa das servidoras e servidores não existe a pergunta "é professor(a)?": **toda pessoa filiada tem 1 kit e leva 1 convidado com kit**. O resto funciona igual (ficha de filiação, conferência, vouchers, portaria, mesa dos kits, gordura, colaboradores, cortesias e relatórios), com textos, cores, fontes, sons e arte do verão.
+
+**No Railway:** no mesmo projeto, **New → Database → PostgreSQL** (banco novo) e **New → GitHub Repo** (este repositório de novo). No serviço novo, gere o domínio e cole as variáveis do passo 4 da seção 4, com o banco novo, **segredos novos** (`npm run env:secrets`) e `NEXT_PUBLIC_FESTA_EDICAO="servidores"`. Depois, `/setup/evento` com a data, o local, os horários e o estoque desta festa.
+
+**Levar a equipe e as listas** (Configurações → Mudança entre festas; para quem administra o acesso e as configurações): no sistema de origem, **Gerar e baixar o pacote** com uma senha de 8 ou mais caracteres; no novo, escolha o arquivo, digite a senha, toque **Ver o que vem** e **Trazer agora**. Vêm:
+
+- a equipe, com o mesmo e-mail e a mesma senha (cada pessoa cria uma senha nova no primeiro acesso e refaz o tutorial e os treinos);
+- os colaboradores e as cortesias, inclusive os convidados sem kit, com vouchers novos;
+- as filiações já conferidas: quem se inscrever com o mesmo CPF e o mesmo nome é **confirmado(a) na hora**; com outro nome, fica para a conferência, com o aviso.
+
+Não vêm inscrições, convidados (os com kit, dos colaboradores, também não), entradas, kits, documentos e configurações. Quem já existe no destino (mesmo e-mail, mesmo CPF ou mesmo nome na lista) fica como está, então importar de novo não duplica ninguém. O arquivo é cifrado com a senha (AES-256-GCM): sem ela, não abre. Apague o arquivo depois.
+
+**Arte da festa** ("Quem luta não fica na sombra"): a original fica em `public/sunset_sindserm.png`, de fundo transparente. O `npm run brand` gera `public/brand/servidores/emblema.webp` e `emblema.png`, usados pelo site, pela prévia do link, pelo voucher em imagem, pelos PDFs e pelo ícone padrão. Arte nova: troque o arquivo original (mesmo nome) e rode o comando.

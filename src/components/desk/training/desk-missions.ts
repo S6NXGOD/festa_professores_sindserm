@@ -1,6 +1,7 @@
 import { toSearchText } from "@/lib/text";
 import type { DeskView } from "@/server/services/desk";
 import type { DeskQueueRow } from "../queue-row";
+import { T } from "@/domain/edition";
 
 /*
  * Treino da mesa dos kits: cada missão é uma pessoa que chega na mesa. A
@@ -65,7 +66,7 @@ function view(input: Partial<DeskView> & Pick<DeskView, "personId" | "fullName" 
     cpf: "***.456.789-**",
     voucherCode: null,
     isMinor: false,
-    roleLabel: "Professor(a) filiado(a)",
+    roleLabel: T.personAffiliated,
     category: "TEACHER",
     entry: { at: today(19, 42), byName: "Carlos (segurança)" },
     walkIn: false,
@@ -82,7 +83,7 @@ function queueRow(personId: string, fullName: string, voucherCode: string, at: D
     isMinor: false,
     checkedInAt: at.toISOString(),
     checkedInByName: "Carlos (segurança)",
-    roleLabel: guestOf ? `Convidado(a) de ${guestOf}` : "Professor(a) filiado(a)",
+    roleLabel: guestOf ? `Convidado(a) de ${guestOf}` : T.personAffiliated,
     category: guestOf ? "TEACHER_GUEST" : "TEACHER",
     hostName: guestOf,
     extra: false,
@@ -98,7 +99,7 @@ export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
     {
       id: "basico",
       title: "O básico",
-      arrival: { says: "Oi! Sou a Ana Lima, professora. Vim pegar meu kit!", shows: { kind: "voucher", code: "K7Q2-9MXA" }, hint: "Ana Lima" },
+      arrival: { says: `Oi! Sou a Ana Lima, ${T.femaleLower}. Vim pegar meu kit!`, shows: { kind: "voucher", code: "K7Q2-9MXA" }, hint: "Ana Lima" },
       roster: [
         { personId: "t-ana", fullName: "Ana Lima", cpf: "***.111.222-**", voucherCode: "K7Q2-9MXA", entered: true },
         { personId: "t-ana-2", fullName: "Ana Lia Lima Souto", cpf: "***.909.808-**", voucherCode: "P3RT-7KLM", entered: false },

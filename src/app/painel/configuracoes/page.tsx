@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Gift, MapPin, Settings, Star, Whatsapp } from "@/components/icons/pixel";
+import { Gift, MapPin, Repeat, Settings, Star, Whatsapp } from "@/components/icons/pixel";
+import { FestaPackageSettings } from "@/components/settings/festa-package-settings";
 import { EventSettingsForm, HelpSettingsForm, SigningSettingsForm } from "@/components/settings/settings-forms";
 import { SiteIconField } from "@/components/settings/site-icon-settings";
 import { VenuePhotoField, VenueSettingsForm } from "@/components/settings/venue-settings";
@@ -12,12 +13,13 @@ import { formatPhone, maskPhoneInput } from "@/lib/phone";
 import { db } from "@/server/db";
 import { getConfig, getSiteIcon } from "@/server/queries/config";
 import { getEventPhotoMeta } from "@/server/services/venue";
+import { can } from "@/domain/access";
 import { requirePageActor } from "@/server/session";
 
 export const metadata: Metadata = { title: "Configurações" };
 
 export default async function SettingsPage() {
-  await requirePageActor("manageSettings");
+  const actor = await requirePageActor("manageSettings");
   const [config, photo, icon] = await Promise.all([getConfig(), getEventPhotoMeta(db), getSiteIcon()]);
   if (!config) redirect("/setup/evento");
 
@@ -93,6 +95,15 @@ export default async function SettingsPage() {
           />
         </div>
       </Panel>
+      {can(actor.access, "manageUsers") ? (
+        <Panel title="Mudança entre festas" icon={Repeat}>
+          <p className="mb-4 text-sm text-fg-muted">
+            Cada festa tem o seu sistema. Para começar a próxima sem recadastrar tudo, gere o pacote aqui e importe no sistema da outra
+            festa (ou o contrário). Tudo fica na auditoria.
+          </p>
+          <FestaPackageSettings />
+        </Panel>
+      ) : null}
     </div>
   );
 }

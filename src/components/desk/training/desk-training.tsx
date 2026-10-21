@@ -19,6 +19,7 @@ import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { finishDeskTrainingAction } from "@/server/actions/users";
 import { type DeskMission, type DeskTrainingContext, deskMissions, searchRoster } from "./desk-missions";
+import { confettiLook } from "@/lib/confetti-look";
 
 /** Acertou: a próxima pessoa chega sozinha neste tempo (um toque adianta). */
 const AUTO_NEXT_MS = 1900;
@@ -132,7 +133,7 @@ export function DeskTraining({ context, required }: { context: DeskTrainingConte
       setStage("done");
       playSound("levelup");
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        confetti({ particleCount: 110, spread: 85, origin: { y: 0.55 }, colors: ["#ff2626", "#ffd23f", "#ffffff", "#22c55e", "#22d3ee"], shapes: ["square"], flat: true });
+        confetti({ particleCount: 110, spread: 85, origin: { y: 0.55 }, ...confettiLook(["#ff2626", "#ffd23f", "#ffffff", "#22c55e", "#22d3ee"]), flat: true });
       }
       if (!savedOnce.current) {
         savedOnce.current = true;

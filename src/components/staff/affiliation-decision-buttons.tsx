@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { cancelAffiliationFormAction, formalizeAffiliationAction } from "@/server/actions/affiliation-forms";
 import { decideAffiliationAction } from "@/server/actions/operations";
+import { T } from "@/domain/edition";
 
 /** Conferir filiação declarada: confirmar ou não confirmar. */
 export function AffiliationDecisionButtons({ registrationId, name, isTeacher }: { registrationId: string; name: string; isTeacher: boolean }) {
@@ -21,7 +22,7 @@ export function AffiliationDecisionButtons({ registrationId, name, isTeacher }: 
           </Button>
         }
         title="Confirmar filiação?"
-        description={`${name} passa a ter direito à entrada${isTeacher ? ", ao kit de consumação e a um convidado" : " (sem kit, por não ser professor(a))"}.`}
+        description={`${name} passa a ter direito à entrada${isTeacher ? ", ao kit de consumação e a um convidado" : ` (sem kit, por não ser ${T.person})`}.`}
         confirmLabel="Confirmar"
         tone="success"
         sound="coin"

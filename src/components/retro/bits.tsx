@@ -1,5 +1,6 @@
 import type { PixelIcon } from "@/components/icons/pixel";
 import { cn } from "@/lib/utils";
+import { GAME } from "@/domain/edition";
 
 export type Tone = "red" | "success" | "warning" | "danger" | "neutral";
 
@@ -39,7 +40,7 @@ export function PixelTag({ children, tone = "red", className }: { children: Reac
 export function PlayerTag({ player, className }: { player: 1 | 2; className?: string }) {
   return (
     <PixelTag tone={player === 1 ? "red" : "neutral"} className={className}>
-      {`PLAYER ${player}`}
+      {GAME.player[player]}
     </PixelTag>
   );
 }

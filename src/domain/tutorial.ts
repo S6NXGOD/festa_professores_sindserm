@@ -1,4 +1,5 @@
 import { type AccessMap, can } from "./access";
+import { GAME, T } from "./edition";
 
 /*
  * Tutorial do primeiro acesso: só as fases que a pessoa usa de verdade (montadas
@@ -70,7 +71,7 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
           scene: "scoreboard",
           title: "Placar: a festa em números",
           bullets: [
-            "Quantas pessoas se inscreveram, quantas já estão prontas para entrar e quantas já estão na pista.",
+            `Quantas pessoas se inscreveram, quantas já estão prontas para entrar e quantas já estão na ${GAME.floor}.`,
             "O que falta resolver aparece em amarelo, aqui e no menu (com o número ao lado).",
           ],
         }
@@ -86,7 +87,7 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
           bullets: [
             can(access, "validateAffiliation")
               ? "Em Inscrições → Para conferir estão as pessoas que disseram ser filiadas. Confira e toque em Confirmar (ou Não confirmar)."
-              : "Em Inscrições você vê cada grupo (professor(a) e convidado), quem já entrou e os kits.",
+              : `Em Inscrições você vê cada grupo (${T.person} e convidado), quem já entrou e os kits.`,
             "O botão verde abre o WhatsApp da pessoa com a mensagem pronta.",
             ...(can(access, "registerAtEvent") ? ["Chegou alguém sem inscrição? Use Cadastrar na hora."] : []),
             "A cada inscrição nova, o painel toca um level up e mostra o nome.",
@@ -255,7 +256,7 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
     title: "Pronto! Bora pra festa",
     bullets: [
       "Dá para rever este tutorial quando quiser no menu do seu nome, no canto de cima.",
-      "No mesmo menu você liga ou desliga os sons 8-bit.",
+      `No mesmo menu você liga ou desliga os ${GAME.sounds.toLowerCase()}.`,
     ],
   });
 

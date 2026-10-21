@@ -5,6 +5,7 @@ import { BootstrapForm } from "@/components/auth/bootstrap-form";
 import { can } from "@/domain/access";
 import { getConfig, hasUsers } from "@/server/queries/config";
 import { getActor, homePathFor } from "@/server/session";
+import { GAME } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Configuração inicial" };
 
@@ -15,7 +16,7 @@ export default async function SetupPage() {
     redirect(actor ? homePathFor(actor.access) : "/entrar");
   }
   return (
-    <AuthShell title="Primeiro acesso" kicker="Player 1 start" subtitle="Crie a conta do primeiro administrador do sistema.">
+    <AuthShell title="Primeiro acesso" kicker={GAME.start} subtitle="Crie a conta do primeiro administrador do sistema.">
       <BootstrapForm />
     </AuthShell>
   );

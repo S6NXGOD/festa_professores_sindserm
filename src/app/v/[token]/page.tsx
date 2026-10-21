@@ -12,6 +12,7 @@ import { APP_NAME, getEventInfo } from "@/server/queries/config";
 import { loadVoucherByToken } from "@/server/queries/vouchers";
 import { consumeRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
 import { clientIp } from "@/server/session";
+import { GAME, T } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Voucher", referrer: "no-referrer" };
 
@@ -25,7 +26,7 @@ export default async function SingleVoucherPage({ params, searchParams }: PagePr
   if (!limit.allowed) {
     return (
       <PublicShell eventName={eventName} backdrop="calm">
-        <MessageCard icon={Clock} title="Muitas tentativas" kicker="Pause" tone="warning">
+        <MessageCard icon={Clock} title="Muitas tentativas" kicker={GAME.pause} tone="warning">
           Aguarde alguns minutos e tente novamente.
         </MessageCard>
       </PublicShell>
@@ -36,7 +37,7 @@ export default async function SingleVoucherPage({ params, searchParams }: PagePr
   if (!event || !result || result.status === "NOT_FOUND") {
     return (
       <PublicShell eventName={eventName} backdrop="calm" help={{ topic: VOUCHER_HELP }}>
-        <MessageCard icon={Search} title="Voucher não encontrado" kicker="Game over" tone="danger" action={{ href: "/", label: "Ir para o início" }}>
+        <MessageCard icon={Search} title="Voucher não encontrado" kicker={GAME.gameOver} tone="danger" action={{ href: "/", label: "Ir para o início" }}>
           Confira o link recebido.
           <HelpLine lead="Dúvidas?" topic={VOUCHER_HELP} className="mt-3 justify-center" />
         </MessageCard>
@@ -47,7 +48,7 @@ export default async function SingleVoucherPage({ params, searchParams }: PagePr
     return (
       <PublicShell eventName={eventName} backdrop="calm" help={{ topic: `${VOUCHER_HELP} (cancelado)` }}>
         <MessageCard icon={Cancel} title="Voucher cancelado" tone="danger">
-          Este QR Code foi cancelado em {formatDateTime(result.revokedAt)}. Procure o(a) professor(a) responsável ou a
+          Este QR Code foi cancelado em {formatDateTime(result.revokedAt)}. Procure {T.thePerson} responsável ou a
           organização.
           <HelpLine lead="Precisa de ajuda?" topic={`${VOUCHER_HELP} (cancelado)`} className="mt-3 justify-center" />
         </MessageCard>

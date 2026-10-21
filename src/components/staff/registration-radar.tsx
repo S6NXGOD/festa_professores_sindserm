@@ -10,6 +10,7 @@ import { REGISTRATION_ORIGIN_LABEL } from "@/domain/labels";
 import type { AffiliationStatus, RegistrationOrigin } from "@/domain/types";
 import { playSound } from "@/lib/sound";
 import { properName } from "@/lib/text";
+import { GAME } from "@/domain/edition";
 
 /*
  * Radar do painel: a cada inscrição nova (pelo site, ficha ou na hora por outra
@@ -88,7 +89,7 @@ function RadarToast({
           <Sparkles className="size-4" />
         </motion.span>
         <span className="pixel text-[0.6rem]">
-          LEVEL UP! +{items.length} {items.length === 1 ? "INSCRIÇÃO" : "INSCRIÇÕES"}
+          {GAME.levelUp} +{items.length} {items.length === 1 ? "INSCRIÇÃO" : "INSCRIÇÕES"}
         </span>
         <button type="button" onClick={onClose} className="ml-auto rounded p-0.5 hover:bg-black/15" aria-label="Fechar aviso">
           <Close className="size-4" />

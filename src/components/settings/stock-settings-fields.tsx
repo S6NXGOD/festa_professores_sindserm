@@ -6,6 +6,7 @@ import { Check, Package, Sliders, Users } from "@/components/icons/pixel";
 import { Input } from "@/components/ui/input";
 import type { StockSettingsData, StockSettingsInput } from "@/domain/schemas";
 import { cn } from "@/lib/utils";
+import { T } from "@/domain/edition";
 
 export type StockForm = UseFormReturn<StockSettingsInput, unknown, StockSettingsData>;
 
@@ -28,16 +29,16 @@ export function StockFields({
       value: "UNIFIED" as const,
       icon: Users,
       title: "Um estoque só para todos",
-      text: "Professoras, professores, convidados, colaboradores e cortesias tiram do mesmo total.",
+      text: `${T.PeopleList}, convidados, colaboradores e cortesias tiram do mesmo total.`,
       badge: "Mais simples",
     },
     {
       value: "SINGLE" as const,
       icon: Package,
       title: "Geral + colaboradores",
-      text: "Um total para professoras, professores e convidados; outro para colaboradores e cortesias.",
+      text: `Um total para ${T.peopleList} e convidados; outro para colaboradores e cortesias.`,
     },
-    { value: "SPLIT" as const, icon: Sliders, title: "Tudo separado", text: "Professor(a), convidado e colaboradores, cada um com a sua quantidade." },
+    { value: "SPLIT" as const, icon: Sliders, title: "Tudo separado", text: `${T.Person}, convidado e colaboradores, cada um com a sua quantidade.` },
   ];
   const deliveredAll = delivered ? delivered.member + delivered.guest + (delivered.employee ?? 0) : 0;
 
@@ -122,13 +123,13 @@ export function StockFields({
           "totalAll",
           "stock-all",
           "Quantidade total de kits (para todos)",
-          `Todos os kits que vocês têm, para professoras, professores, convidados, colaboradores e cortesias.${delivered ? ` Já entregues: ${deliveredAll}.` : ""}`,
+          `Todos os kits que vocês têm, para ${T.peopleList}, convidados, colaboradores e cortesias.${delivered ? ` Já entregues: ${deliveredAll}.` : ""}`,
         )
       ) : mode === "SINGLE" ? (
         numberField("totalAll", "stock-all", "Quantidade total de kits", delivered ? `Já entregues: ${delivered.member + delivered.guest}` : undefined)
       ) : (
         <div className="grid gap-5 sm:grid-cols-2">
-          {numberField("totalMember", "stock-member", "Kits de professor(a)", delivered ? `Já entregues: ${delivered.member}` : undefined)}
+          {numberField("totalMember", "stock-member", `Kits de ${T.person}`, delivered ? `Já entregues: ${delivered.member}` : undefined)}
           {numberField("totalGuest", "stock-guest", "Kits de convidado", delivered ? `Já entregues: ${delivered.guest}` : undefined)}
         </div>
       )}

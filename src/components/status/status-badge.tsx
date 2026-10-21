@@ -1,4 +1,5 @@
-import { Check, ClipboardNote, Clock, Close, Login, type PixelIcon, Sparkles, Teach } from "@/components/icons/pixel";
+import { Check, ClipboardNote, Clock, Close, Login, type PixelIcon, Sparkles } from "@/components/icons/pixel";
+import { PersonIcon } from "@/components/icons/person-icon";
 import {
   AFFILIATION_STATUS_LABEL,
   AFFILIATION_STATUS_SHORT,
@@ -7,6 +8,7 @@ import {
 } from "@/domain/labels";
 import type { AffiliationStatus } from "@/domain/types";
 import { cn } from "@/lib/utils";
+import { EDITION, T } from "@/domain/edition";
 
 const TONE_CLASSES: Record<StatusTone, string> = {
   success: "border-success/45 bg-success-soft text-success-text",
@@ -72,13 +74,15 @@ export function AffiliationBadge({
 }
 
 export function TeacherBadge({ isTeacher, className }: { isTeacher: boolean; className?: string }) {
+  // Festa sem a pergunta "é professor(a)?": todo filiado(a) é do público da festa, o selo não diz nada.
+  if (!EDITION.askTeacher) return null;
   return isTeacher ? (
-    <ToneBadge tone="info" icon={Teach} className={className}>
-      Professor(a)
+    <ToneBadge tone="info" icon={PersonIcon} className={className}>
+      {T.Person}
     </ToneBadge>
   ) : (
     <ToneBadge tone="neutral" className={className}>
-      Não professor(a)
+      Não {T.person}
     </ToneBadge>
   );
 }

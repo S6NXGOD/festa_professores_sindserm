@@ -38,6 +38,7 @@ import { EntryPromptDialog } from "./entry-prompt";
 import { Disclosure } from "./disclosure";
 import { canConfirmEntry, ConfirmEntryButton, deliveredKitCount, GateResult } from "./gate-result";
 import { PersonOperations } from "./person-operations";
+import { GAME } from "@/domain/edition";
 
 type CameraState = "starting" | "scanning" | "error";
 
@@ -331,7 +332,7 @@ export function ScannerScreen() {
               setSoundEnabled(!soundOn);
               if (!soundOn) playSound("coin");
             }}
-            aria-label={soundOn ? "Desligar sons 8-bit" : "Ligar sons 8-bit"}
+            aria-label={soundOn ? `Desligar ${GAME.sounds.toLowerCase()}` : `Ligar ${GAME.sounds.toLowerCase()}`}
           >
             {soundOn ? <Volume /> : <VolumeOff />}
           </Button>
@@ -516,7 +517,7 @@ export function ScannerScreen() {
                         {problem.title.includes("CANCELADO") ? <Cancel className="size-9" /> : <Warning className="size-9" />}
                       </span>
                       <div>
-                        <p className="pixel text-[0.55rem] opacity-80">Game over</p>
+                        <p className="pixel text-[0.55rem] opacity-80">{GAME.gameOver}</p>
                         <p className="display mt-1 text-3xl leading-none" data-testid="gate-status-title">
                           {problem.title}
                         </p>

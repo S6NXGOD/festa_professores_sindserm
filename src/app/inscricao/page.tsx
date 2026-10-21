@@ -12,6 +12,7 @@ import { formatDateTime, formatTime, todayInZone } from "@/lib/datetime";
 import { db } from "@/server/db";
 import { getConfig, getEventInfo, getRegistrationWindow } from "@/server/queries/config";
 import { getKitSupply } from "@/server/services/kit-waitlist";
+import { GAME } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Inscrição" };
 
@@ -30,7 +31,7 @@ export default async function RegistrationPage({ searchParams }: PageProps<"/ins
       <PublicShell eventName={config.name} help={{ topic: "me inscrever na festa" }}>
         <div className="mx-auto mt-6 max-w-md rounded-2xl border border-line bg-surface p-8 text-center">
           <Calendar className="mx-auto size-12 text-red" />
-          <p className="pixel mt-5 text-[0.6rem] text-fg-muted">{window.state === "NOT_OPEN" ? "Aguarde" : "Game over"}</p>
+          <p className="pixel mt-5 text-[0.6rem] text-fg-muted">{window.state === "NOT_OPEN" ? "Aguarde" : GAME.gameOver}</p>
           <h1 className="display mt-2 text-4xl text-fg">
             {window.state === "NOT_OPEN" ? "Inscrições ainda não abertas" : "Inscrições encerradas"}
           </h1>

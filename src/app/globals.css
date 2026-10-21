@@ -101,6 +101,30 @@
   --animate-crt-on: crt-on 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-wiggle: wiggle 2.8s ease-in-out infinite;
+  /* Verão: ondas passando, bolhas subindo e brilhos do fim de tarde. */
+  --animate-wave-drift: wave-drift 30s linear infinite;
+  --animate-bubble: bubble-rise 14s linear infinite;
+  --animate-twinkle: twinkle 3.6s ease-in-out infinite;
+  --animate-bob: bob 2.4s ease-in-out infinite;
+
+  @keyframes wave-drift {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes bubble-rise {
+    0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+    10% { opacity: 0.9; }
+    50% { transform: translate(14px, -50vh) scale(1); }
+    100% { transform: translate(-8px, -105vh) scale(1.1); opacity: 0; }
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+  }
+  @keyframes twinkle {
+    0%, 100% { transform: scale(0.6) rotate(0deg); opacity: 0.35; }
+    50% { transform: scale(1) rotate(20deg); opacity: 1; }
+  }
 
   /* Despertador tocando: parado quase o tempo todo, uma sacudida curta. */
   @keyframes wiggle {
@@ -233,6 +257,40 @@
   --sidebar-ring: var(--red);
 }
 
+/*
+ * Verão (festa das servidoras e servidores): fim de tarde na piscina. Azul do
+ * céu escurecendo, coral do pôr do sol como cor principal e turquesa da água.
+ * As outras cores (verde, amarelo, vermelho de aviso) continuam as mesmas.
+ */
+[data-tema="verao"] {
+  --ink: #0a1630;
+  --ink-2: #0d1b3a;
+  --surface: #13224a;
+  --surface-2: #182a57;
+  --surface-3: #213567;
+  --line: #2a3d72;
+  --line-strong: #3a5090;
+  --paper: #ffe8c2;
+  --paper-ink: #3a2410;
+
+  --fg: #fff9f0;
+  --fg-muted: #c1c6e0;
+  --fg-dim: #8590b8;
+
+  --red: #ff6a4d;
+  --brand: #ff5233;
+  --brand-strong: #b8341a;
+  --brand-foreground: #ffffff;
+  --brand-soft: rgb(255 106 77 / 0.14);
+  --glow: rgb(255 130 80 / 0.55);
+
+  --info: #e9f4ff;
+  --info-foreground: #0a1630;
+  --info-soft: rgb(31 214 201 / 0.12);
+
+  --chart-4: #1fd6c9;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Base                                                                       */
 /* ------------------------------------------------------------------------- */
@@ -254,6 +312,13 @@
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
       repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.018) 0 1px, transparent 1px 3px);
     background-attachment: fixed;
+  }
+  /* Verão: céu do fim de tarde (azul escurecendo para o roxo, com o brilho do sol no horizonte). */
+  [data-tema="verao"] body {
+    background-image:
+      radial-gradient(120% 55% at 50% 108%, rgb(255 120 80 / 0.26), transparent 62%),
+      radial-gradient(90% 40% at 50% 100%, rgb(255 201 74 / 0.16), transparent 60%),
+      linear-gradient(180deg, #0a1630 0%, #1b1747 58%, #3a1d4f 100%);
   }
   ::selection {
     background: var(--brand);
@@ -445,6 +510,87 @@
   /* Linhas de TV sobre um bloco (ex.: visor do leitor de QR). */
   .scanlines {
     background-image: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.28) 0 1px, transparent 1px 3px);
+  }
+
+  /* ----------------------------------------------------------------------- */
+  /* Verão: as mesmas peças do tema, com cara de piscina e pôr do sol.         */
+  /* Só fonte, cor e brilho mudam (tamanho e espaçamento seguem os da tela).  */
+  /* ----------------------------------------------------------------------- */
+  [data-tema="verao"] .display {
+    font-family: var(--font-summer-display), var(--font-display);
+    font-stretch: normal;
+    font-weight: 400;
+    letter-spacing: 0.012em;
+  }
+  [data-tema="verao"] .pixel {
+    font-family: var(--font-summer-label), var(--font-pixel);
+    font-weight: 600;
+    font-size-adjust: cap-height 0.8;
+    letter-spacing: 0.07em;
+  }
+  [data-tema="verao"] .neon {
+    color: #fff;
+    text-shadow:
+      0 0 2px #fff,
+      0 0 10px var(--red),
+      0 0 26px rgb(255 201 74 / 0.55),
+      0 0 52px rgb(255 82 51 / 0.35);
+  }
+  [data-tema="verao"] .neon-red {
+    color: var(--red);
+    text-shadow:
+      0 0 8px rgb(255 106 77 / 0.75),
+      0 0 22px rgb(255 201 74 / 0.32);
+  }
+  [data-tema="verao"] .neon-box {
+    box-shadow:
+      0 0 0 1px rgb(255 106 77 / 0.6),
+      0 0 18px -2px var(--glow),
+      inset 0 0 14px -6px var(--glow);
+  }
+  [data-tema="verao"] .neon-line {
+    background: linear-gradient(90deg, transparent, #1fd6c9 18%, #fff7d6 50%, #ff6a4d 82%, transparent);
+    box-shadow: 0 0 12px rgb(31 214 201 / 0.5);
+  }
+  /* Título em degradê de pôr do sol (no lugar do cromado). */
+  [data-tema="verao"] .chrome {
+    background: linear-gradient(180deg, #fff7d1 0%, #ffd36b 30%, #ff9a4d 55%, #ff5c7a 80%, #ff3d8b 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 3px 0 #1b1747) drop-shadow(0 0 18px rgb(255 120 80 / 0.4));
+  }
+  @media (max-width: 639px) {
+    [data-tema="verao"] .chrome {
+      background: none;
+      color: #ffd36b;
+      -webkit-text-fill-color: #ffd36b;
+    }
+  }
+  [data-tema="verao"] .halftone {
+    background-image: radial-gradient(rgb(31 214 201 / 0.45) 1.1px, transparent 1.6px);
+  }
+  /* O chão quadriculado vira o azulejo do fundo da piscina, mais calmo. */
+  [data-tema="verao"] .retro-floor {
+    background-image:
+      linear-gradient(to right, rgb(31 214 201 / 0.4) 1.5px, transparent 1.5px),
+      linear-gradient(to bottom, rgb(31 214 201 / 0.4) 1.5px, transparent 1.5px);
+    animation-duration: 3.2s;
+  }
+  /* O sol listrado dos anos 80 vira o sol se pondo (amarelo → coral → rosa). */
+  [data-tema="verao"] .retro-sun {
+    background: linear-gradient(to bottom, #fff2a8 0%, #ffd24a 28%, #ff9a3d 52%, #ff5c6a 76%, #d9387f 100%);
+  }
+  [data-tema="verao"] .animate-sun-glow {
+    animation-name: sun-glow-verao;
+  }
+  @keyframes sun-glow-verao {
+    0%, 100% { filter: drop-shadow(0 0 30px rgb(255 190 80 / 0.45)); }
+    50% { filter: drop-shadow(0 0 60px rgb(255 140 80 / 0.7)); }
+  }
+  /* Sem linhas de TV no verão. */
+  [data-tema="verao"] .scanlines {
+    background-image: none;
   }
 
   .safe-bottom {

@@ -8,6 +8,7 @@ import type { CheckInMethod, EmployeeCategory, ParticipantRole } from "@/domain/
 import { formatDateTimeSeconds } from "@/lib/datetime";
 import { personSearchCondition } from "@/server/services/people";
 import { type Page, PAGE_SIZE } from "./panel";
+import { T } from "@/domain/edition";
 
 /*
  * Controle de entrada: cada entrada registrada na portaria, com quem registrou,
@@ -201,7 +202,7 @@ export function entryType(row: EntryRow): string {
   if (row.role === "GUEST") return "Convidado(a)";
   if (row.role === "EMPLOYEE" && row.employeeCategory === "COURTESY") return "Cortesia";
   if (row.role === "EMPLOYEE") return `Colaborador(a) · ${row.employeeCategory ? EMPLOYEE_CATEGORY_LABEL[row.employeeCategory] : "SINDSERM"}`;
-  return row.isTeacher ? "Professor(a)" : "Filiado(a)";
+  return row.isTeacher ? T.Person : "Filiado(a)";
 }
 
 export function entriesCsv(rows: EntryRow[], eventStart: Date | null): string {

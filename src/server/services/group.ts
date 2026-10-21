@@ -12,6 +12,7 @@ import {
   type TeacherStatusInput,
   teacherStatusSchema,
 } from "@/domain/schemas";
+import { EDITION, T } from "@/domain/edition";
 import { guestRemovalCheck } from "@/domain/rules";
 import { maskCpf } from "@/lib/cpf";
 import { type Actor, assertPermission, type StaffActor } from "./actor";
@@ -92,7 +93,7 @@ async function lockHost(tx: Tx, input: { registrationId?: string | null; employe
     await lockRegistrationRow(tx, input.registrationId);
     const state = await loadRegistrationState(tx, input.registrationId);
     if (!state) throw new DomainError("NOT_FOUND", "Inscrição não encontrada.");
-    if (!state.isTeacher) throw new DomainError("INVALID_STATE", "Somente professoras e professores podem levar convidado.");
+    if (!state.isTeacher) throw new DomainError("INVALID_STATE", `Somente ${T.people} podem levar convidado.`);
     if (state.status === "REJECTED") {
       throw new DomainError("INVALID_STATE", "Filiação não confirmada: não é possível cadastrar convidado.");
     }
@@ -322,12 +323,16 @@ export async function setTeacherStatus(actor: Actor, rawInput: TeacherStatusInpu
   return withTx(async (tx) => {
     const state = await lockRegistration(tx, input.registrationId);
     if (state.isTeacher === input.isTeacher) return { changed: false };
+    // Festa sem a pergunta (servidoras e servidores): todo filiado(a) tem kit e convidado.
+    if (!EDITION.askTeacher && !input.isTeacher) {
+      throw new DomainError("INVALID_STATE", "Nesta festa, toda pessoa filiada tem kit e convidado.");
+    }
     if (!input.isTeacher) {
       if (state.deliveries.MEMBER || state.deliveries.GUEST) {
         throw new DomainError("INVALID_STATE", "Já houve entrega de kit para esta inscrição; o administrador precisa estornar antes.");
       }
       if (state.guest) {
-        throw new DomainError("INVALID_STATE", "Remova o convidado antes: somente professoras e professores levam convidado.");
+        throw new DomainError("INVALID_STATE", `Remova o convidado antes: somente ${T.people} levam convidado.`);
       }
     }
     await tx.update(registration).set({ isTeacher: input.isTeacher }).where(eq(registration.id, state.id));
@@ -343,7 +348,7 @@ export async function setTeacherStatus(actor: Actor, rawInput: TeacherStatusInpu
       action: "TEACHER_STATUS_CHANGED",
       entityType: "registration",
       entityId: state.id,
-      summary: `${state.member.fullName}: ${input.isTeacher ? "marcado(a) como professor(a)" : "marcado(a) como não professor(a)"}.`,
+      summary: `${state.member.fullName}: ${input.isTeacher ? `marcado(a) como ${T.person}` : `marcado(a) como não ${T.person}`}.`,
       before: { isTeacher: state.isTeacher },
       after: { isTeacher: input.isTeacher },
     });

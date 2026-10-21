@@ -1,4 +1,5 @@
 import { ENTRY_BLOCK_MESSAGE } from "@/domain/labels";
+import { GAME, T } from "@/domain/edition";
 
 /*
  * Treino relâmpago da portaria: 8 situações em cartões curtos, com as mesmas
@@ -53,12 +54,12 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       card: {
         tone: "success",
         icon: "ok",
-        kicker: "Ready",
+        kicker: GAME.ready,
         title: "LIBERADO PARA ENTRADA",
         name: "Ana Lima",
-        role: "Professora · Filiação confirmada",
+        role: `${T.female} · Filiação confirmada`,
         tags: ["P1"],
-        kit: { kind: "give", title: "Entregue 1 kit", detail: "Kit da professora" },
+        kit: { kind: "give", title: "Entregue 1 kit", detail: `Kit da ${T.femaleLower}` },
       },
       right: "Confirmar a entrada e entregar o kit",
       wrong: "Mandar buscar o kit depois",
@@ -69,7 +70,7 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       card: {
         tone: "success",
         icon: "ok",
-        kicker: "Ready",
+        kicker: GAME.ready,
         title: "LIBERADO PARA ENTRADA",
         name: "Júlia Mendes",
         role: "Convidada de Carla Mendes (ainda não chegou)",
@@ -85,10 +86,10 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       card: {
         tone: "success",
         icon: "ok",
-        kicker: "Ready",
+        kicker: GAME.ready,
         title: "LIBERADO PARA ENTRADA",
         name: "Paulo Reis",
-        role: "Professor · Filiação confirmada",
+        role: `${T.male} · Filiação confirmada`,
         tags: ["P1"],
         kit: { kind: "give", title: "Entregue 2 kits", detail: "O dele e o do convidado, que já entrou", count: 2 },
       },
@@ -101,11 +102,11 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       card: {
         tone: "warning",
         icon: "wait",
-        kicker: "Stop",
+        kicker: GAME.stop,
         title: "FILIAÇÃO AGUARDANDO CONFERÊNCIA",
         detail: ctx.resolve ? "Entrada bloqueada: resolva abaixo ou pelo Atendimento." : ENTRY_BLOCK_MESSAGE.MEMBER_PENDING.detail,
         name: "Marcos Silva",
-        role: "Professor · Aguardando conferência",
+        role: `${T.male} · Aguardando conferência`,
       },
       right: ctx.resolve ? "Conferir e confirmar a filiação" : "Mandar ao Atendimento",
       wrong: "Deixar entrar assim mesmo",
@@ -116,11 +117,11 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       card: {
         tone: "danger",
         icon: "stop",
-        kicker: "Stop",
+        kicker: GAME.stop,
         title: "FILIAÇÃO NÃO CONFIRMADA",
         detail: "Se comprovar que é filiada (ex.: contracheque com o desconto), o Atendimento confirma na hora.",
         name: "Sandra Melo",
-        role: "Professora · Filiação não confirmada",
+        role: `${T.female} · Filiação não confirmada`,
       },
       right: "Ler o motivo e encaminhar ao Atendimento",
       wrong: "Deixar entrar porque ela insiste",
@@ -131,11 +132,11 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       card: {
         tone: "warning",
         icon: "again",
-        kicker: "Continue?",
+        kicker: GAME.again,
         title: "ENTRADA JÁ REGISTRADA",
         detail: "Registrada às 20:04 por Joana (QR Code).",
         name: "Beatriz Costa",
-        role: "Professora · Filiação confirmada",
+        role: `${T.female} · Filiação confirmada`,
       },
       right: "Ver se é a mesma pessoa (não registra de novo)",
       wrong: "Registrar de novo para sair outro kit",
@@ -146,7 +147,7 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       card: {
         tone: "danger",
         icon: "stop",
-        kicker: "Game over",
+        kicker: GAME.gameOver,
         title: "QR CODE CANCELADO",
         detail: "Este voucher foi trocado por um novo. Localize a pessoa pela busca.",
       },
@@ -159,10 +160,10 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       card: {
         tone: "success",
         icon: "ok",
-        kicker: "Ready",
+        kicker: GAME.ready,
         title: "LIBERADO PARA ENTRADA",
         name: "Fabiana Nunes",
-        role: "Professora · Filiação confirmada",
+        role: `${T.female} · Filiação confirmada`,
         tags: ["P1"],
         kit: { kind: "none", title: "Sem kit agora", detail: "Está na fila do kit" },
       },
@@ -179,7 +180,7 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       card: {
         tone: "success",
         icon: "ok",
-        kicker: "Ready",
+        kicker: GAME.ready,
         title: "LIBERADO PARA ENTRADA",
         name: "Theo Barros",
         role: "Convidado de André Barros, que já entrou",
@@ -231,10 +232,10 @@ function atDesk(questions: QuickQuestion[]): QuickQuestion[] {
     card: {
       tone: "success",
       icon: "ok",
-      kicker: "Ready",
+      kicker: GAME.ready,
       title: "LIBERADO PARA ENTRADA",
       name: "Rafael Souza",
-      role: "Professor · Filiação confirmada",
+      role: `${T.male} · Filiação confirmada`,
       tags: ["P1", "WALK_IN"],
       kit: { kind: "desk", title: "Pega na mesa", detail: "Kit da gordura (inscrição na hora)" },
     },

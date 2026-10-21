@@ -6,6 +6,7 @@ import { FestaEmblem } from "@/components/brand/brand";
 import { Building, Check, Crown, Gift, Heart, Key, Login, QrCode, Settings, Sparkles, Whatsapp } from "@/components/icons/pixel";
 import type { TutorialScene } from "@/domain/tutorial";
 import { cn } from "@/lib/utils";
+import { GAME } from "@/domain/edition";
 
 /*
  * Mini-cenas animadas de cada fase do tutorial: mostram o gesto em vez de só
@@ -46,14 +47,14 @@ function StartScene({ initials }: { initials: string }) {
       </motion.div>
       <div className="grid gap-2 text-center">
         <span className="pixel mx-auto rounded-[4px] bg-red px-2 py-1 text-[0.6rem] text-white shadow-[0_3px_0_0_var(--brand-strong)]">
-          PLAYER {initials}
+          {GAME.playerWord} {initials}
         </span>
         <motion.span
           className="pixel text-[0.62rem] text-warning"
           animate={{ opacity: [1, 0.15, 1] }}
           transition={{ duration: 1.1, ...loop }}
         >
-          PRESS START
+          {GAME.pressStart.toUpperCase()}
         </motion.span>
       </div>
     </div>
@@ -64,7 +65,7 @@ function ScoreboardScene() {
   const tiles = [
     { label: "Inscrições", value: 128, tone: "text-red" },
     { label: "Prontos", value: 96, tone: "text-warning" },
-    { label: "Na pista", value: 42, tone: "text-success-text" },
+    { label: `Na ${GAME.floor}`, value: 42, tone: "text-success-text" },
   ];
   return (
     <div className="grid h-full grid-cols-3 items-center gap-2 px-3">
@@ -151,7 +152,7 @@ function FormScene() {
 function VouchersScene() {
   const loop = useLoop();
   const cards = [
-    { rotate: -12, x: -58, color: "border-red bg-[linear-gradient(160deg,#2a0507,#0e0e0f)]", label: "PLAYER 1" },
+    { rotate: -12, x: -58, color: "border-red bg-[linear-gradient(160deg,#2a0507,#0e0e0f)]", label: GAME.player[1] },
     { rotate: 0, x: 0, color: "border-warning bg-[linear-gradient(160deg,#2a2000,#0e0e0f)]", label: "DA CASA" },
     { rotate: 12, x: 58, color: "border-[#ff4fb4] bg-[linear-gradient(160deg,#2a0a1c,#0e0e0f)]", label: "CORTESIA" },
   ];
@@ -343,7 +344,7 @@ function LevelUpScene() {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 320, damping: 12 }}
       >
-        LEVEL UP!
+        {GAME.levelUp}
       </motion.p>
     </div>
   );

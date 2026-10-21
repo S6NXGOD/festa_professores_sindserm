@@ -12,6 +12,7 @@ import { callAction } from "@/lib/call-action";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { recoverVouchers } from "@/server/actions/registration";
+import { GAME } from "@/domain/edition";
 
 /** Pede os vouchers ao servidor (CPF + WhatsApp) e abre a página do grupo. */
 function useRecoverVouchers() {
@@ -89,7 +90,7 @@ export function RecoverVouchersForm({ className }: { className?: string }) {
       {error ? <RecoverError>{error}</RecoverError> : null}
       <Button type="submit" size="xl" disabled={pending} className="w-full" data-testid="recover-submit">
         {pending ? <Loader className="animate-spin-steps" /> : <QrCode />}
-        {pending ? "Procurando a sua fita..." : "Recuperar meus vouchers"}
+        {pending ? `Procurando a sua ${GAME.tape}...` : "Recuperar meus vouchers"}
       </Button>
       <p className="text-center text-xs leading-relaxed text-fg-dim">
         Por segurança, sai um link novo e o anterior para de funcionar. Imagens de voucher que você já salvou continuam valendo.

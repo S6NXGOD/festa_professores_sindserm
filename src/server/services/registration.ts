@@ -3,6 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import type { Executor, Tx } from "@/server/db";
 import { affiliationForm, guestLink, person, registration } from "@/server/db/schema";
 import { authorizationText } from "@/domain/affiliation-text";
+import { T } from "@/domain/edition";
 import {
   type PreAffiliationInput,
   preAffiliationSchema,
@@ -20,6 +21,7 @@ import { generateToken, isWellFormedToken, sha256Hex } from "@/server/crypto";
 import { type Actor, actorUserId, assertPermission, PUBLIC_ACTOR } from "./actor";
 import { writeAudit } from "./audit";
 import { linkDocumentsToForm } from "./documents";
+import { applyPriorAffiliation } from "./prior-affiliation";
 import { DomainError, isUniqueViolation } from "./errors";
 import { allocateKitSlots, type SlotOutcome } from "./kit-waitlist";
 import { getEventConfig, registrationWindow } from "./settings";
@@ -220,7 +222,7 @@ export async function createRegistration(actor: Actor, rawInput: RegistrationInp
         action: "REGISTRATION_CREATED",
         entityType: "registration",
         entityId: reg!.id,
-        summary: `Inscrição de ${input.member.fullName}${input.isTeacher ? " (professor(a))" : " (não professor(a))"}${input.guest ? ` com convidado(a) ${input.guest.fullName}` : ""}.`,
+        summary: `Inscrição de ${input.member.fullName}${input.isTeacher ? ` (${T.person})` : ` (não ${T.person})`}${input.guest ? ` com convidado(a) ${input.guest.fullName}` : ""}.`,
         after: {
           member: { fullName: input.member.fullName, cpf: maskCpf(input.member.cpf) },
           isTeacher: input.isTeacher,
@@ -229,6 +231,8 @@ export async function createRegistration(actor: Actor, rawInput: RegistrationInp
           kits,
         },
       });
+      // Filiação já conferida em outra festa do SINDSERM (pacote de mudança): confirmada na hora.
+      await applyPriorAffiliation(tx, actor, reg!.id, input.member.cpf, input.member.fullName);
 
       return { registrationId: reg!.id, accessToken, reused: false };
     });

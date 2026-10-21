@@ -4,7 +4,8 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { CountUp } from "@/components/count-up";
-import { Building, Copy, Heart, Human, Login, type PixelIcon, Teach, Users, Whatsapp, Zap } from "@/components/icons/pixel";
+import { Building, Copy, Heart, Human, Login, type PixelIcon, Users, Whatsapp, Zap } from "@/components/icons/pixel";
+import { PersonIcon } from "@/components/icons/person-icon";
 import { Button } from "@/components/ui/button";
 import {
   GROUPS_WITHOUT_KIT,
@@ -27,7 +28,7 @@ import { StockMath } from "./stock-math";
 
 /** Cor e ícone de cada grupo (as mesmas cores da portaria e dos vouchers). */
 const GROUP_STYLE: Record<PeopleGroupId, { icon: PixelIcon; badge: string }> = {
-  TEACHERS: { icon: Teach, badge: "bg-red text-white shadow-[0_2px_0_0_var(--brand-strong)]" },
+  TEACHERS: { icon: PersonIcon, badge: "bg-red text-white shadow-[0_2px_0_0_var(--brand-strong)]" },
   TEACHER_GUESTS: { icon: Users, badge: "border border-red/45 bg-brand-soft text-red" },
   WALK_INS: { icon: Zap, badge: "border border-[#ffd23f]/60 bg-[#ffd23f]/15 text-[#ffd23f]" },
   OTHER_MEMBERS: { icon: Human, badge: "border border-line-strong bg-surface-3 text-fg-muted" },

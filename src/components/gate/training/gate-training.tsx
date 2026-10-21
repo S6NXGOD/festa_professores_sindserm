@@ -31,6 +31,7 @@ import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { finishGateTrainingAction } from "@/server/actions/users";
 import { type MiniCard, type QuickQuestion, quickQuestions, shuffled, type TrainingContext } from "./scenarios";
+import { confettiLook } from "@/lib/confetti-look";
 
 /** Acertou: a próxima situação vem sozinha neste tempo (um toque adianta). */
 const AUTO_NEXT_MS = 1600;
@@ -122,7 +123,7 @@ export function GateTraining({ context, required }: { context: TrainingContext; 
       setStage("done");
       playSound("levelup");
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        confetti({ particleCount: 110, spread: 85, origin: { y: 0.55 }, colors: ["#ff2626", "#f8c000", "#ffffff", "#ff4fb4", "#22d3ee"], shapes: ["square"], flat: true });
+        confetti({ particleCount: 110, spread: 85, origin: { y: 0.55 }, ...confettiLook(["#ff2626", "#f8c000", "#ffffff", "#ff4fb4", "#22d3ee"]), flat: true });
       }
       if (!savedOnce.current) {
         savedOnce.current = true;

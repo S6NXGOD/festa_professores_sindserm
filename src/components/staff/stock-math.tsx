@@ -12,16 +12,17 @@ import { callAction } from "@/lib/call-action";
 import { plural } from "@/lib/plural";
 import { cn } from "@/lib/utils";
 import { updateStockSettingsAction } from "@/server/actions/setup";
+import { T } from "@/domain/edition";
 
 /** Nome curto de cada estoque e para quem ele é. */
 function poolInfo(pool: StockPool, mode?: StockMode): { name: string; audience: string } {
   if (pool === "ALL") {
     return mode === "UNIFIED"
-      ? { name: "Estoque único", audience: "Todo mundo: professoras, professores, convidados, colaboradores e cortesias" }
-      : { name: "Estoque geral", audience: "Professoras, professores e os convidados delas e deles" };
+      ? { name: "Estoque único", audience: `Todo mundo: ${T.peopleList}, convidados, colaboradores e cortesias` }
+      : { name: "Estoque geral", audience: `${T.PeopleList} e os convidados delas e deles` };
   }
-  if (pool === "MEMBER") return { name: "Estoque de professor(a)", audience: "Professoras e professores" };
-  if (pool === "GUEST") return { name: "Estoque de convidado", audience: "Convidados das professoras e professores" };
+  if (pool === "MEMBER") return { name: `Estoque de ${T.person}`, audience: T.People };
+  if (pool === "GUEST") return { name: "Estoque de convidado", audience: `Convidados ${T.ofPeople}` };
   return { name: "Estoque dos colaboradores", audience: "Colaboradores do SINDSERM, convidados deles e cortesias" };
 }
 
@@ -153,7 +154,7 @@ export function StockMath({
                 </Button>
               }
               title="Juntar os estoques?"
-              description={`Os ${stockTotal.toLocaleString("pt-BR")} kits passam a valer para todo mundo: professoras, professores, convidados, colaboradores e cortesias. Dá para separar de novo em Quantidades, quando quiser.`}
+              description={`Os ${stockTotal.toLocaleString("pt-BR")} kits passam a valer para todo mundo: ${T.peopleList}, convidados, colaboradores e cortesias. Dá para separar de novo em Quantidades, quando quiser.`}
               confirmLabel="Juntar os estoques"
               tone="success"
               sound="powerup"

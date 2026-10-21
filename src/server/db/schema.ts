@@ -726,6 +726,22 @@ export const auditLog = pgTable(
 );
 
 /** Janela fixa de rate limiting. A chave nunca contém IP em texto puro (HMAC). */
+/**
+ * Filiação já conferida em outra festa do SINDSERM (com RG e contracheque),
+ * trazida pelo pacote de mudança. Quem se inscreve com esse CPF (e o mesmo
+ * nome) entra com a filiação confirmada, sem passar pela fila de conferência.
+ * Guarda só o necessário para conferir: CPF, nome, matrícula, quando e onde.
+ */
+export const priorAffiliation = pgTable("prior_affiliation", {
+  cpf: text("cpf").primaryKey(),
+  fullName: text("full_name").notNull(),
+  registrationNumber: text("registration_number"),
+  confirmedAt: timestamptz("confirmed_at").notNull(),
+  /** Onde foi conferida (ex.: "Festa das Professoras e Professores – SINDSERMTHE 2026"). */
+  source: text("source").notNull(),
+  importedAt: timestamptz("imported_at").notNull().defaultNow(),
+});
+
 export const rateLimit = pgTable("rate_limit", {
   key: text("key").primaryKey(),
   count: integer("count").notNull(),

@@ -14,6 +14,7 @@ import { getAffiliationForm } from "@/server/queries/panel";
 import { consumeRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
 import { clientIp } from "@/server/session";
 import { readSigningToken } from "@/server/signing-link";
+import { GAME } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Assinar a ficha pelo gov.br", referrer: "no-referrer", robots: { index: false, follow: false } };
 
@@ -38,7 +39,7 @@ export default async function SignFormPage({ params }: PageProps<"/assinar/[toke
   if (!limit.allowed) {
     return (
       <PublicShell eventName={eventName} backdrop="calm">
-        <MessageCard icon={Clock} title="Muitas tentativas" kicker="Pause" tone="warning">
+        <MessageCard icon={Clock} title="Muitas tentativas" kicker={GAME.pause} tone="warning">
           Aguarde alguns minutos e tente novamente.
         </MessageCard>
       </PublicShell>
@@ -50,7 +51,7 @@ export default async function SignFormPage({ params }: PageProps<"/assinar/[toke
   if (!data || data.form.status === "CANCELLED") {
     return (
       <PublicShell eventName={eventName} backdrop="calm" help={{ topic: "assinar a minha ficha de filiação (o link não funcionou)" }}>
-        <MessageCard icon={Search} title="Link inválido ou vencido" kicker="Fita não encontrada" tone="danger">
+        <MessageCard icon={Search} title="Link inválido ou vencido" kicker={GAME.notFound} tone="danger">
           Peça um link novo para a organização do SINDSERM. Se preferir, a ficha também pode ser assinada no papel, na recepção da festa.
         </MessageCard>
       </PublicShell>

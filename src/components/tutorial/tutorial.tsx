@@ -13,6 +13,7 @@ import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { finishTutorialAction } from "@/server/actions/users";
 import { TutorialSceneView } from "./tutorial-scenes";
+import { confettiLook } from "@/lib/confetti-look";
 
 const OPEN_EVENT = "festa:tutorial";
 
@@ -50,7 +51,7 @@ export function Tutorial({ steps, autoOpen, initials }: { steps: TutorialStep[];
       if (finished) {
         playSound("levelup");
         if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 }, colors: ["#ff2626", "#f8c000", "#ffffff", "#ff4fb4", "#22d3ee"], shapes: ["square"], flat: true });
+          confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 }, ...confettiLook(["#ff2626", "#f8c000", "#ffffff", "#ff4fb4", "#22d3ee"]), flat: true });
         }
       }
       // Primeira vez: grava que a pessoa já viu (terminou ou pulou) e não abre mais sozinho.

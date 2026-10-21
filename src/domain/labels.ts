@@ -1,3 +1,4 @@
+import { EDITION, T } from "./edition";
 import type { EntryBlockCode, KitBlockCode } from "./rules";
 import type { AffiliationStatus, CheckInMethod, DocumentKind, EmployeeCategory, KitType, RegistrationOrigin, StaffRole, StockMode, StockPool } from "./types";
 
@@ -9,7 +10,7 @@ export const ORG_NAME = "SINDSERM";
  * "do SINDSERM": a festa é do sindicato, não das professoras e professores
  * lotados nele (decisão da organização).
  */
-export const DEFAULT_EVENT_NAME = "Festa das Professoras e Professores – SINDSERMTHE";
+export const DEFAULT_EVENT_NAME = EDITION.defaultEventName;
 
 export const AFFILIATION_STATUS_LABEL: Record<AffiliationStatus, string> = {
   PENDING: "Aguardando conferência",
@@ -52,7 +53,7 @@ export const ROLE_DESCRIPTION: Record<StaffRole, string> = {
 };
 
 export const KIT_TYPE_LABEL: Record<KitType, string> = {
-  MEMBER: "Kit do(a) professor(a)",
+  MEMBER: `Kit ${T.ofPerson}`,
   GUEST: "Kit do convidado",
   EMPLOYEE: "Kit de colaborador(a)",
 };
@@ -60,12 +61,12 @@ export const KIT_TYPE_LABEL: Record<KitType, string> = {
 export const STOCK_MODE_LABEL: Record<StockMode, string> = {
   UNIFIED: "Estoque único para todos",
   SINGLE: "Estoque geral + estoque dos colaboradores",
-  SPLIT: "Estoque separado (professoras e professores / convidados / colaboradores)",
+  SPLIT: `Estoque separado (${T.people} / convidados / colaboradores)`,
 };
 
 export const STOCK_POOL_LABEL: Record<StockPool, string> = {
   ALL: "Kits (estoque geral)",
-  MEMBER: "Kits de professor(a)",
+  MEMBER: `Kits de ${T.person}`,
   GUEST: "Kits de convidado",
   EMPLOYEE: "Kits dos colaboradores",
   EXTRA: "Gordura (inscrições na hora)",
@@ -140,7 +141,7 @@ export const CHECK_IN_METHOD_LABEL: Record<CheckInMethod, string> = {
   CODE: "Código do voucher",
 };
 
-export const TEACHER_LABEL = (isTeacher: boolean) => (isTeacher ? "Professor(a)" : "Filiado(a) — não professor(a)");
+export const TEACHER_LABEL = (isTeacher: boolean) => (isTeacher ? T.Person : `Filiado(a) — não ${T.person}`);
 
 export const ENTRY_BLOCK_MESSAGE: Record<EntryBlockCode, { title: string; detail: string }> = {
   MEMBER_PENDING: {
@@ -154,15 +155,15 @@ export const ENTRY_BLOCK_MESSAGE: Record<EntryBlockCode, { title: string; detail
   MEMBER_REJECTED: {
     title: "Filiação não confirmada",
     detail:
-      "Se comprovar agora que é filiado(a) (ex.: contracheque com o desconto do SINDSERM), o Atendimento confirma na hora. Sem comprovação: pode entrar como convidado(a) de um(a) professor(a) ou se filiar no Atendimento.",
+      `Se comprovar agora que é filiado(a) (ex.: contracheque com o desconto do SINDSERM), o Atendimento confirma na hora. Sem comprovação: pode entrar como convidado(a) de ${T.aPerson} ou se filiar no Atendimento.`,
   },
   HOST_PENDING: {
     title: "Responsável ainda não liberado",
-    detail: "A entrada do convidado depende da filiação do(a) professor(a) responsável. Encaminhe ao Atendimento.",
+    detail: `A entrada do convidado depende da filiação ${T.ofPerson} responsável. Encaminhe ao Atendimento.`,
   },
   HOST_REJECTED: {
     title: "Filiação do responsável não confirmada",
-    detail: "Convidado só entra vinculado a um(a) professor(a) filiado(a). Procure o Atendimento.",
+    detail: `Convidado só entra vinculado a ${T.aPerson} filiado(a). Procure o Atendimento.`,
   },
   HOST_EMPLOYEE_REMOVED: {
     title: "Colaborador(a) responsável fora da lista",
@@ -180,7 +181,7 @@ export const ENTRY_BLOCK_MESSAGE: Record<EntryBlockCode, { title: string; detail
 
 export const KIT_BLOCK_MESSAGE: Record<KitBlockCode, string> = {
   NOT_ACTIVE_MEMBER: "Sai na entrada, depois que a filiação for confirmada.",
-  NOT_TEACHER: "Kit de consumação é exclusivo para professoras e professores.",
+  NOT_TEACHER: `Kit de consumação é exclusivo para ${T.people}.`,
   MEMBER_NOT_CHECKED_IN: "Sai junto com a entrada.",
   NO_GUEST: "Nenhum convidado cadastrado.",
   HOST_NOT_CHECKED_IN: "Sai depois que quem convidou chegar.",
@@ -203,7 +204,7 @@ export const ENTRY_KIT_MESSAGE: Record<
   KIT_WAITLIST: "Sem kit agora: está na fila do kit. Depois do horário dos kits guardados, as sobras saem por ordem de chegada.",
   NO_EMPLOYEE_STOCK: "Sem kit: falta cadastrar a quantidade de kits (Kits e estoque → Quantidades).",
   NOT_ACTIVE_MEMBER: "Sem kit: a filiação ainda não foi confirmada.",
-  NOT_TEACHER: "Sem kit: não é professor(a).",
+  NOT_TEACHER: `Sem kit: não é ${T.person}.`,
   MEMBER_NOT_CHECKED_IN: "Sem kit.",
   NO_GUEST: "Sem kit.",
   HOST_NOT_CHECKED_IN: "Kit fica para depois: sai quando quem convidou chegar.",

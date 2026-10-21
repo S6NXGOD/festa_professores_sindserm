@@ -19,6 +19,7 @@ import { findDraftFormId, loadGroupByAccessToken } from "@/server/queries/vouche
 import { consumeRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
 import { clientIp } from "@/server/session";
 import { signingPath } from "@/server/signing-link";
+import { GAME, T } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Meus vouchers", referrer: "no-referrer" };
 
@@ -33,7 +34,7 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
   if (!limit.allowed) {
     return (
       <PublicShell eventName={eventName} backdrop="calm">
-        <MessageCard icon={Clock} title="Muitas tentativas" kicker="Pause" tone="warning">
+        <MessageCard icon={Clock} title="Muitas tentativas" kicker={GAME.pause} tone="warning">
           Aguarde alguns minutos e tente novamente.
         </MessageCard>
       </PublicShell>
@@ -47,7 +48,7 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
         <MessageCard
           icon={Search}
           title="Link inválido"
-          kicker="Fita não encontrada"
+          kicker={GAME.notFound}
           tone="danger"
           action={{ href: "/vouchers", label: "Recuperar meus vouchers" }}
         >
@@ -75,10 +76,10 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
             <QrCode className="mx-auto size-12 text-red" />
           )}
           <p className="pixel mt-5 text-[0.62rem] text-red neon-red">
-            {isNew ? (cards.length > 1 ? "Player 1 + Player 2 prontos" : "Player 1 pronto") : recovered ? "Fita recuperada" : "Seus vouchers"}
+            {isNew ? (cards.length > 1 ? `${GAME.player1Name} + ${GAME.player2Name} prontos` : `${GAME.player1Name} pronto`) : recovered ? GAME.recovered : "Seus vouchers"}
           </p>
           <h1 className="display mt-3 text-5xl text-fg sm:text-6xl">
-            {isNew ? (awaitingSignature ? "Ficha gravada!" : "Você está na pista!") : recovered ? "Achamos seus vouchers!" : "Vouchers da inscrição"}
+            {isNew ? (awaitingSignature ? "Ficha gravada!" : `Você está na ${GAME.floor}!`) : recovered ? "Achamos seus vouchers!" : "Vouchers da inscrição"}
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-fg-muted">
             {cards.length === 1 ? "Seu voucher está pronto. " : "Um voucher para você e outro para o seu convidado. "}
@@ -86,7 +87,7 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             <AffiliationBadge status={group.status} size="lg" />
-            {group.isTeacher ? <PixelTag tone="red">Professor(a)</PixelTag> : <PixelTag tone="neutral">Sem kit</PixelTag>}
+            {group.isTeacher ? <PixelTag tone="red">{T.Person}</PixelTag> : <PixelTag tone="neutral">Sem kit</PixelTag>}
           </div>
         </Reveal>
 

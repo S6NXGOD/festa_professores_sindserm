@@ -9,6 +9,7 @@ import { properName } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import type { EventInfo } from "@/server/queries/config";
 import type { VoucherCardData } from "@/server/queries/vouchers";
+import { GAME, T } from "@/domain/edition";
 
 export interface VoucherEventInfo {
   name: string;
@@ -88,7 +89,7 @@ export function VoucherCard({
       <div className="relative px-5 pt-1 pb-4">
         <div className="flex items-center justify-between gap-2">
           <PlayerTag player={isMember ? 1 : 2} />
-          <span className="pixel text-[0.5rem] text-fg-muted print:text-black">Admit one</span>
+          <span className="pixel text-[0.5rem] text-fg-muted print:text-black">{GAME.admitOne}</span>
         </div>
         <h3 className="display mt-3 text-[1.9rem] break-words text-fg print:text-black" data-testid="voucher-name">
           {card.fullName}
@@ -96,7 +97,7 @@ export function VoucherCard({
         <p className="mt-1 text-sm font-semibold text-fg-muted print:text-black">
           {isMember ? (
             card.isTeacher ? (
-              "Professor(a) filiado(a)"
+              T.personAffiliated
             ) : (
               "Filiado(a) ao SINDSERM"
             )
@@ -241,7 +242,7 @@ function EmployeePass({
           <span className={cn("pixel inline-flex items-center rounded-[4px] px-1.5 py-1 text-[0.55rem] leading-none", metal.tag)} data-testid="voucher-category">
             {courtesy ? "Convidado(a)" : EMPLOYEE_CATEGORY_LABEL[category]}
           </span>
-          <span className="pixel text-[0.5rem] text-fg-muted print:text-black">Admit one</span>
+          <span className="pixel text-[0.5rem] text-fg-muted print:text-black">{GAME.admitOne}</span>
         </div>
         <h3 className="display mt-3 text-[1.9rem] break-words text-fg print:text-black" data-testid="voucher-name">
           {card.fullName}
@@ -406,7 +407,7 @@ function MemberNotes({ card, active, kitDeadline }: { card: VoucherCardData; act
         </Note>
       ) : (
         <Note tone="neutral" icon={Info}>
-          Você participa da festa sem kit de consumação (o kit é só para professoras e professores).
+          Você participa da festa sem kit de consumação (o kit é só para {T.people}).
         </Note>
       )}
     </>

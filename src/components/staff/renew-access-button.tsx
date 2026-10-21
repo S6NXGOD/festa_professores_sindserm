@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { CopyLinkBox } from "@/components/voucher/copy-link-box";
 import { callAction } from "@/lib/call-action";
 import { renewAccessAction } from "@/server/actions/operations";
+import { T } from "@/domain/edition";
 
 /** Gera um novo link de vouchers do grupo (o anterior deixa de funcionar). */
 export function RenewAccessButton({ registrationId }: { registrationId: string }) {
@@ -34,7 +35,7 @@ export function RenewAccessButton({ registrationId }: { registrationId: string }
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Link de vouchers do grupo</DialogTitle>
-            <DialogDescription>Envie ao(à) professor(a). O link mostra todos os vouchers do grupo e só é exibido agora.</DialogDescription>
+            <DialogDescription>Envie ao(à) {T.person}. O link mostra todos os vouchers do grupo e só é exibido agora.</DialogDescription>
           </DialogHeader>
           {token ? <CopyLinkBox path={`/vouchers/${token}`} label="Novo link" /> : null}
         </DialogContent>

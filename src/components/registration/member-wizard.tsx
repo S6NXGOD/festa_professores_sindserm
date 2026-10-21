@@ -46,6 +46,7 @@ import {
 import { firstName } from "@/lib/text";
 import { type KitSupply, kitOutlook, kitsSoldOut } from "@/domain/kit-supply";
 import { KitsSoldOutBanner, KitWaitlistNotice } from "./kit-waitlist-notice";
+import { EDITION, GAME, T } from "@/domain/edition";
 
 type Step = "member" | "guest" | "review";
 
@@ -75,7 +76,8 @@ export function MemberWizard({
       submissionId,
       member: { fullName: "", cpf: "", whatsapp: "", registrationNumber: "", workplace: "" },
       // Sem resposta até a pessoa escolher.
-      isTeacher: null as unknown as boolean,
+      // Festa sem a pergunta (servidoras e servidores): todo filiado(a) tem kit e convidado.
+      isTeacher: (EDITION.askTeacher ? null : true) as unknown as boolean,
       guest: null,
       privacyConsent: false,
       acceptKitWaitlist: false,
@@ -185,7 +187,7 @@ export function MemberWizard({
     toast.error("Revise os campos destacados.");
   };
 
-  const stepNames = isTeacher ? ["Seus dados", "Player 2", "Confirmar"] : ["Seus dados", "Confirmar"];
+  const stepNames = isTeacher ? ["Seus dados", GAME.player2Name, "Confirmar"] : ["Seus dados", "Confirmar"];
   const guest = values.guest;
 
   return (
@@ -265,8 +267,8 @@ export function MemberWizard({
           {step === "guest" ? (
             <>
               <StepHeader
-                title={staff ? "Convidado (Player 2)" : "Seu Player 2"}
-                subtitle="Cada professor(a) pode levar um convidado. Ele recebe o próprio QR Code para entrar."
+                title={staff ? `Convidado (${GAME.player2Name})` : `Seu ${GAME.player2Name}`}
+                subtitle={`Cada ${T.person} pode levar um convidado. Ele recebe o próprio QR Code para entrar.`}
               />
               <Controller
                 control={control}
@@ -294,7 +296,7 @@ export function MemberWizard({
                   <ReviewItem label="WhatsApp" value={formatPhone(values.member?.whatsapp)} />
                   <ReviewItem label="Matrícula" value={values.member?.registrationNumber} />
                   <ReviewItem label="Lotação" value={values.member?.workplace} />
-                  <ReviewItem label="Professor(a)" value={isTeacher ? "Sim" : "Não"} />
+                  {EDITION.askTeacher ? <ReviewItem label={T.Person} value={isTeacher ? "Sim" : "Não"} /> : null}
                 </dl>
               </ReviewBlock>
 
@@ -334,8 +336,8 @@ export function MemberWizard({
                     <strong className="font-bold">Kits de consumação:</strong>{" "}
                     {guest ? (
                       <>
-                        1 para {staff ? "o(a) professor(a)" : "você"} e 1 para <strong>{guest.fullName || "o convidado"}</strong>, entregues
-                        na recepção. O do convidado sai depois que {staff ? "o(a) professor(a)" : "você"} chegar.
+                        1 para {staff ? T.thePerson : "você"} e 1 para <strong>{guest.fullName || "o convidado"}</strong>, entregues
+                        na recepção. O do convidado sai depois que {staff ? T.thePerson : "você"} chegar.
                       </>
                     ) : (
                       <>1 kit, entregue na recepção junto com a entrada.</>
@@ -345,7 +347,7 @@ export function MemberWizard({
                     ) : null}
                   </>
                 ) : (
-                  <>Participação sem kit de consumação (exclusivo para professoras e professores).</>
+                  <>Participação sem kit de consumação (exclusivo para {T.people}).</>
                 )}
               </Callout>
               )}
@@ -397,7 +399,7 @@ export function MemberWizard({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <PixelTag tone="red" className="w-fit animate-blink">
-              1UP
+              {GAME.oneUp}
             </PixelTag>
             <DialogTitle>Inscrição gravada!</DialogTitle>
             <DialogDescription>

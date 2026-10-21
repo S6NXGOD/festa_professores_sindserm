@@ -11,6 +11,7 @@ import { type KitSupply, kitsSoldOut } from "@/domain/kit-supply";
 import { FichaWizard } from "./ficha-wizard";
 import { KitsSoldOutBanner } from "./kit-waitlist-notice";
 import { MemberWizard } from "./member-wizard";
+import { EDITION, GAME, T } from "@/domain/edition";
 
 type Path = "choose" | "not-member" | "guest-info" | "member" | "ficha";
 
@@ -46,7 +47,7 @@ export function RegistrationFlow({
         {path === "choose" ? (
           <div className="text-center">
             <p className="pixel text-[0.62rem] text-red neon-red">
-              Press start<span className="animate-blink">_</span>
+              {GAME.pressStart}<span className="animate-blink">_</span>
             </p>
             <h1 className="display mt-4 text-[2.6rem] text-fg sm:text-5xl">Você é filiado(a) ao SINDSERM?</h1>
             <p className="mt-3 text-fg-muted">A inscrição é feita por quem é filiado(a), que também cadastra o seu convidado.</p>
@@ -93,7 +94,7 @@ export function RegistrationFlow({
               <BigChoice
                 icon={Users}
                 title="Vou como convidado(a)"
-                hint="Um(a) professor(a) filiado(a) me cadastra como convidado"
+                hint={`${T.aPerson.charAt(0).toUpperCase()}${T.aPerson.slice(1)} filiado(a) me cadastra como convidado`}
                 onClick={() => setPath("guest-info")}
                 testId="choose-guest"
               />
@@ -101,8 +102,8 @@ export function RegistrationFlow({
             <p className="mt-4 flex items-start gap-2 rounded-xl border border-red/40 bg-brand-soft p-4 text-sm leading-relaxed text-fg" data-testid="kit-teachers-only">
               <Gift className="mt-0.5 size-5 shrink-0 text-red" />
               <span>
-                Qualquer servidor(a) municipal pode se filiar e vir à festa. <strong>O kit de consumação (e o convidado) é só
-                para professoras e professores.</strong>
+                Qualquer servidor(a) municipal pode se filiar e vir à festa.{" "}
+                <strong>{EDITION.askTeacher ? `O kit de consumação (e o convidado) é só para ${T.people}.` : "E já ganha o kit de consumação e 1 convidado."}</strong>
               </span>
             </p>
             <Button variant="ghost" className="mt-6" onClick={() => setPath("choose")}>
@@ -113,10 +114,10 @@ export function RegistrationFlow({
 
         {path === "guest-info" ? (
           <div className="rounded-2xl border border-line bg-surface p-6 sm:p-8" role="status">
-            <PixelTag tone="neutral">Player 2</PixelTag>
+            <PixelTag tone="neutral">{GAME.player2Name}</PixelTag>
             <h1 className="display mt-4 text-4xl text-fg">Entre como convidado(a)</h1>
             <p className="mt-3 leading-relaxed text-fg-muted">
-              Cada professor(a) filiado(a) pode levar <strong className="text-fg">um convidado</strong>. Peça para ele(a)
+              Cada {T.person} filiado(a) pode levar <strong className="text-fg">um convidado</strong>. Peça para ele(a)
               cadastrar você (nome completo e, se tiver, CPF) na inscrição dele(a) — você recebe o seu próprio QR Code.
             </p>
             <p className="mt-3 leading-relaxed text-fg-muted">

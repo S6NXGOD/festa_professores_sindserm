@@ -24,6 +24,7 @@ import { type AddGuestData, type AddGuestInput, addGuestSchema } from "@/domain/
 import { callAction } from "@/lib/call-action";
 import { playSound } from "@/lib/sound";
 import { addGuestAction } from "@/server/actions/operations";
+import { GAME } from "@/domain/edition";
 
 /** Cadastro (ou troca) do convidado — o Player 2 — de um(a) professor(a) ou de um(a) funcionário(a) do SINDSERM. */
 export function AddGuestDialog({
@@ -68,7 +69,7 @@ export function AddGuestDialog({
           ? `Convidado trocado: agora é ${result.data.name}.`
           : result.data.reusedPerson
             ? `${result.data.name} (já cadastrado) agora é convidado(a).`
-            : `${result.data.name} entrou como Player 2.`,
+            : `${result.data.name} entrou como ${GAME.player2Name}.`,
       );
       form.reset(defaults);
       setOpen(false);

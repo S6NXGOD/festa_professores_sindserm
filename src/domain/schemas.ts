@@ -8,6 +8,7 @@ import { normalizeMapsInput } from "@/lib/maps";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeSpaces, toSearchText } from "@/lib/text";
 import { ACCESS_LEVELS, sanitizeAccess } from "./access";
+import { EDITION, T } from "./edition";
 import { EMPLOYEE_CATEGORIES, STAFF_ROLES } from "./types";
 
 const NAME_REGEX = /^[\p{L}\p{M}'’. -]+$/u;
@@ -152,6 +153,13 @@ const optionalName = (label: string) =>
 
 /** Resposta obrigatória de sim/não (o formulário começa sem resposta). */
 const yesNoField = (message: string) => z.boolean({ error: message });
+/**
+ * "É professor(a)?": decide quem tem kit e convidado. Na festa sem a pergunta
+ * (servidoras e servidores), todo filiado(a) tem: vale sempre "sim", mesmo que
+ * chegue outra resposta.
+ */
+const teacherField = (message: string) =>
+  EDITION.askTeacher ? yesNoField(message) : z.boolean().nullish().transform((): boolean => true);
 
 const consentField = (message: string) => z.boolean().refine((v) => v, message);
 
@@ -183,9 +191,9 @@ export const guestInputSchema = z.object({
 export type GuestInput = z.input<typeof guestInputSchema>;
 
 const PRIVACY_MESSAGE = "É necessário concordar com o aviso de privacidade";
-const TEACHER_MESSAGE = "Responda se você é professor(a)";
+const TEACHER_MESSAGE = `Responda se você é ${T.person}`;
 
-export const SAME_NAME_GUEST_MESSAGE = "Mesmo nome do(a) professor(a): informe o CPF do convidado para mostrar que é outra pessoa";
+export const SAME_NAME_GUEST_MESSAGE = `Mesmo nome ${T.ofPerson}: informe o CPF do convidado para mostrar que é outra pessoa`;
 
 /**
  * Convidado sem CPF com o mesmo nome do(a) professor(a): provavelmente é a
@@ -205,7 +213,7 @@ function refineGuest(
 ) {
   if (!data.guest) return;
   if (!data.isTeacher) {
-    ctx.addIssue({ code: "custom", path: ["guest"], message: "Somente professoras e professores podem levar convidado" });
+    ctx.addIssue({ code: "custom", path: ["guest"], message: `Somente ${T.people} podem levar convidado` });
   } else if (data.guest.cpf && data.guest.cpf === member.cpf) {
     ctx.addIssue({ code: "custom", path: ["guest", "cpf"], message: "O convidado precisa ter outro CPF" });
   } else if (guestNameClash(data.guest, member.fullName)) {
@@ -229,7 +237,7 @@ export const registrationSchema = z
   .object({
     submissionId: z.uuid(),
     member: memberDataSchema,
-    isTeacher: yesNoField(TEACHER_MESSAGE),
+    isTeacher: teacherField(TEACHER_MESSAGE),
     guest: guestInputSchema.nullable(),
     privacyConsent: consentField(PRIVACY_MESSAGE),
     /** Kits esgotados: a pessoa leu o aviso e aceita entrar na fila do kit. */
@@ -325,7 +333,7 @@ export const preAffiliationSchema = z
   .object({
     submissionId: z.uuid(),
     ficha: affiliationFieldsSchema,
-    isTeacher: yesNoField(TEACHER_MESSAGE),
+    isTeacher: teacherField(TEACHER_MESSAGE),
     guest: guestInputSchema.nullable(),
     authorizationAccepted: consentField(AUTHORIZATION_MESSAGE),
     documents: requiredDocumentsSchema,
@@ -344,7 +352,7 @@ export type PreAffiliationData = z.output<typeof preAffiliationSchema>;
 export const affiliationFormSchema = affiliationFieldsSchema.extend({
   personId: z.uuid().nullable(),
   formDate: dateField("a data da ficha"),
-  isTeacher: yesNoField("Informe se a pessoa é professor(a)"),
+  isTeacher: teacherField(`Informe se a pessoa é ${T.person}`),
   authorizationAccepted: consentField(AUTHORIZATION_MESSAGE),
   documents: z.object({ rg: uploadIds, payslip: uploadIds }).optional(),
 });
@@ -359,7 +367,7 @@ export const declaredMemberSchema = z.object({
   whatsapp: phoneField,
   registrationNumber: registrationNumberField,
   workplace: workplaceField,
-  isTeacher: yesNoField("Informe se a pessoa é professor(a)"),
+  isTeacher: teacherField(`Informe se a pessoa é ${T.person}`),
 });
 export type DeclaredMemberInput = z.input<typeof declaredMemberSchema>;
 
@@ -620,7 +628,7 @@ export const stockSettingsSchema = z
   .object({
     stockMode: z.enum(["SINGLE", "SPLIT", "UNIFIED"]),
     totalAll: optionalIntField("a quantidade de kits"),
-    totalMember: optionalIntField("a quantidade de kits de professor(a)"),
+    totalMember: optionalIntField(`a quantidade de kits de ${T.person}`),
     totalGuest: optionalIntField("a quantidade de kits de convidado"),
     /** Estoque dos colaboradores (nos modos geral + colaboradores e separado). Vazio = 0. */
     totalEmployee: optionalIntField("a quantidade de kits dos colaboradores"),

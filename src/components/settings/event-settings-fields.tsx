@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { EventSettingsData, EventSettingsInput } from "@/domain/schemas";
 import { formatClock } from "@/lib/datetime";
+import { EDITION } from "@/domain/edition";
 
 export type EventForm = UseFormReturn<EventSettingsInput, unknown, EventSettingsData>;
 
@@ -22,7 +23,7 @@ export function EventDetailsFields({ form }: { form: EventForm }) {
         description="Aparece no topo do site, na aba do navegador, na prévia do link no WhatsApp, nos vouchers e nas mensagens. Com um traço entre espaços ( – ), o que vem depois dele vira a chamada em vermelho."
         error={e.name?.message}
       >
-        <Input id="event-name" placeholder="Ex.: Festa das Professoras e Professores – SINDSERMTHE 2026" {...register("name")} />
+        <Input id="event-name" placeholder={`Ex.: ${EDITION.defaultEventName} 2026`} {...register("name")} />
       </FormField>
       {name?.trim() ? (
         <div className="-mt-2 rounded-xl border border-dashed border-line-strong bg-ink/60 px-3 py-2.5" data-testid="event-name-preview">

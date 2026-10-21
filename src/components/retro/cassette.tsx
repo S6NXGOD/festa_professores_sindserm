@@ -1,24 +1,31 @@
 "use client";
 
 import { motion } from "motion/react";
+import { EDITION } from "@/domain/edition";
 import { cn } from "@/lib/utils";
+import { FloatLoader, PoolProgress } from "./pool-progress";
 
-/**
- * Fita cassete como barra de progresso: a fita passa do carretel da esquerda
- * para o da direita conforme as etapas avançam, e os carretéis giram.
- */
-export function CassetteProgress({
-  step,
-  steps,
-  label = "LADO A",
-  className,
-}: {
+interface ProgressProps {
   /** Etapa atual (0 = primeira). */
   step: number;
   steps: string[];
   label?: string;
   className?: string;
-}) {
+}
+
+/**
+ * Barra de progresso dos assistentes: a fita cassete (anos 80) ou, no tema
+ * verão, a piscina com a boia nadando até a etapa atual.
+ */
+export function CassetteProgress(props: ProgressProps) {
+  return EDITION.theme === "verao" ? <PoolProgress {...props} /> : <Cassette {...props} />;
+}
+
+/**
+ * Fita cassete como barra de progresso: a fita passa do carretel da esquerda
+ * para o da direita conforme as etapas avançam, e os carretéis giram.
+ */
+function Cassette({ step, steps, label = "LADO A", className }: ProgressProps) {
   const progress = steps.length > 1 ? step / (steps.length - 1) : 1;
   // Raio da fita enrolada em cada carretel (fita "passa" da esquerda para a direita).
   const leftTape = 15 - 8 * progress;
@@ -93,8 +100,9 @@ function Reel({ cx, cy }: { cx: number; cy: number }) {
   );
 }
 
-/** Indicador de carregamento: carretéis girando e "CARREGANDO" piscando. */
+/** Indicador de carregamento: carretéis girando e "CARREGANDO" piscando (no verão, a boia na água). */
 export function CassetteLoader({ label = "Carregando", className }: { label?: string; className?: string }) {
+  if (EDITION.theme === "verao") return <FloatLoader label={label} className={className} />;
   return (
     <div role="status" className={cn("flex flex-col items-center gap-3 text-fg-muted", className)}>
       <svg viewBox="0 0 64 28" className="w-20" aria-hidden>

@@ -1,5 +1,7 @@
-import { Building, Clock, Gift, Heart, Hourglass, Notebook, Package, Teach, Users, Warning } from "@/components/icons/pixel";
+import { Building, Clock, Gift, Heart, Hourglass, Notebook, Package, Users, Warning } from "@/components/icons/pixel";
+import { PersonIcon } from "@/components/icons/person-icon";
 import type { PixelIcon } from "@/components/icons/pixel";
+import { EDITION, T } from "@/domain/edition";
 
 /**
  * Como funcionam os kits, numa página: quem tem direito, quando sai, de qual
@@ -18,9 +20,11 @@ export function KitRules({
 }) {
   const rules: { icon: PixelIcon; title: string; text: string }[] = [
     {
-      icon: Teach,
+      icon: PersonIcon,
       title: "Quem tem kit",
-      text: "Professora ou professor filiado(a): 1 kit, e mais 1 para o convidado, que sai depois que quem convidou chegar. Filiado(a) que não é professor(a) entra sem kit.",
+      text: EDITION.askTeacher
+        ? `${T.pair.replace(" e ", " ou ")} filiado(a): 1 kit, e mais 1 para o convidado, que sai depois que quem convidou chegar. Filiado(a) que não é ${T.person} entra sem kit.`
+        : `${T.pair.replace(" e ", " ou ")} filiado(a): 1 kit, e mais 1 para o convidado, que sai depois que quem convidou chegar.`,
     },
     {
       icon: Building,
@@ -35,7 +39,7 @@ export function KitRules({
     {
       icon: Package,
       title: "Guardado por ordem de inscrição",
-      text: `Cada inscrição guarda o kit dela (inclusive quem ainda aguarda conferência ou assinatura)${separateStock ? ", no estoque de professores ou de convidados" : ""}.`,
+      text: `Cada inscrição guarda o kit dela (inclusive quem ainda aguarda conferência ou assinatura)${separateStock ? `, no estoque de ${T.person} ou de convidado` : ""}.`,
     },
     {
       icon: Hourglass,

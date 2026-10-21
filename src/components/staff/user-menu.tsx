@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ROLE_LABEL } from "@/domain/labels";
 import type { StaffRole } from "@/domain/types";
+import { GAME } from "@/domain/edition";
 import { authClient } from "@/lib/auth-client";
 import { playSound, setSoundEnabled, useSoundEnabled } from "@/lib/sound";
 import { initials } from "@/lib/text";
@@ -107,7 +108,7 @@ export function UserMenu({
         >
           {soundOn ? <Volume className="mt-0.5" /> : <VolumeOff className="mt-0.5" />}
           <span className="flex flex-col">
-            <span>{soundOn ? "Sons 8-bit: ligados" : "Sons 8-bit: desligados"}</span>
+            <span>{soundOn ? `${GAME.sounds}: ligados` : `${GAME.sounds}: desligados`}</span>
             <span className="text-xs font-normal text-fg-muted">Tocam ao ler QR, confirmar entrada, entregar kit e a cada inscrição nova</span>
           </span>
         </DropdownMenuItem>

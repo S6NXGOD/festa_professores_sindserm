@@ -28,6 +28,7 @@ import { buildGateView } from "@/server/services/gate-view";
 import { getEventConfig, getStockOverview } from "@/server/services/settings";
 import { loadPersonState } from "@/server/services/state";
 import { requirePageActor } from "@/server/session";
+import { T } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Cadastro" };
 
@@ -94,7 +95,7 @@ export default async function PersonPage({ params, searchParams }: PageProps<"/p
         <div className="flex items-start gap-3 rounded-xl border border-success/40 bg-success-soft p-4 text-sm font-semibold text-fg" role="status">
           <Check className="mt-0.5 size-5 shrink-0 text-success-text" />
           <p>
-            Inscrição gravada! Confira a filiação abaixo. Para imprimir os vouchers (do(a) professor(a) e do convidado numa folha
+            Inscrição gravada! Confira a filiação abaixo. Para imprimir os vouchers ({T.ofPerson} e do convidado numa folha
             só), use <strong>Imprimir vouchers</strong>.
           </p>
         </div>

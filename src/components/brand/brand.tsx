@@ -2,8 +2,14 @@ import Image from "next/image";
 import { SiteIconMark } from "@/components/brand/site-icon";
 import { splitEventName } from "@/lib/text";
 import { cn } from "@/lib/utils";
+import { EDITION } from "@/domain/edition";
+import emblemProfessores from "../../../public/brand/festa-emblema.webp";
+import emblemServidores from "../../../public/brand/servidores/emblema.webp";
 
-/** Emblema da festa (recorte do cartaz). Fundo preto igual ao do site. */
+// Importada (e não pelo caminho em /public): o endereço muda junto com a arte, sem imagem velha presa no cache.
+const EMBLEM_IMAGE = EDITION.id === "servidores" ? emblemServidores : emblemProfessores;
+
+/** Emblema da festa (recorte do cartaz de fundo preto, ou a arte de fundo transparente do verão). */
 export function FestaEmblem({
   className,
   eager = false,
@@ -15,17 +21,18 @@ export function FestaEmblem({
 }) {
   return (
     <Image
-      src="/brand/festa-emblema.webp"
-      alt="Festa dos/as professores/as — A luta não sai de moda — Nos embalos de sexta à noite"
-      width={904}
-      height={776}
+      src={EMBLEM_IMAGE}
+      alt={EDITION.emblem.alt}
       sizes={sizes}
       loading={eager ? "eager" : "lazy"}
       fetchPriority={eager ? "high" : "auto"}
       className={cn(
+        "h-auto w-full select-none print:mx-auto print:w-[58%]",
         // Fundo preto do cartaz "some" sobre qualquer fundo escuro (mistura de tela).
         // No papel branco a mistura "screen" apagaria a imagem: na impressão, mistura normal.
-        "h-auto w-full select-none mix-blend-screen print:mx-auto print:w-[58%] print:mix-blend-normal [mask-image:radial-gradient(ellipse_72%_70%_at_50%_50%,#000_62%,transparent_100%)]",
+        // A arte de fundo transparente aparece como está.
+        !EDITION.emblem.transparent &&
+          "mix-blend-screen print:mix-blend-normal [mask-image:radial-gradient(ellipse_72%_70%_at_50%_50%,#000_62%,transparent_100%)]",
         className,
       )}
       draggable={false}

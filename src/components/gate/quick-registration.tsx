@@ -19,6 +19,7 @@ import { playSound } from "@/lib/sound";
 import { firstName } from "@/lib/text";
 import { uuidv4 } from "@/lib/uuid";
 import { submitGateRegistration } from "@/server/actions/registration";
+import { EDITION } from "@/domain/edition";
 
 /** Entrada de cada bloco, um depois do outro (a tela "monta" rápido, sem pular). */
 const block = (index: number) => ({
@@ -42,8 +43,8 @@ export function QuickRegistrationForm({ initialName, initialCpf }: { initialName
     defaultValues: {
       submissionId,
       member: { fullName: initialName, cpf: initialCpf, whatsapp: "", registrationNumber: "", workplace: "" },
-      // Sem resposta até a equipe escolher.
-      isTeacher: null as unknown as boolean,
+      // Sem resposta até a equipe escolher (na festa sem a pergunta, todo filiado(a) tem kit e convidado).
+      isTeacher: (EDITION.askTeacher ? null : true) as unknown as boolean,
       guest: null,
       privacyConsent: false,
     },

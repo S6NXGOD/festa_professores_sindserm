@@ -32,6 +32,7 @@ import { ENTRY_FILTERS, type EntryFilter, type EntryRow, entryOperators, entrySu
 import { pageNumber } from "@/server/queries/panel";
 import { getDashboardStats } from "@/server/services/stats";
 import { requirePageActor } from "@/server/session";
+import { T } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Entradas" };
 
@@ -54,7 +55,7 @@ const FILTER_LABEL: Record<EntryFilter, string> = {
 function roleText(row: EntryRow) {
   if (row.role === "GUEST") return `Convidado(a) de ${row.hostName ?? "—"}`;
   if (row.role === "EMPLOYEE") return employeeTitleLine(row.employeeCategory ?? "STAFF", row.employeeJobTitle);
-  return row.isTeacher ? "Professor(a)" : "Filiado(a)";
+  return row.isTeacher ? T.Person : "Filiado(a)";
 }
 
 function EntryItem({ row, early, canOpen }: { row: EntryRow; early: boolean; canOpen: boolean }) {

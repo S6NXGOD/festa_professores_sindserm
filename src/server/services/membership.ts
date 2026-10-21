@@ -9,6 +9,7 @@ import {
   declaredMemberSchema,
   registrationNumberKey,
 } from "@/domain/schemas";
+import { T } from "@/domain/edition";
 import { DOCUMENT_KIND_LABEL } from "@/domain/labels";
 import { isActiveMember } from "@/domain/rules";
 import { authorizationText } from "@/domain/affiliation-text";
@@ -20,6 +21,7 @@ import { hasSignedForm, linkDocumentsToForm, missingDocuments } from "./document
 import { DomainError, isUniqueViolation } from "./errors";
 import { allocateKitSlots, promoteKitWaitlist } from "./kit-waitlist";
 import { lockRegistration } from "./locks";
+import { applyPriorAffiliation } from "./prior-affiliation";
 import { personSearchFields } from "./registration";
 import { findRegistrationIdByMember, isActiveEmployee } from "./state";
 import { withTx } from "./tx";
@@ -109,12 +111,14 @@ export async function registerDeclaredMember(actor: Actor, rawInput: DeclaredMem
         })
         .returning({ id: registration.id });
       await ensureActiveVoucher(tx, target.id, actor.userId);
+      // Já conferida em outra festa: fica o recado para a equipe confirmar (o Confirmar também desfaz o vínculo de convidado).
+      await applyPriorAffiliation(tx, actor, reg!.id, target.cpf ?? input.cpf ?? null, target.fullName, "note");
       if (input.isTeacher) await allocateKitSlots(tx, actor, reg!.id, { member: true, guest: false });
       await writeAudit(tx, actor, {
         action: "DECLARED_MEMBER_REGISTERED",
         entityType: "registration",
         entityId: reg!.id,
-        summary: `${target.fullName} cadastrado(a) como filiado(a)${input.isTeacher ? " (professor(a))" : ""}, aguardando conferência.`,
+        summary: `${target.fullName} cadastrado(a) como filiado(a)${input.isTeacher ? ` (${T.person})` : ""}, aguardando conferência.`,
       });
       return { registrationId: reg!.id, accessToken };
     });
@@ -173,7 +177,7 @@ export async function saveAffiliationForm(actor: Actor, rawInput: AffiliationFor
         if (form.registrationId && form.isTeacher !== data.isTeacher) {
           const state = await lockRegistration(tx, form.registrationId);
           if (!data.isTeacher && state.guest) {
-            throw new DomainError("INVALID_STATE", "Remova o convidado antes: somente professoras e professores levam convidado.", {
+            throw new DomainError("INVALID_STATE", `Remova o convidado antes: somente ${T.people} levam convidado.`, {
               isTeacher: "Há convidado cadastrado",
             });
           }
@@ -308,7 +312,7 @@ export async function formalizeAffiliation(actor: Actor, formId: string, method:
         const state = await lockRegistration(tx, own.id);
         ownState = state;
         if (!form.isTeacher && state.guest) {
-          throw new DomainError("INVALID_STATE", "A ficha indica que a pessoa não é professor(a), mas há convidado cadastrado. Remova o convidado ou corrija a ficha.");
+          throw new DomainError("INVALID_STATE", `A ficha indica que a pessoa não é ${T.person}, mas há convidado cadastrado. Remova o convidado ou corrija a ficha.`);
         }
       }
       const target = await lockPerson(tx, form.personId);

@@ -12,6 +12,7 @@ import { slugify } from "@/lib/clipboard";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { firstName } from "@/lib/text";
+import { confettiLook } from "@/lib/confetti-look";
 
 export interface MissionVoucher {
   personId: string;
@@ -103,8 +104,7 @@ export function SaveVouchersMission({
         particleCount: 70,
         spread: 80,
         origin: { y: 0.4 },
-        colors: ["#ff2626", "#e3000f", "#ffffff", "#22c55e"],
-        shapes: ["square"],
+        ...confettiLook(["#ff2626", "#e3000f", "#ffffff", "#22c55e"]),
         ticks: 160,
         flat: true,
       });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useNowSeconds } from "@/lib/clock";
+import { GAME } from "@/domain/edition";
 import { cn } from "@/lib/utils";
 
 function parts(totalSeconds: number) {
@@ -20,7 +21,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 export function Countdown({
   target,
   label,
-  doneLabel = "A pista está aberta",
+  doneLabel = `A ${GAME.floor} está aberta`,
   align = "center",
   className,
 }: {

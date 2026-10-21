@@ -15,6 +15,7 @@ import {
   stockPoolFor,
 } from "@/domain/rules";
 import { isKitDeadlinePassed } from "@/domain/kit-deadline";
+import { T } from "@/domain/edition";
 import { KIT_BLOCK_MESSAGE, KIT_TYPE_LABEL } from "@/domain/labels";
 import { justificationField } from "@/domain/schemas";
 import type { EmployeeKitType, GroupKitType, KitType, StockPool } from "@/domain/types";
@@ -225,7 +226,7 @@ export async function recordEmployeeKitDelivery(
 /** Entrega manual de um kit do grupo de um(a) funcionário(a) que não saiu na entrada. */
 async function deliverEmployeeGroupKit(tx: Tx, actor: StaffActor, employeeId: string, kitType: KitType, now: Date) {
   if (kitType === "MEMBER") {
-    throw new DomainError("KIT_NOT_AVAILABLE", "Colaborador(a) do SINDSERM recebe o kit de colaborador(a), não o de professor(a).");
+    throw new DomainError("KIT_NOT_AVAILABLE", `Colaborador(a) do SINDSERM recebe o kit de colaborador(a), não o de ${T.person}.`);
   }
   const group = await lockEmployeeGroupWithPeople(tx, employeeId);
   const config = await getEventConfig(tx);

@@ -47,6 +47,7 @@ import {
   validateGuestStep,
   WizardNav,
 } from "./wizard-parts";
+import { EDITION, GAME, T } from "@/domain/edition";
 
 type Step = "personal" | "work" | "authorization" | "guest" | "documents" | "review";
 
@@ -111,7 +112,8 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
         admissionDate: "",
         contributionStartMonth: nextMonthValue(today),
       },
-      isTeacher: null as unknown as boolean,
+      // Festa sem a pergunta (servidoras e servidores): todo filiado(a) tem kit e convidado.
+      isTeacher: (EDITION.askTeacher ? null : true) as unknown as boolean,
       guest: null,
       authorizationAccepted: false,
       documents: { rg: [], payslip: [] },
@@ -139,7 +141,7 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
     personal: "Você",
     work: "Trabalho",
     authorization: "Desconto",
-    guest: "Player 2",
+    guest: GAME.player2Name,
     documents: "Docs",
     review: "Confirmar",
   };
@@ -263,8 +265,8 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
                 subtitle="Os mesmos dados da ficha em papel do SINDSERM. Na recepção você só assina."
               />
               <Callout tone="red" icon={Gift} testId="ficha-kit-notice">
-                Qualquer servidor(a) municipal pode se filiar e vir à festa. <strong>O kit de consumação (e o convidado) é só
-                para professoras e professores.</strong>
+                Qualquer servidor(a) municipal pode se filiar e vir à festa.{" "}
+                <strong>{EDITION.askTeacher ? `O kit de consumação (e o convidado) é só para ${T.people}.` : "E já ganha o kit de consumação e 1 convidado."}</strong>
               </Callout>
               {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner deadlineLabel={kitSupply?.reservedUntil?.passed ? null : (kitSupply?.reservedUntil?.label ?? null)} /> : null}
               <FormField id="f-name" label="Nome completo" error={fe?.fullName?.message}>
@@ -399,7 +401,7 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
 
           {step === "guest" ? (
             <>
-              <StepHeader title="Seu Player 2" subtitle="Cada professor(a) pode levar um convidado. Ele recebe o próprio QR Code." />
+              <StepHeader title={`Seu ${GAME.player2Name}`} subtitle={`Cada ${T.person} pode levar um convidado. Ele recebe o próprio QR Code.`} />
               <Controller
                 control={control}
                 name="guest"
@@ -482,7 +484,7 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
                   <ReviewItem label="Matrícula" value={f?.registrationNumber} />
                   <ReviewItem label="Cargo / função" value={f?.jobTitle} />
                   <ReviewItem label="Admissão" value={formatPlainDate(f?.admissionDate)} />
-                  <ReviewItem label="Professor(a)" value={isTeacher ? "Sim" : "Não"} />
+                  {EDITION.askTeacher ? <ReviewItem label={T.Person} value={isTeacher ? "Sim" : "Não"} /> : null}
                 </dl>
               </ReviewBlock>
               {isTeacher ? (
@@ -528,7 +530,7 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
                 />
               ) : isTeacher ? (
                 <Callout tone="info" icon={Gift}>
-                  Como professor(a) filiado(a), você terá 1 kit de consumação
+                  Como {T.person} filiado(a), você terá 1 kit de consumação
                   {guest ? " e mais 1 para o seu convidado" : ""}. Os kits são entregues na recepção
                   {guest ? ": o seu na sua entrada; o do convidado, depois que você chegar." : ", junto com a sua entrada."}
                   {kitSupply?.reservedUntil && !kitSupply.reservedUntil.passed

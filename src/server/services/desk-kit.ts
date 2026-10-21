@@ -1,5 +1,6 @@
 import "server-only";
 import { isKitDeadlinePassed } from "@/domain/kit-deadline";
+import { T } from "@/domain/edition";
 import { kitPlanSchema } from "@/domain/kit-plan";
 import { ENTRY_KIT_MESSAGE } from "@/domain/labels";
 import {
@@ -36,7 +37,7 @@ export type DeskKit =
 /** O que a mesa lê quando o kit não sai (escrito para quem está na mesa, não para a portaria). */
 export const DESK_BLOCK_MESSAGE: Record<DeskKitCode, string> = {
   NOT_ACTIVE_MEMBER: "A filiação ainda não foi confirmada: mande ao Atendimento.",
-  NOT_TEACHER: "Não é professor(a): entra na festa, mas não tem kit de consumação.",
+  NOT_TEACHER: `Não é ${T.person}: entra na festa, mas não tem kit de consumação.`,
   MEMBER_NOT_CHECKED_IN: "Ainda não passou pela entrada.",
   NO_GUEST: "Sem kit de convidado neste grupo.",
   HOST_NOT_CHECKED_IN: "O kit do convidado sai depois que quem convidou chegar (kits na portaria).",

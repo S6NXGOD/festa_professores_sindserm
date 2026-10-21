@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { toSearchText } from "@/lib/text";
+import { T } from "./edition";
 
 /*
  * Montagem dos kits: o que vem em cada tipo de kit (itens e quantidades, com
@@ -12,8 +13,8 @@ export const KIT_KINDS = ["MEMBER", "GUEST", "EMPLOYEE", "EMPLOYEE_GUEST", "COUR
 export type KitKind = (typeof KIT_KINDS)[number];
 
 export const KIT_KIND_LABEL: Record<KitKind, string> = {
-  MEMBER: "Professora e professor",
-  GUEST: "Convidado(a) de professor(a)",
+  MEMBER: T.pair,
+  GUEST: `Convidado(a) de ${T.person}`,
   EMPLOYEE: "Colaborador(a) do SINDSERM",
   EMPLOYEE_GUEST: "Convidado(a) de colaborador(a)",
   COURTESY: "Cortesia",

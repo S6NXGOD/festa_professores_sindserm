@@ -30,6 +30,7 @@ import {
   registrationStatusCounts,
 } from "@/server/queries/panel";
 import { requirePageActor } from "@/server/session";
+import { EDITION, T } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Inscrições" };
 
@@ -159,7 +160,7 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
               ? `Na ordem da ${status === "JOINED_AT_EVENT" ? "assinatura" : "decisão"} (${
                   order === "antigas" ? "as mais antigas primeiro" : "as últimas primeiro"
                 }), como na Auditoria. A hora da inscrição aparece em cada linha.`
-              : `${plural(statusCounts.total, "inscrição", "inscrições")}${today ? ` · ${today} hoje` : ""}. Cada uma é o(a) professor(a) ou filiado(a) e, se houver, o convidado. A busca acha também o convidado.`
+              : `${plural(statusCounts.total, "inscrição", "inscrições")}${today ? ` · ${today} hoje` : ""}. Cada uma é ${T.thePerson}${EDITION.askTeacher ? " ou filiado(a)" : " filiado(a)"} e, se houver, o convidado. A busca acha também o convidado.`
         }
         actions={
           <>

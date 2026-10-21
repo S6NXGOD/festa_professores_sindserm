@@ -4,8 +4,9 @@ import confetti from "canvas-confetti";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { playSound } from "@/lib/sound";
+import { confettiLook } from "@/lib/confetti-look";
 
-/** Chuva de confete "pixelado" (quadrados) nas cores do sindicato, só ao concluir a inscrição. */
+/** Chuva de confete nas cores da festa (quadrados "pixelados" ou bolinhas do verão), só ao concluir a inscrição. */
 export function Celebration({ enabled }: { enabled: boolean }) {
   const pathname = usePathname();
 
@@ -15,7 +16,7 @@ export function Celebration({ enabled }: { enabled: boolean }) {
     window.history.replaceState(null, "", pathname);
     playSound("fanfare");
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const colors = ["#ff2626", "#e3000f", "#ffffff", "#f3e8d4", "#8c0008"];
+    const look = confettiLook(["#ff2626", "#e3000f", "#ffffff", "#f3e8d4", "#8c0008"]);
     const shoot = (originX: number, angle: number) =>
       confetti({
         particleCount: 80,
@@ -23,8 +24,7 @@ export function Celebration({ enabled }: { enabled: boolean }) {
         startVelocity: 48,
         angle,
         origin: { x: originX, y: 0.72 },
-        colors,
-        shapes: ["square"],
+        ...look,
         scalar: 1.05,
         ticks: 200,
         flat: true,
@@ -32,7 +32,7 @@ export function Celebration({ enabled }: { enabled: boolean }) {
     shoot(0.08, 60);
     shoot(0.92, 120);
     const timer = window.setTimeout(
-      () => confetti({ particleCount: 70, spread: 110, origin: { y: 0.35 }, colors, shapes: ["square"], ticks: 180, flat: true }),
+      () => confetti({ particleCount: 70, spread: 110, origin: { y: 0.35 }, ...look, ticks: 180, flat: true }),
       380,
     );
     return () => window.clearTimeout(timer);

@@ -5,6 +5,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { type PDFFont, type PDFImage, type PDFPage, PDFDocument, type RGB, rgb } from "pdf-lib";
 import { UNION } from "@/domain/union";
 import { formatShortDateTime } from "@/lib/datetime";
+import { EDITION } from "@/domain/edition";
 
 /*
  * Relatórios em PDF com a cara do sistema: faixa escura com o emblema da festa,
@@ -109,7 +110,7 @@ function loadAssets(): Promise<Assets> {
       }
     };
     const [emblem, logo] = await Promise.all([
-      image("festa-emblema.jpg", (s) => s.resize({ width: 300 }).jpeg({ quality: 84, mozjpeg: true }).toBuffer()),
+      image(EDITION.emblem.raster.replace("/brand/", ""), (s) => s.resize({ width: 300 }).flatten({ background: "#000000" }).jpeg({ quality: 84, mozjpeg: true }).toBuffer()),
       image("sindserm-branca.png", (s) => s.resize({ height: 80 }).png({ compressionLevel: 9 }).toBuffer()),
     ]);
     return { fonts: Object.fromEntries(entries) as Record<keyof Fonts, Buffer>, emblem, logo };

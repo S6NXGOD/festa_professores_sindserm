@@ -1,4 +1,5 @@
 import type { DeskCategory } from "@/domain/desk-category";
+import { T } from "@/domain/edition";
 
 /*
  * Cor de cada grupo na mesa dos kits: as mesmas dos vouchers (professor(a) em
@@ -8,7 +9,7 @@ import type { DeskCategory } from "@/domain/desk-category";
  * do servidor também leem.
  */
 export const DESK_CATEGORY_STYLE: Record<DeskCategory, { label: string; color: string; text: string }> = {
-  TEACHER: { label: "Professor(a)", color: "#ff3b3b", text: "#ffffff" },
+  TEACHER: { label: T.Person, color: "#ff3b3b", text: "#ffffff" },
   MEMBER: { label: "Filiado(a)", color: "#8b8781", text: "#0a0a0a" },
   TEACHER_GUEST: { label: "Convidado(a)", color: "#b794ff", text: "#140b2e" },
   BOARD: { label: "Diretoria", color: "#e4e4e7", text: "#0a0a0a" },

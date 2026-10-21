@@ -23,6 +23,7 @@ import { formatClock, formatPlainDateLong } from "@/lib/datetime";
 import { completeSetupAction } from "@/server/actions/setup";
 import { EventDetailsFields, KitDeadlineField, RegistrationPeriodFields } from "./event-settings-fields";
 import { StockFields } from "./stock-settings-fields";
+import { T } from "@/domain/edition";
 
 const STEPS = ["Evento", "Inscrições", "Kits", "Revisão"];
 const DRAFT_KEY = "festa-setup-draft";
@@ -180,7 +181,7 @@ export function SetupWizard({ timeZone }: { timeZone: string }) {
                   value={
                     s.stockMode !== "SPLIT"
                       ? `${String(s.totalAll ?? "")} kits`
-                      : `${String(s.totalMember ?? "")} de professor(a) · ${String(s.totalGuest ?? "")} de convidado`
+                      : `${String(s.totalMember ?? "")} de ${T.person} · ${String(s.totalGuest ?? "")} de convidado`
                   }
                 />
                 <Summary label="Kits guardados até" value={e.kitDeadlineTime ? formatClock(e.kitDeadlineTime) : "Sem horário (guardados a festa toda)"} />

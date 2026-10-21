@@ -12,6 +12,7 @@ import { maskCpfInput } from "@/lib/cpf";
 import { db } from "@/server/db";
 import { getStaffKitSupply } from "@/server/services/kit-waitlist";
 import { requireGateActor } from "@/server/session";
+import { T } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Cadastro rápido" };
 
@@ -56,7 +57,7 @@ export default async function GateQuickRegistrationPage({ searchParams }: PagePr
         <p className="flex items-start gap-2">
           <Users className="mt-0.5 size-4 shrink-0 text-red" />
           <span>
-            <strong className="text-fg">Convidado(a) de um(a) professor(a):</strong> busque quem convidou e toque em{" "}
+            <strong className="text-fg">Convidado(a) de {T.aPerson}:</strong> busque quem convidou e toque em{" "}
             <strong className="text-fg">Cadastrar convidado</strong>.
           </span>
         </p>

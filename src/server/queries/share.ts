@@ -3,6 +3,7 @@ import { formatShortDateTime } from "@/lib/datetime";
 import { capitalizeFirst } from "@/lib/text";
 import type { RegistrationWindow } from "@/server/services/settings";
 import type { EventInfo } from "./config";
+import { EDITION, T } from "@/domain/edition";
 
 /*
  * Textos de divulgação montados com os dados da festa (nada fixo no código):
@@ -22,7 +23,7 @@ export function shareSummary(event: EventInfo, window: RegistrationWindow): stri
   const where = event.venue?.name ? ` · ${event.venue.name}` : "";
   return (
     `${capitalizeFirst(event.dateLongLabel)} · ${event.timeLabel}${where}. ${registrationLine(window)}. ` +
-    "Kit de consumação para professoras e professores filiados(as), com 1 convidado."
+    `Kit de consumação para ${T.peopleAffiliated}, com 1 convidado.`
   );
 }
 
@@ -33,7 +34,7 @@ export function shareSummary(event: EventInfo, window: RegistrationWindow): stri
 export function defaultShareMessage(event: EventInfo, window: RegistrationWindow, url: string): string {
   const lines = [
     `*${event.name}*`,
-    "_A luta não sai de moda — nos embalos de sexta à noite!_",
+    `_${EDITION.tagline}_`,
     "",
     `📅 ${capitalizeFirst(event.dateLongLabel)}`,
     `🕖 ${event.timeLabel}`,
@@ -43,7 +44,7 @@ export function defaultShareMessage(event: EventInfo, window: RegistrationWindow
   }
   lines.push(
     "",
-    "Professoras e professores filiados(as) ao SINDSERM ganham *kit de consumação* e podem levar *1 convidado(a)* (com kit).",
+    `${T.PeopleAffiliated} ao SINDSERM ganham *kit de consumação* e podem levar *1 convidado(a)* (com kit).`,
     "Ainda não é filiado(a)? Dá para preencher a ficha de filiação na própria inscrição.",
     "",
     `✅ ${registrationLine(window)}:`,

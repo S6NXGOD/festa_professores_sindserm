@@ -5,6 +5,7 @@ import { Clock, Gift, Hourglass } from "@/components/icons/pixel";
 import type { KitOutlook } from "@/domain/kit-supply";
 import { firstName } from "@/lib/text";
 import { ConsentBox } from "./wizard-parts";
+import { T } from "@/domain/edition";
 
 /** Um dos jeitos de o kit sair da fila (numerado, como as fases do jogo). */
 function WayOut({ n, children }: { n: number; children: React.ReactNode }) {
@@ -82,8 +83,8 @@ export function KitWaitlistNotice({
   const guestFirst = guestName ? firstName(guestName) : "o convidado";
   const memberWaits = outlook.member === "WAITLIST";
   const guestWaits = outlook.guest === "WAITLIST";
-  const you = staff ? "o(a) professor(a)" : "você";
-  const ownKit = staff ? "o kit do(a) professor(a)" : "o seu kit";
+  const you = staff ? T.thePerson : "você";
+  const ownKit = staff ? `o kit ${T.ofPerson}` : "o seu kit";
   const { member: memberPosition, guest: guestPosition } = outlook.position;
   const places =
     memberPosition && guestPosition ? ` (lugares nº ${memberPosition} e ${guestPosition})` : memberPosition ? ` (nº ${memberPosition})` : "";

@@ -27,6 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import type { GuestInput } from "@/domain/schemas";
 import { cn } from "@/lib/utils";
+import { EDITION, T } from "@/domain/edition";
 
 /** Seção de etapa com transição lateral (como trocar de faixa na fita). */
 export function StepFrame({ stepKey, direction, children }: { stepKey: string; direction: number; children: React.ReactNode }) {
@@ -107,24 +108,26 @@ export function TeacherQuestion({
   subject?: "Você" | "A pessoa";
 }) {
   const self = subject === "Você";
+  // Festa sem a pergunta (servidoras e servidores): todo filiado(a) tem kit e convidado.
+  if (!EDITION.askTeacher) return null;
   const options = [
     {
       answer: true,
       icon: Teach,
-      title: self ? "Sim, sou professor(a)" : "Sim, é professor(a)",
+      title: self ? `Sim, sou ${T.person}` : `Sim, é ${T.person}`,
       hint: self ? "Tenho direito ao kit e a 1 convidado" : "Tem direito ao kit e a 1 convidado",
     },
     {
       answer: false,
       icon: User,
-      title: self ? "Não sou professor(a)" : "Não é professor(a)",
+      title: self ? `Não sou ${T.person}` : `Não é ${T.person}`,
       hint: self ? "Participo sem kit de consumação" : "Participa sem kit de consumação",
     },
   ] as const;
   return (
     <fieldset className="space-y-3">
       <legend className="text-[0.78rem] font-bold tracking-[0.08em] text-fg-muted uppercase">
-        {subject === "Você" ? "Você é professor(a)?" : "A pessoa é professor(a)?"}
+        {subject === "Você" ? `Você é ${T.person}?` : `A pessoa é ${T.person}?`}
       </legend>
       <div className="grid gap-3 sm:grid-cols-2">
         {options.map((option) => {
@@ -181,7 +184,7 @@ export function TeacherQuestion({
           >
             <Shield className="mt-0.5 size-4 shrink-0 text-red" />
             <span>
-              <strong className="text-fg">Atenção:</strong> na portaria, a equipe confere se você é professor(a).
+              <strong className="text-fg">Atenção:</strong> na portaria, a equipe confere se você é {T.person}.
             </span>
           </motion.p>
         ) : null}
@@ -197,7 +200,7 @@ export function TeacherQuestion({
             <Info className="mt-0.5 size-4 shrink-0 text-warning" />
             <span>
               Tudo certo: {subject === "Você" ? "você participa" : "a pessoa participa"} da festa normalmente. O kit de consumação e
-              o convidado são exclusivos para professoras e professores.
+              o convidado são exclusivos para {T.people}.
             </span>
           </motion.p>
         ) : null}
@@ -357,7 +360,7 @@ export function GuestFields({
             <p className="relative mt-4 flex items-start gap-2 rounded-lg bg-ink/60 p-3 text-sm text-fg-muted">
               <Gift className="mt-0.5 size-4 shrink-0 text-red" />
               <span>
-                O convidado tem direito ao kit de consumação. Ele é entregue na recepção depois que o(a) professor(a) chegar.
+                O convidado tem direito ao kit de consumação. Ele é entregue na recepção depois que {T.thePerson} chegar.
               </span>
             </p>
           </motion.div>

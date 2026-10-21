@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Permanent_Marker, Saira, Tiny5 } from "next/font/google";
+import { Fredoka, Lilita_One, Permanent_Marker, Saira, Tiny5 } from "next/font/google";
 import { SiteIconProvider } from "@/components/brand/site-icon";
 import { HelpProvider } from "@/components/help/help";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 import { siteIconUrl } from "@/lib/site-icon";
+import { EDITION } from "@/domain/edition";
 import { cn } from "@/lib/utils";
 import { APP_NAME, getConfig, getEventInfo, getRegistrationWindow, getSiteIcon } from "@/server/queries/config";
 import { shareSummary } from "@/server/queries/share";
@@ -22,6 +23,9 @@ const marker = Permanent_Marker({
   display: "swap",
   preload: false,
 });
+// Verão (festa das servidoras e servidores): títulos redondos e etiquetas de boia, com acentos. Só baixam quando usadas.
+const summerDisplay = Lilita_One({ subsets: ["latin"], weight: "400", variable: "--font-summer-display", display: "swap", preload: false });
+const summerLabel = Fredoka({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-summer-label", display: "swap", preload: false });
 
 export async function generateMetadata(): Promise<Metadata> {
   const [config, event, window, icon] = await Promise.all([getConfig(), getEventInfo(), getRegistrationWindow(), getSiteIcon()]);
@@ -49,7 +53,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#080808",
+  themeColor: EDITION.themeColor,
   colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
@@ -58,7 +62,11 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const [config, icon] = await Promise.all([getConfig(), getSiteIcon()]);
   return (
-    <html lang="pt-BR" className={cn(saira.variable, pixel.variable, marker.variable)}>
+    <html
+      lang="pt-BR"
+      data-tema={EDITION.theme}
+      className={cn(saira.variable, pixel.variable, marker.variable, summerDisplay.variable, summerLabel.variable)}
+    >
       <body className="min-h-dvh antialiased">
         <Providers>
           <SiteIconProvider version={icon.version}>

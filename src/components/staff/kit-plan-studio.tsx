@@ -20,13 +20,13 @@ import {
   Pencil,
   Plus,
   Save,
-  Teach,
   Trash,
   Users,
   Wallet,
   Warning,
   Whatsapp,
 } from "@/components/icons/pixel";
+import { PersonIcon } from "@/components/icons/person-icon";
 import { Panel } from "@/components/retro/bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,11 +57,12 @@ import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { uuidv4 } from "@/lib/uuid";
 import { updateKitPlanAction } from "@/server/actions/setup";
+import { T } from "@/domain/edition";
 
-const KIND_ICON: Record<KitKind, typeof Gift> = { MEMBER: Teach, GUEST: Users, EMPLOYEE: Building, EMPLOYEE_GUEST: Users, COURTESY: Heart };
+const KIND_ICON: Record<KitKind, typeof Gift> = { MEMBER: PersonIcon, GUEST: Users, EMPLOYEE: Building, EMPLOYEE_GUEST: Users, COURTESY: Heart };
 /** Nome curto de quem recebe cada kit (nos tíquetes). */
 const KIND_SHORT: Record<KitKind, string> = {
-  MEMBER: "Professoras e professores",
+  MEMBER: T.People,
   GUEST: "Convidados delas e deles",
   EMPLOYEE: "Colaboradores",
   EMPLOYEE_GUEST: "Convidados dos colaboradores",
@@ -335,7 +336,7 @@ function KitTickets({ plan, counts, hasPrices }: { plan: KitPlan; counts: KitCou
                     ? "Kit principal"
                     : "Kit"
             }
-            audience={everyone ? "Professoras e professores, convidados, colaboradores e cortesias" : group.kinds.map((kind) => KIND_SHORT[kind]).join(" · ")}
+            audience={everyone ? `${T.People}, convidados, colaboradores e cortesias` : group.kinds.map((kind) => KIND_SHORT[kind]).join(" · ")}
             plan={plan}
             lines={group.lines}
             footer={plural(kits, "kit previsto", "kits previstos")}
@@ -603,7 +604,7 @@ function KitEditor({
         <Phase
           n={1}
           title="O que vem no kit"
-          hint="Este é o kit da professora e do professor. Os outros kits usam o mesmo, a não ser que você mude na fase 2. O preço é opcional (serve para a conta)."
+          hint={`Este é o kit ${T.ofPair}. Os outros kits usam o mesmo, a não ser que você mude na fase 2. O preço é opcional (serve para a conta).`}
           extra={hasPrices ? `${formatCents(memberCost.cents)} por kit` : null}
           testId="kit-kind-member"
         >
@@ -748,7 +749,7 @@ function KindChoice({
         <div className="min-w-0 flex-1 basis-40">
           <p className="font-bold leading-tight text-fg">{title}</p>
           <p className="mt-0.5 line-clamp-2 text-xs text-fg-muted">
-            {custom ? describe(plan, shown) : minor ? "Recebe o mesmo kit dos adultos" : "Igual ao da professora e do professor"}
+            {custom ? describe(plan, shown) : minor ? "Recebe o mesmo kit dos adultos" : `Igual ao ${T.ofPair}`}
           </p>
         </div>
         <div className="flex w-full shrink-0 rounded-lg border border-line-strong bg-ink p-0.5 sm:w-auto" role="group" aria-label={`${title}: igual ou diferente`}>

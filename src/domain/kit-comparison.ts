@@ -1,4 +1,5 @@
 import { plural } from "@/lib/plural";
+import { T } from "./edition";
 import { employeeCategoryCount } from "./labels";
 import { COLLABORATOR_CATEGORIES, type CollaboratorCategory, type StockMode, type StockPool } from "./types";
 
@@ -48,8 +49,8 @@ export interface PeopleKitComparison {
 }
 
 export const PEOPLE_GROUP_LABEL: Record<PeopleGroupId, string> = {
-  TEACHERS: "Professoras e professores",
-  TEACHER_GUESTS: "Convidados das professoras e professores",
+  TEACHERS: T.People,
+  TEACHER_GUESTS: `Convidados ${T.ofPeople}`,
   WALK_INS: "Inscritos na hora (kit da gordura)",
   OTHER_MEMBERS: "Outras pessoas filiadas",
   EMPLOYEES: "Colaboradores do SINDSERM",
@@ -71,7 +72,7 @@ export function peopleGroupDetail(row: PeopleGroupRow, comparison: PeopleKitComp
     case "WALK_INS":
       return "Inscrição feita na hora: 1 kit cada, do estoque gordura (fora da conta do oficial)";
     case "OTHER_MEMBERS":
-      return "Não são professoras nem professores: entram sem kit";
+      return `Não são ${T.people.replace(" e ", " nem ")}: entram sem kit`;
     case "EMPLOYEES": {
       const parts = COLLABORATOR_CATEGORIES.filter((c) => comparison.employeeCategories[c] > 0).map((c) =>
         employeeCategoryCount(c, comparison.employeeCategories[c]),
@@ -146,7 +147,7 @@ export function poolDemand(pool: StockPool, demand: KitDemand, mode?: StockMode)
 
 export const POOL_SHORT_LABEL: Record<StockPool, string> = {
   ALL: "geral",
-  MEMBER: "de professoras e professores",
+  MEMBER: `de ${T.people}`,
   GUEST: "de convidados",
   EMPLOYEE: "dos colaboradores",
   EXTRA: "da gordura",

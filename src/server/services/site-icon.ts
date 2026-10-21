@@ -10,6 +10,7 @@ import { type Actor, assertPermission } from "./actor";
 import { writeAudit } from "./audit";
 import { DomainError } from "./errors";
 import { withTx } from "./tx";
+import { EDITION } from "@/domain/edition";
 
 /** Limite do arquivo recebido (o navegador já reduz a imagem antes de enviar). */
 export const ICON_MAX_BYTES = 8 * 1024 * 1024;
@@ -21,7 +22,8 @@ const ACCEPTED_FORMATS = new Set(["jpeg", "png", "webp", "gif", "avif", "heif", 
 /** Muda quando o jeito de montar o ícone muda, para o navegador buscar de novo. */
 const PROCESSING = "q1";
 
-const DEFAULT_SOURCE = join(process.cwd(), "public/brand/festa-emblema.jpg");
+// Sem ícone trocado em Configurações: a arte da festa desta edição.
+const DEFAULT_SOURCE = join(process.cwd(), "public", EDITION.emblem.raster);
 
 /** Quadrado de 512 px em PNG: a imagem inteira, centralizada, com bordas pretas se precisar. */
 async function toMaster(bytes: Buffer): Promise<Buffer> {

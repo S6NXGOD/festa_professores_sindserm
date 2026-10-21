@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { can } from "@/domain/rules";
 import { db } from "@/server/db";
+import { GAME } from "@/domain/edition";
 import { getEventInfo } from "@/server/queries/config";
 import { getDashboardStats } from "@/server/services/stats";
 import { requireGateActor } from "@/server/session";
@@ -63,7 +64,7 @@ export default async function GateHomePage() {
           <div className="flex items-end justify-between gap-3">
             <div>
               <p className="flex items-center gap-1.5 text-[0.7rem] font-bold tracking-[0.1em] text-fg-muted uppercase">
-                <Login className="size-4 text-success-text" /> Na pista
+                <Login className="size-4 text-success-text" /> Na {GAME.floor}
                 <LiveRefresh className="ml-1" />
               </p>
               <p className="display mt-1 text-5xl leading-none text-fg tabular">

@@ -74,6 +74,7 @@ import { AddGuestDialog } from "./add-guest-dialog";
 import { CompanionDialog } from "./companion-dialog";
 import { KitStatusText } from "./gate-result";
 import { firstName as firstNameOf } from "@/lib/text";
+import { EDITION, GAME, T } from "@/domain/edition";
 
 export interface PersonOperationsProps {
   view: GateView;
@@ -207,7 +208,7 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
         <Panel title="Responsável sem filiação confirmada" icon={Unlink}>
           <p className="mb-3 text-sm text-fg-muted">
             A filiação de {host.fullName} não foi confirmada, então {view.fullName} não entra como convidado(a) nesse grupo.
-            Desvincule para ligar a outro(a) professor(a) ou fazer a filiação.
+            Desvincule para ligar a outro(a) {T.person} ou fazer a filiação.
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             <ConfirmActionDialog
@@ -331,8 +332,13 @@ function VerifySection({ view, onChanged, onConfirmed }: { view: GateView; onCha
   return (
     <Panel title="Conferência de filiação" icon={Check} tone="red">
       <p className="mb-4 text-sm text-fg-muted">
-        Confira se {view.fullName} é filiado(a) antes de liberar a entrada. Declarou ser{" "}
-        <strong className="text-fg">{own.isTeacher ? "professor(a)" : "não professor(a)"}</strong>.
+        Confira se {view.fullName} é filiado(a) antes de liberar a entrada.
+        {EDITION.askTeacher ? (
+          <>
+            {" "}
+            Declarou ser <strong className="text-fg">{own.isTeacher ? T.person : `não ${T.person}`}</strong>.
+          </>
+        ) : null}
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         <ConfirmActionDialog
@@ -342,7 +348,7 @@ function VerifySection({ view, onChanged, onConfirmed }: { view: GateView; onCha
             </Button>
           }
           title="Confirmar filiação?"
-          description={`${view.fullName} passa a ter direito à entrada${own.isTeacher ? ", ao kit e a um convidado" : " (sem kit, por não ser professor(a))"}.`}
+          description={`${view.fullName} passa a ter direito à entrada${own.isTeacher ? ", ao kit e a um convidado" : ` (sem kit, por não ser ${T.person})`}.`}
           confirmLabel="Confirmar filiação"
           tone="success"
           sound="coin"
@@ -357,7 +363,7 @@ function VerifySection({ view, onChanged, onConfirmed }: { view: GateView; onCha
             </Button>
           }
           title="Não confirmar a filiação?"
-          description="A pessoa não entra como filiada. Ainda pode ser convidada de um(a) professor(a) ou fazer a filiação na hora."
+          description={`A pessoa não entra como filiada. Ainda pode ser convidada de ${T.aPerson} ou fazer a filiação na hora.`}
           confirmLabel="Não confirmar"
           tone="danger"
           justification="optional"
@@ -482,7 +488,7 @@ function KitsSection({ view, onChanged }: { view: GateView; onChanged?: () => vo
   return (
     <GroupKitsSection
       view={view}
-      intro="Os kits saem sozinhos com as entradas e o estoque baixa na hora. O do convidado só sai depois que o(a) professor(a) chegar: se o convidado chegou antes, o kit dele sai junto com a entrada do(a) professor(a)."
+      intro={`Os kits saem sozinhos com as entradas e o estoque baixa na hora. O do convidado só sai depois que ${T.thePerson} chegar: se o convidado chegou antes, o kit dele sai junto com a entrada ${T.ofPerson}.`}
       cards={[
         { type: "MEMBER", label: KIT_TYPE_LABEL.MEMBER, detail: `Para ${view.fullName}, na entrada dele(a)`, state: own.kits.MEMBER },
         {
@@ -619,7 +625,7 @@ function PlayerTwoSection({ view, personBasePath, onChanged }: { view: GateView;
     return (
       <Panel title="Convidado" icon={Users}>
         <p className="text-sm text-fg-muted">
-          Filiado(a) que não é professor(a): participa sem kit de consumação e sem convidado. Se foi marcado por engano, corrija
+          Filiado(a) que não é {T.person}: participa sem kit de consumação e sem convidado. Se foi marcado por engano, corrija
           em Atendimento.
         </p>
       </Panel>
@@ -632,7 +638,7 @@ function PlayerTwoSection({ view, personBasePath, onChanged }: { view: GateView;
       host={{ registrationId: own.id }}
       guest={own.guest}
       canHaveGuest={own.canHaveGuest}
-      emptyText="Sem convidado. Cada professor(a) pode levar um."
+      emptyText={`Sem convidado. Cada ${T.person} pode levar um.`}
       blockedText="Filiação não confirmada: não é possível cadastrar convidado."
       personBasePath={personBasePath}
       onChanged={onChanged}
@@ -826,16 +832,16 @@ function TeacherToggle({ view, onChanged }: { view: GateView; onChanged?: () => 
     <ConfirmActionDialog
       trigger={
         <Button variant="outline" data-testid="toggle-teacher">
-          <Teach /> {next ? "Corrigir: é professor(a)" : "Corrigir: não é professor(a)"}
+          <Teach /> {next ? `Corrigir: é ${T.person}` : `Corrigir: não é ${T.person}`}
         </Button>
       }
-      title={next ? `${view.fullName} é professor(a)?` : `${view.fullName} não é professor(a)?`}
+      title={next ? `${view.fullName} é ${T.person}?` : `${view.fullName} não é ${T.person}?`}
       description={
         next
           ? "Passa a ter direito ao kit de consumação e a levar 1 convidado."
           : "Perde o direito ao kit de consumação e ao convidado. Só dá para corrigir se nenhum kit foi entregue e não houver convidado cadastrado."
       }
-      confirmLabel={next ? "Sim, é professor(a)" : "Sim, não é professor(a)"}
+      confirmLabel={next ? `Sim, é ${T.person}` : `Sim, não é ${T.person}`}
       onConfirm={() => setTeacherStatusAction({ registrationId: own.id, isTeacher: next })}
       successMessage="Resposta corrigida."
       onDone={onChanged}
@@ -853,7 +859,8 @@ function MembershipSection({ view, onChanged }: { view: GateView; onChanged?: ()
   const canDeclare = p.registerAtEvent && !own && view.role === "GUEST";
   const canLinkAsGuest = p.manageGuests && !view.host && (!own || own.status === "REJECTED");
 
-  const canToggleTeacher = Boolean(own) && p.manageGuests && own?.status !== "REJECTED";
+  // Na festa sem a pergunta "é professor(a)?", todo filiado(a) tem kit: não há o que corrigir.
+  const canToggleTeacher = EDITION.askTeacher && Boolean(own) && p.manageGuests && own?.status !== "REJECTED";
   if (!canNewAffiliation && !canDeclare && !canLinkAsGuest && !p.manageGuests) return null;
 
   return (
@@ -908,7 +915,7 @@ function DeclaredMemberDialog({ view, onChanged }: { view: GateView; onChanged?:
   const [whatsapp, setWhatsapp] = useState("");
   const [registrationNumber, setRegistrationNumber] = useState("");
   const [workplace, setWorkplace] = useState("");
-  const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
+  const [isTeacher, setIsTeacher] = useState<boolean | null>(EDITION.askTeacher ? null : true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
 
@@ -1030,8 +1037,10 @@ function LinkAsGuestDialog({ view, onChanged }: { view: GateView; onChanged?: ()
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Vincular a um(a) professor(a)</DialogTitle>
-          <DialogDescription>{view.fullName} vira o Player 2 do(a) professor(a) escolhido(a).</DialogDescription>
+          <DialogTitle>Vincular a {T.aPerson}</DialogTitle>
+          <DialogDescription>
+            {view.fullName} vira o {GAME.player2Name} {T.ofPerson} escolhido(a).
+          </DialogDescription>
         </DialogHeader>
         <form
           className="flex gap-2"
@@ -1040,7 +1049,7 @@ function LinkAsGuestDialog({ view, onChanged }: { view: GateView; onChanged?: ()
             search();
           }}
         >
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nome ou CPF do(a) professor(a)" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Nome ou CPF ${T.ofPerson}`} />
           <Button type="submit" size="icon" disabled={pending} aria-label="Buscar">
             <Search />
           </Button>

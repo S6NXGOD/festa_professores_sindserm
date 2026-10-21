@@ -10,19 +10,32 @@ import { getEventInfo } from "@/server/queries/config";
 import { loadVoucherByToken, qrPngDataUrl } from "@/server/queries/vouchers";
 import { consumeRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
 import { clientIp } from "@/server/session";
+import { EDITION, GAME, T } from "@/domain/edition";
 
 const fontsDir = join(process.cwd(), "src/assets/fonts");
 const assetsPromise = Promise.all([
   readFile(join(fontsDir, "saira-latin-500-normal.woff")),
   readFile(join(fontsDir, "saira-latin-700-normal.woff")),
   readFile(join(fontsDir, "saira-condensed-latin-900-normal.woff")),
-  readFile(join(fontsDir, "tiny5-latin-400-normal.woff")),
-  readFile(join(process.cwd(), "public/brand/festa-emblema.jpg")),
+  // Selos do voucher: letreiro pixel (anos 80) ou letras redondas (verão).
+  readFile(join(fontsDir, EDITION.theme === "verao" ? "fredoka-latin-600-normal.woff" : "tiny5-latin-400-normal.woff")),
+  readFile(join(process.cwd(), "public", EDITION.emblem.raster)),
   readFile(join(process.cwd(), "public/brand/sindserm-branca.png")),
 ]);
+const EMBLEM_MIME = EDITION.emblem.raster.endsWith(".png") ? "image/png" : "image/jpeg";
 
 const { width: WIDTH, height: HEIGHT } = VOUCHER_IMAGE;
-const RED = "#ff2626";
+// Cores da festa desta edição: vermelho e preto (anos 80) ou coral e azul do fim de tarde (verão).
+const SUMMER = EDITION.theme === "verao";
+const RED = SUMMER ? "#ff6a4d" : "#ff2626";
+const RED_RGB = SUMMER ? "255,106,77" : "255,38,38";
+const CARD = SUMMER ? "#13224a" : "#0e0e0f";
+const TAG_MEMBER = SUMMER ? "#ff5233" : "#e3000f";
+const TAG_GUEST = SUMMER ? "#213567" : "#232326";
+const FG = SUMMER ? "#fff9f0" : "#f5f4f1";
+const MUTED = SUMMER ? "#c1c6e0" : "#a8a49e";
+const LINE = SUMMER ? "#3a5090" : "#3b3b41";
+const LINE_SOFT = SUMMER ? "#2a3d72" : "#26262a";
 const AMBER = "#f8c000";
 
 /** O "metal" do passe da casa por categoria (o mesmo do voucher na tela). */
@@ -32,7 +45,7 @@ const METAL: Record<EmployeeCategory, { accent: string; rgb: string; tagText: st
   CONTRACTOR: { accent: "#22d3ee", rgb: "34,211,238", tagText: "#0e0e0f", tag: "PRESTADOR(A)" },
   COURTESY: { accent: "#ff4fb4", rgb: "255,79,180", tagText: "#1a0010", tag: "CORTESIA" },
 };
-const INK = "#080808";
+const INK = SUMMER ? "#0a1630" : "#080808";
 /** Nenhum bloco encolhe: a altura de cada um é garantida pela conta do layout. */
 const KEEP = { flexShrink: 0 } as const;
 
@@ -47,7 +60,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
   const card = result.card;
 
   const [regular, bold, condensed, pixel, emblem, unionLogo] = await assetsPromise;
-  const emblemSrc = `data:image/jpeg;base64,${emblem.toString("base64")}`;
+  const emblemSrc = `data:${EMBLEM_MIME};base64,${emblem.toString("base64")}`;
   const unionLogoSrc = `data:image/png;base64,${unionLogo.toString("base64")}`;
   const isMember = card.kind === "MEMBER";
   // Colaborador(a) do SINDSERM: "passe da casa" no metal da categoria, para não confundir com o voucher dos filiados.
@@ -57,7 +70,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
   // Inscrição na hora: voucher amarelo (kit da gordura), para a mesa dos kits reconhecer de longe.
   const walkIn = Boolean(card.walkIn) && !isEmployee;
   const accent = isEmployee ? metal.accent : walkIn ? "#ffd23f" : RED;
-  const glowRgb = isEmployee ? metal.rgb : walkIn ? "255,210,63" : "255,38,38";
+  const glowRgb = isEmployee ? metal.rgb : walkIn ? "255,210,63" : RED_RGB;
   // Na faixa do kit, só o primeiro nome: o nome completo já está no voucher de cada pessoa.
   const guestFirst = card.guestName ? firstName(card.guestName) : null;
   const kitLine = isEmployee
@@ -81,14 +94,14 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
               : "1 kit de consumação"
           : "Participação sem kit de consumação"
         : `1 kit de consumação, depois que ${card.hostName ? firstName(card.hostName) : "quem te convidou"} chegar`;
-  const tag = isEmployee ? metal.tag : isMember ? "PLAYER 1" : "PLAYER 2";
+  const tag = isEmployee ? metal.tag : GAME.player[isMember ? 1 : 2];
   const subtitle = isEmployee
     ? card.broughtByName
       ? `Convidado(a) de ${properName(card.broughtByName)}`
       : employeeTitleLine(category, card.jobTitle)
     : isMember
       ? card.isTeacher
-        ? "Professor(a) filiado(a)"
+        ? T.personAffiliated
         : "Filiado(a) ao SINDSERM"
       : `Convidado(a) de ${card.hostName ? properName(card.hostName) : ""}`;
   const statusLine =
@@ -115,7 +128,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
             display: "flex",
             flexDirection: "column",
             flex: 1,
-            background: "#0e0e0f",
+            background: CARD,
             border: `${VOUCHER_IMAGE.border}px solid ${accent}`,
             borderRadius: 48,
             overflow: "hidden",
@@ -136,14 +149,14 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                   fontSize: 36,
                   padding: "14px 18px",
                   borderRadius: 8,
-                  background: isEmployee ? metal.accent : isMember ? "#e3000f" : "#232326",
+                  background: isEmployee ? metal.accent : isMember ? TAG_MEMBER : TAG_GUEST,
                   color: isEmployee ? metal.tagText : "#ffffff",
                 }}
               >
                 {tag}
               </div>
-              <div style={{ display: "flex", fontFamily: "Pixel", fontSize: 28, letterSpacing: 2, color: isEmployee ? metal.accent : walkIn ? "#ffd23f" : "#a8a49e" }}>
-                {isEmployee ? (category === "COURTESY" ? "CONVITE ESPECIAL" : "PASSE DA CASA") : walkIn ? "NA HORA" : "ADMIT ONE"}
+              <div style={{ display: "flex", fontFamily: "Pixel", fontSize: 28, letterSpacing: 2, color: isEmployee ? metal.accent : walkIn ? "#ffd23f" : MUTED }}>
+                {isEmployee ? (category === "COURTESY" ? "CONVITE ESPECIAL" : "PASSE DA CASA") : walkIn ? "NA HORA" : GAME.admitOne.toUpperCase()}
               </div>
             </div>
             <div
@@ -154,7 +167,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                 fontSize: layout.nameSize,
                 fontWeight: 900,
                 lineHeight: NAME_LINE_HEIGHT,
-                color: "#f5f4f1",
+                color: FG,
                 textTransform: "uppercase",
               }}
             >
@@ -167,14 +180,14 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                 fontSize: 36,
                 lineHeight: LINE_HEIGHT,
                 fontWeight: 500,
-                color: isEmployee ? metal.accent : "#a8a49e",
+                color: isEmployee ? metal.accent : MUTED,
               }}
             >
               {subtitle}
             </div>
           </div>
 
-          <div style={{ ...KEEP, display: "flex", margin: "32px 48px 0", borderTop: "5px dashed #3b3b41" }} />
+          <div style={{ ...KEEP, display: "flex", margin: "32px 48px 0", borderTop: `5px dashed ${LINE}` }} />
 
           <div
             style={{
@@ -199,10 +212,10 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
               {/* eslint-disable-next-line @next/next/no-img-element -- renderizado pelo Satori */}
               <img src={qr} width={layout.qrSize} height={layout.qrSize} alt="" />
             </div>
-            <div style={{ ...KEEP, display: "flex", marginTop: 34, fontSize: 60, lineHeight: 1.1, fontWeight: 700, letterSpacing: 12, color: "#f5f4f1" }}>
+            <div style={{ ...KEEP, display: "flex", marginTop: 34, fontSize: 60, lineHeight: 1.1, fontWeight: 700, letterSpacing: 12, color: FG }}>
               {card.code}
             </div>
-            <div style={{ ...KEEP, display: "flex", marginTop: 18, fontSize: 32, lineHeight: LINE_HEIGHT, fontWeight: 700, color: "#a8a49e" }}>
+            <div style={{ ...KEEP, display: "flex", marginTop: 18, fontSize: 32, lineHeight: LINE_HEIGHT, fontWeight: 700, color: MUTED }}>
               {`${event.dateLabel} · ${event.timeLabel}`}
             </div>
             {event.venue?.name ? (
@@ -214,7 +227,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                   fontSize: 28,
                   lineHeight: LINE_HEIGHT,
                   fontWeight: 500,
-                  color: "#a8a49e",
+                  color: MUTED,
                   textAlign: "center",
                 }}
               >
@@ -235,7 +248,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                 fontSize: KIT_BOX.fontSize,
                 lineHeight: LINE_HEIGHT,
                 fontWeight: 700,
-                color: "#f5f4f1",
+                color: FG,
                 textAlign: "center",
               }}
             >
@@ -257,13 +270,13 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
               alignItems: "center",
               margin: "0 48px",
               padding: "18px 0 24px",
-              borderTop: "2px solid #26262a",
+              borderTop: `2px solid ${LINE_SOFT}`,
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- renderizado pelo Satori */}
             <img src={unionLogoSrc} width={308} height={88} alt="" />
             {event.helpWhatsapp ? (
-              <div style={{ display: "flex", marginTop: 12, fontSize: 26, lineHeight: LINE_HEIGHT, fontWeight: 700, color: "#a8a49e" }}>
+              <div style={{ display: "flex", marginTop: 12, fontSize: 26, lineHeight: LINE_HEIGHT, fontWeight: 700, color: MUTED }}>
                 {`Dúvidas? WhatsApp ${formatPhone(event.helpWhatsapp)}`}
               </div>
             ) : null}

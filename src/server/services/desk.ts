@@ -6,6 +6,7 @@ import type { AccessMap } from "@/domain/access";
 import { formatTime } from "@/lib/datetime";
 import { isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
 import { type DeskCategory, deskCategoryOf } from "@/domain/desk-category";
+import { T } from "@/domain/edition";
 import { EMPLOYEE_CATEGORY_LABEL } from "@/domain/labels";
 import { can, employeeKitAvailability, isActiveMember, kitAvailability, type KitAvailability } from "@/domain/rules";
 import type { EmployeeCategory, GroupKitType, KitType, ParticipantRole, StockPool } from "@/domain/types";
@@ -54,7 +55,7 @@ function employeeLabel(category: EmployeeCategory): string {
 export function deskRoleLabel(state: PersonState): string {
   if (state.employee?.active) return employeeLabel(state.employee.category);
   const own = state.ownRegistration;
-  if (own && isActiveMember(own.status)) return own.isTeacher ? "Professor(a) filiado(a)" : "Filiado(a), não é professor(a)";
+  if (own && isActiveMember(own.status)) return own.isTeacher ? T.personAffiliated : `Filiado(a), não é ${T.person}`;
   if (state.guestOf) return `Convidado(a) de ${state.guestOf.host.member.fullName}`;
   if (state.guestOfEmployee) return `Convidado(a) de ${state.guestOfEmployee.host.person.fullName} (SINDSERM)`;
   if (own) return "Filiação ainda não confirmada";
@@ -308,7 +309,7 @@ export async function listDeskQueue(ex: Executor, limit = 40): Promise<DeskQueue
           : "SINDSERM"
         : row.role === "GUEST"
           ? `Convidado(a) de ${row.host_name ?? row.host_employee_name ?? "—"}`
-          : "Professor(a) filiado(a)";
+          : T.personAffiliated;
     return {
       personId: row.person_id,
       fullName: row.full_name,

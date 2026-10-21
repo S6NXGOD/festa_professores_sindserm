@@ -4,6 +4,7 @@ import { Building, Login, QrCode, Users } from "@/components/icons/pixel";
 import { Reveal } from "@/components/motion/reveal";
 import { PublicShell } from "@/components/public/public-shell";
 import { RecoverVouchersForm } from "@/components/voucher/recover-vouchers-form";
+import { GAME } from "@/domain/edition";
 import { APP_NAME, getEventInfo } from "@/server/queries/config";
 
 export const metadata: Metadata = {
@@ -36,7 +37,7 @@ export default async function RecoverVouchersPage() {
             </span>
           </div>
           <p className="pixel mt-6 text-[0.62rem] text-red neon-red" aria-hidden>
-            Continue? <span className="ml-0.5 inline-block h-[0.9em] w-[0.55em] animate-blink bg-current align-[-0.1em]" />
+            {GAME.again} <span className="ml-0.5 inline-block h-[0.9em] w-[0.55em] animate-blink bg-current align-[-0.1em]" />
           </p>
           <h1 className="display mt-3 text-5xl text-fg sm:text-6xl">Perdeu o voucher?</h1>
           <p className="mx-auto mt-3 max-w-sm text-fg-muted">

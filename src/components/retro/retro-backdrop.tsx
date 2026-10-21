@@ -1,4 +1,6 @@
+import { EDITION } from "@/domain/edition";
 import { cn } from "@/lib/utils";
+import { SummerBackdrop } from "./summer-backdrop";
 
 /**
  * Cenário anos 80 atrás do conteúdo: sol listrado, chão quadriculado em
@@ -10,6 +12,8 @@ import { cn } from "@/lib/utils";
  * - "calm": área da equipe (discreto, para não competir com os dados).
  */
 export function RetroBackdrop({ variant = "stage", className }: { variant?: "stage" | "hero" | "calm"; className?: string }) {
+  // Festa de verão (servidoras e servidores): pôr do sol, ondas e boia no lugar do fliperama.
+  if (EDITION.theme === "verao") return <SummerBackdrop variant={variant} className={className} />;
   const stage = variant !== "calm";
   return (
     <div aria-hidden className={cn("no-print pointer-events-none fixed inset-0 -z-10 overflow-hidden", className)}>

@@ -1,5 +1,6 @@
 import "server-only";
 import type { Executor } from "@/server/db";
+import { T } from "@/domain/edition";
 import { auditLog } from "@/server/db/schema";
 import { type Actor, actorLabel, actorUserId } from "./actor";
 
@@ -27,11 +28,14 @@ export const AUDIT_ACTIONS = {
   AFFILIATION_REJECTED: "Filiação não confirmada",
   AFFILIATION_REOPENED: "Conferência de filiação reaberta",
   AFFILIATION_PROVEN: "Filiação confirmada após comprovação",
+  AFFILIATION_PRIOR_CONFIRMED: "Filiação confirmada (já conferida em outra festa)",
+  FESTA_PACKAGE_EXPORTED: "Pacote de mudança gerado",
+  FESTA_PACKAGE_IMPORTED: "Pacote de mudança importado",
   AFFILIATION_FORM_SAVED: "Ficha de filiação salva",
   AFFILIATION_FORM_CANCELLED: "Ficha de filiação cancelada",
   AFFILIATION_FORMALIZED: "Ficha de filiação assinada",
   DECLARED_MEMBER_REGISTERED: "Convidado cadastrado como filiado",
-  TEACHER_STATUS_CHANGED: "Resposta \"é professor(a)?\" corrigida",
+  TEACHER_STATUS_CHANGED: `Resposta "é ${T.person}?" corrigida`,
   GUEST_ADDED: "Convidado cadastrado",
   GUEST_REPLACED: "Convidado trocado",
   GUEST_REMOVED: "Convidado removido",

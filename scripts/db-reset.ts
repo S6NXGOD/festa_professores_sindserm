@@ -67,7 +67,7 @@ async function main() {
         : "Apaga também a configuração da festa: ao entrar, o administrador configura tudo de novo.",
     );
     console.log(
-      "Apaga: inscrições, pessoas, funcionários da festa, vouchers, entradas, entregas, fichas (com RG e contracheque), auditoria e usuários que não são administradores.\n",
+      "Apaga: inscrições, pessoas, funcionários da festa, vouchers, entradas, entregas, fichas (com RG e contracheque), auditoria, filiações trazidas de outra festa (pacote de mudança) e usuários que não são administradores.\n",
     );
 
     if (!values.sim) {

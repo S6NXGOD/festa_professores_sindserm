@@ -12,12 +12,12 @@ import {
   Package,
   QrCode,
   Sparkles,
-  Teach,
   Trophy,
   UserPlus,
   Users,
   Warning,
 } from "@/components/icons/pixel";
+import { PersonIcon } from "@/components/icons/person-icon";
 import { Led, PixelTag } from "@/components/retro/bits";
 import { DeadlineTimer } from "@/components/retro/countdown";
 import { LiveRefresh } from "@/components/retro/live-refresh";
@@ -39,13 +39,14 @@ import { stockBalance } from "@/domain/kit-comparison";
 import type { StockMode, StockPool } from "@/domain/types";
 import { can } from "@/domain/rules";
 import { requirePageActor } from "@/server/session";
+import { GAME, T } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Placar" };
 
 /** "no estoque geral", "no dos colaboradores": onde falta ou sobra kit. */
 function poolPlace(pool: StockPool, mode: StockMode) {
   if (pool === "ALL") return mode === "UNIFIED" ? "no estoque único" : "no estoque geral";
-  if (pool === "MEMBER") return "no estoque de professor(a)";
+  if (pool === "MEMBER") return `no estoque de ${T.person}`;
   if (pool === "GUEST") return "no estoque de convidado";
   return "no estoque dos colaboradores";
 }
@@ -91,7 +92,7 @@ export default async function DashboardPage() {
   const employeeKitsDelivered = stats.kitsDeliveredEmployee - stats.kitsDeliveredCourtesy;
   const employeeKitsOwed = Math.max(0, stats.kitsOwedEmployee - stats.kitsOwedCourtesy);
   const kitParts = (member: number, guest: number, employee: number, courtesy: number) =>
-    [`${member} prof.`, `${guest} conv.`, employee ? `${employee} colab.` : null, courtesy ? `${courtesy} cort.` : null].filter(Boolean).join(" · ");
+    [`${member} ${T.short}`, `${guest} conv.`, employee ? `${employee} colab.` : null, courtesy ? `${courtesy} cort.` : null].filter(Boolean).join(" · ");
   // Quem são os esperados (o total do placar e da portaria): todo mundo que tem voucher.
   const expectedBreakdown = [
     plural(stats.teachers + stats.otherMembers, "inscrito", "inscritos"),
@@ -269,7 +270,7 @@ export default async function DashboardPage() {
                   ) : null}
                 </>
               ) : stats.expected > 0 ? (
-                "Todo mundo já está liberado: agora é só a pista abrir."
+                `Todo mundo já está liberado: agora é só a ${GAME.floor} abrir.`
               ) : (
                 "Ainda sem inscritos."
               )}
@@ -280,7 +281,7 @@ export default async function DashboardPage() {
             <div className="halftone pointer-events-none absolute -top-10 -right-10 size-48 rounded-full opacity-30 [mask-image:radial-gradient(circle,#000_25%,transparent_70%)]" />
             <div className="relative flex items-center gap-2">
               <Led tone={stats.present > 0 ? "success" : "neutral"} blink={stats.present > 0} />
-              <p className="pixel text-[0.55rem] text-fg-muted">{event && !event.started ? "Na pista (antes do horário)" : "Na pista agora"}</p>
+              <p className="pixel text-[0.55rem] text-fg-muted">{event && !event.started ? `Na ${GAME.floor} (antes do horário)` : `Na ${GAME.floor} agora`}</p>
               <LiveRefresh score={stats.present} className="ml-auto" />
             </div>
             <p className="relative mt-3 flex items-end gap-3">
@@ -375,7 +376,7 @@ export default async function DashboardPage() {
           hint={stats.rejected ? plural(stats.rejected, "recusada", "recusadas") : undefined}
           testId="stat-registrations"
         />
-        <StatTile label="Professoras e professores" value={stats.teachers} icon={Teach} href={canRegistrations ? "/painel/inscricoes?filtro=todas" : undefined} testId="stat-teachers" hint={stats.otherMembers ? `+ ${plural(stats.otherMembers, "filiado", "filiados")} sem kit` : undefined} />
+        <StatTile label={T.People} value={stats.teachers} icon={PersonIcon} href={canRegistrations ? "/painel/inscricoes?filtro=todas" : undefined} testId="stat-teachers" hint={stats.otherMembers ? `+ ${plural(stats.otherMembers, "filiado", "filiados")} sem kit` : undefined} />
         <StatTile
           label="Convidados"
           value={stats.guests + stats.employeeGuests}
@@ -495,7 +496,7 @@ export default async function DashboardPage() {
                       <p className="truncate font-semibold text-fg">{row.fullName}</p>
                     )}
                     <p className="truncate text-xs text-fg-muted">
-                      {row.isTeacher ? "Professor(a)" : "Não professor(a)"} · Matrícula {row.registrationNumber || "—"} ·{" "}
+                      {row.isTeacher ? T.Person : `Não ${T.person}`} · Matrícula {row.registrationNumber || "—"} ·{" "}
                       {formatShortDateTime(row.createdAt)}
                     </p>
                   </div>
@@ -524,7 +525,7 @@ export default async function DashboardPage() {
           }
         >
           {checkIns.length === 0 ? (
-            <EmptyState icon={Login} title="Pista vazia">
+            <EmptyState icon={Login} title={`${GAME.Floor} vazia`}>
               As entradas aparecem aqui assim que a portaria começar.
             </EmptyState>
           ) : (
