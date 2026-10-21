@@ -19,7 +19,7 @@ import { playSound } from "@/lib/sound";
 import { firstName } from "@/lib/text";
 import { uuidv4 } from "@/lib/uuid";
 import { submitGateRegistration } from "@/server/actions/registration";
-import { EDITION } from "@/domain/edition";
+import { EDITION, T } from "@/domain/edition";
 
 /** Entrada de cada bloco, um depois do outro (a tela "monta" rápido, sem pular). */
 const block = (index: number) => ({
@@ -128,7 +128,7 @@ export function QuickRegistrationForm({ initialName, initialCpf }: { initialName
             <Input
               id="quick-workplace"
               autoComplete="off"
-              placeholder="Ex.: Escola Municipal X"
+              placeholder={T.workplaceExample}
               aria-invalid={Boolean(errors.member?.workplace)}
               data-testid="quick-workplace"
               {...register("member.workplace")}

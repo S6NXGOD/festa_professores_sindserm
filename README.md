@@ -126,6 +126,7 @@ npm run lint
 npm run typecheck
 npm test             # Vitest: regras críticas contra o banco <nome>_test (recriado a cada execução)
 npm run test:e2e     # Playwright: build + fluxos completos no banco <nome>_e2e, porta 3210 (outra: E2E_PORT=3215)
+npm run test:e2e:servidores  # os mesmos fluxos na festa das servidoras e servidores (build nessa edição)
 ```
 
 Antes do primeiro `test:e2e`: `npx playwright install chromium`. O E2E simula a câmera com um vídeo do QR Code do voucher e exercita o leitor ZXing de verdade. `npm run check` executa lint, typecheck, testes e build em sequência.

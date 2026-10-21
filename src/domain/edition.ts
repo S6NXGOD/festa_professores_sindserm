@@ -57,6 +57,8 @@ export interface EditionTerms {
   partyOf: string;
   /** Abreviação nos números curtos ("5 prof. · 1 conv."). */
   short: string;
+  /** Exemplo do campo Lotação. */
+  workplaceExample: string;
 }
 
 /** As palavras de jogo do tema (fliperama nos anos 80; piscina no verão). */
@@ -158,6 +160,7 @@ export const EDITIONS: Record<EditionId, Edition> = {
       femaleLower: "professora",
       partyOf: "Festa das professoras e professores",
       short: "prof.",
+      workplaceExample: "Ex.: Escola Municipal X, Secretaria de Saúde",
     },
     game: {
       player: { 1: "PLAYER 1", 2: "PLAYER 2" },
@@ -218,6 +221,7 @@ export const EDITIONS: Record<EditionId, Edition> = {
       femaleLower: "servidora",
       partyOf: "Festa das servidoras e servidores",
       short: "serv.",
+      workplaceExample: "Ex.: Secretaria de Saúde, Fundação Municipal X",
     },
     game: {
       player: { 1: "TITULAR", 2: "+1" },

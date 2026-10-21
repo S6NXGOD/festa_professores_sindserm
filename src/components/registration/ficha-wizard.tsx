@@ -326,7 +326,7 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
                   <Input
                     id="f-workplace"
                     autoComplete="organization"
-                    placeholder="Ex.: Escola Municipal X, Secretaria de Saúde"
+                    placeholder={T.workplaceExample}
                     aria-invalid={Boolean(fe?.workplace)}
                     {...register("ficha.workplace")}
                   />

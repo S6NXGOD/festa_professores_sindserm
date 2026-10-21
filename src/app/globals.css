@@ -612,6 +612,15 @@
     0%, 100% { filter: drop-shadow(0 0 30px rgb(255 170 40 / 0.45)); }
     50% { filter: drop-shadow(0 0 60px rgb(255 110 30 / 0.7)); }
   }
+  /* O cartão do voucher na tela no mesmo azul do voucher em imagem (na impressão, segue branco). */
+  @media screen {
+    [data-tema="verao"] .voucher-card {
+      background-color: #141f46;
+    }
+    [data-tema="verao"] .voucher-card-fade {
+      --tw-gradient-from: #141f46;
+    }
+  }
   /* Sem linhas de TV no verão. */
   [data-tema="verao"] .scanlines {
     background-image: none;

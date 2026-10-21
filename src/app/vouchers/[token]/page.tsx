@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { HelpLine } from "@/components/help/help";
-import { ClipboardNote, Clock, PartyPopper, Pencil, QrCode, Search, Warning } from "@/components/icons/pixel";
+import { ClipboardNote, Clock, PartyPopper, Pencil, Printer, QrCode, Search, Warning } from "@/components/icons/pixel";
 import { Reveal } from "@/components/motion/reveal";
 import { MessageCard } from "@/components/public/message-card";
 import { PublicShell } from "@/components/public/public-shell";
@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Celebration } from "@/components/voucher/celebration";
 import { CopyLinkBox } from "@/components/voucher/copy-link-box";
 import { SaveVouchersMission } from "@/components/voucher/save-mission";
-import { VoucherActions } from "@/components/voucher/voucher-actions";
 import { VoucherCard, voucherEventFrom } from "@/components/voucher/voucher-card";
 import { APP_NAME, getEventInfo } from "@/server/queries/config";
 import { findDraftFormId, loadGroupByAccessToken } from "@/server/queries/vouchers";
@@ -157,7 +156,18 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
           {cards.map((card, index) => (
             <Reveal key={card.personId} delay={0.14 + index * 0.06} className="space-y-4">
               <VoucherCard card={card} event={voucherEvent} eager={index === 0} />
-              <VoucherActions token={card.token} fullName={card.fullName} eventName={event.name} printMode="open" className="mx-auto max-w-sm" />
+              {/* Salvar e mandar ficam na missão lá em cima; aqui, só abrir este voucher (para imprimir). */}
+              <p className="no-print text-center">
+                <a
+                  href={`/v/${card.token}?imprimir=1`}
+                  target="_blank"
+                  rel="noopener"
+                  className="inline-flex items-center gap-1.5 text-sm text-fg-muted underline-offset-4 hover:text-fg hover:underline"
+                  data-testid="voucher-open"
+                >
+                  <Printer className="size-4" /> {card.kind === "GUEST" ? "Imprimir o voucher do convidado" : "Imprimir o seu voucher"}
+                </a>
+              </p>
             </Reveal>
           ))}
         </div>

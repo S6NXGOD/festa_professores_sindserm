@@ -1,6 +1,7 @@
-import { chromium, devices, expect, type Page, test } from "@playwright/test";
+import { chromium, devices, expect, type Locator, type Page, test } from "@playwright/test";
 import pg from "pg";
 import sharp from "sharp";
+import { EDITION, GAME, T } from "../../src/domain/edition";
 import { E2E } from "./env";
 import { writeQrVideo } from "./helpers/qr-video";
 
@@ -13,6 +14,26 @@ import { writeQrVideo } from "./helpers/qr-video";
  *    convidado chega antes (kit espera) → funcionária chega (2 kits) → estoque acaba e o kit sai pelo botão.
  * 4. Perfis de acesso (visitante, Segurança, Atendimento, Administrador) e /api/health.
  */
+
+/**
+ * Roda nas duas festas: sem variável, a das professoras e professores; com
+ * NEXT_PUBLIC_FESTA_EDICAO=servidores (npm run test:e2e:servidores), a das
+ * servidoras e servidores. Textos que mudam vêm da edição (T e GAME).
+ */
+const EVENT_NAME = `${EDITION.defaultEventName} E2E`;
+
+/** "É professor(a)?": só existe na festa das professoras e professores (na dos servidores, todo filiado(a) tem kit e convidado). */
+async function answerTeacher(scope: Page | Locator, yes = true) {
+  if (!EDITION.askTeacher) return;
+  await scope.getByTestId(yes ? "teacher-yes" : "teacher-no").click();
+}
+
+/** Na festa dos servidores, todo filiado(a) passa pela etapa do convidado (na dos professores, quem não é professor(a) pula): segue sem convidado. */
+async function passGuestStepAlone(page: Page) {
+  if (EDITION.askTeacher) return;
+  await expect(page.getByTestId("guest-yes")).toBeVisible();
+  await page.getByTestId("wizard-next").click();
+}
 
 const ADMIN = { name: "Ana Administradora Lima", email: "admin@e2e.test", password: "senha-admin-123" };
 const ATTENDANT = { name: "Paulo Atendente Rocha", email: "atendimento@e2e.test", password: "senha-atend-123" };
@@ -148,7 +169,7 @@ async function openPersonAtGate(page: Page, query: string, expectedName: string)
   await expect(page.getByTestId("gate-person-name")).toHaveText(expectedName);
 }
 
-test.describe.serial("festa das professoras e professores", () => {
+test.describe.serial(T.partyOf.toLowerCase(), () => {
   test("configurar → inscrever → conferir → escanear → entrada com kit", async ({ browser }, testInfo) => {
     test.setTimeout(300_000);
     const adminContext = await browser.newContext();
@@ -173,7 +194,7 @@ test.describe.serial("festa das professoras e professores", () => {
 
     await test.step("wizard de configuração da festa (com horário limite dos kits)", async () => {
       const eventDay = new Date(Date.now() + 20 * 86_400_000);
-      await admin.fill("#event-name", "Festa das Professoras e Professores – SINDSERMTHE E2E");
+      await admin.fill("#event-name", EVENT_NAME);
       // Prévia do topo: o que vem depois do travessão vira a chamada.
       await expect(admin.getByTestId("event-name-preview")).toContainText("SINDSERMTHE E2E");
       await admin.fill("#event-description", "Evento de teste automatizado.");
@@ -188,7 +209,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin.locator("#stock-threshold")).toHaveValue("15");
       await admin.fill("#kit-deadline", "22:30");
       await admin.getByTestId("setup-next").click();
-      await expect(admin.getByText("Festa das Professoras e Professores – SINDSERMTHE E2E")).toBeVisible();
+      await expect(admin.getByText(EVENT_NAME)).toBeVisible();
       await expect(admin.getByText("22h30")).toBeVisible();
       await admin.getByTestId("finish-setup").click();
       await admin.waitForURL("**/painel");
@@ -285,17 +306,22 @@ test.describe.serial("festa das professoras e professores", () => {
       await page.fill("#member-whatsapp", MEMBER.whatsapp);
       await page.fill("#member-registration", MEMBER.registrationNumber);
       await page.fill("#member-workplace", MEMBER.workplace);
-      // Kit e convidado são só para professoras e professores: a pergunta é obrigatória.
-      await page.getByTestId("wizard-next").click();
-      await expect(page.getByText("Responda se você é professor(a)")).toBeVisible();
-      // Só quem se declara professor(a) é avisado de que isso é conferido na portaria.
-      await expect(page.getByTestId("teacher-check-notice")).toHaveCount(0);
-      await page.getByTestId("teacher-yes").click();
-      await expect(page.getByTestId("teacher-check-notice")).toContainText("na portaria, a equipe confere se você é professor(a)");
-      await page.getByTestId("teacher-no").click();
-      await expect(page.getByTestId("teacher-check-notice")).toHaveCount(0);
-      await page.getByTestId("teacher-yes").click();
-      await expect(page.getByTestId("teacher-check-notice")).toBeVisible();
+      if (EDITION.askTeacher) {
+        // Kit e convidado são só para professoras e professores: a pergunta é obrigatória.
+        await page.getByTestId("wizard-next").click();
+        await expect(page.getByText("Responda se você é professor(a)")).toBeVisible();
+        // Só quem se declara professor(a) é avisado de que isso é conferido na portaria.
+        await expect(page.getByTestId("teacher-check-notice")).toHaveCount(0);
+        await answerTeacher(page);
+        await expect(page.getByTestId("teacher-check-notice")).toContainText("na portaria, a equipe confere se você é professor(a)");
+        await answerTeacher(page, false);
+        await expect(page.getByTestId("teacher-check-notice")).toHaveCount(0);
+        await answerTeacher(page);
+        await expect(page.getByTestId("teacher-check-notice")).toBeVisible();
+      } else {
+        // Festa dos servidores: sem a pergunta, todo filiado(a) tem kit e convidado.
+        await expect(page.getByTestId("teacher-yes")).toHaveCount(0);
+      }
       await page.getByTestId("wizard-next").click();
 
       await page.getByTestId("guest-yes").click();
@@ -317,7 +343,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await page.getByTestId("submit-registration").click();
 
       await page.waitForURL("**/vouchers/**");
-      await expect(page.getByRole("heading", { name: "Você está na pista!" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: `Você está na ${GAME.floor}!` })).toBeVisible();
       await expect(page.getByTestId("voucher-card")).toHaveCount(2);
       await expect(page.getByTestId("voucher-name")).toHaveText([MEMBER.name, GUEST.name]);
       await expect(page.getByTestId("voucher-kits")).toContainText("2 kits de consumação");
@@ -325,20 +351,35 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(page.getByTestId("voucher-guest-kit")).toContainText(`Ele é entregue na recepção depois que ${MEMBER.name} chegar`);
       await expect(page.getByTestId("voucher-kits")).toContainText("o do convidado, depois que você chegar");
 
-      // Logo depois da inscrição, o aviso para salvar os vouchers; baixar o próprio marca 1 de 2 na missão.
+      // Logo depois da inscrição, o aviso para salvar os vouchers; salvar o próprio marca 1 de 2 na missão.
       const mission = page.getByTestId("save-mission");
       await expect(mission).toContainText("Agora salve os vouchers no celular");
       const reminder = page.getByTestId("voucher-reminder");
       await expect(reminder).toBeVisible();
       await expect(reminder).toContainText("Não esqueça: salve os vouchers");
+      // Cada passo mostra a miniatura do voucher; o do convidado vai para ele (a imagem, no celular).
+      await expect(reminder.getByTestId("reminder-send-guest")).toContainText(`Mandar para ${GUEST.name.split(" ")[0]}`);
+      await expect(reminder.getByTestId("reminder-step-member").locator("img")).toBeVisible();
       await reminder.getByTestId("reminder-download-member").click();
       await reminder.getByTestId("reminder-later").click();
       await expect(reminder).toHaveCount(0);
-      await expect(mission).toContainText("1/2");
+      await expect(page.getByTestId("mission-progress")).toHaveText("1/2");
 
-      const hrefs = await page.getByTestId("voucher-save").evaluateAll((els) => els.map((el) => el.getAttribute("href") ?? ""));
-      for (const href of hrefs) tokens.push(/\/v\/([0-9A-Z]{32})\/imagem/.exec(href)?.[1] ?? "");
-      expect(tokens.filter(Boolean)).toHaveLength(2);
+      // Modo print: um voucher por tela, com o que fazer; terminado, a missão fica completa.
+      await mission.getByTestId("mission-print-mode").click();
+      const printMode = page.getByTestId("print-mode");
+      await expect(printMode.getByTestId("print-mode-title")).toHaveText("Tire o print do seu voucher");
+      await expect(printMode.locator("img")).toBeVisible();
+      await printMode.getByTestId("print-mode-next").click();
+      await expect(printMode.getByTestId("print-mode-title")).toHaveText(`Tire o print e mande para ${GUEST.name.split(" ")[0]}`);
+      await printMode.getByTestId("print-mode-next").click();
+      await expect(printMode).toHaveCount(0);
+      await expect(page.getByTestId("mission-progress")).toHaveText("2/2");
+      await expect(mission).toContainText("Vouchers salvos");
+
+      const found = await mission.locator("[data-voucher-token]").evaluateAll((els) => els.map((el) => el.getAttribute("data-voucher-token") ?? ""));
+      tokens.push(...found);
+      expect(tokens.filter((token) => /^[0-9A-Z]{32}$/.test(token))).toHaveLength(2);
 
       // O QR não contém dados pessoais: somente o prefixo e o token aleatório.
       const svg = await page.getByTestId("voucher-card").first().locator("svg").first().innerHTML();
@@ -419,8 +460,8 @@ test.describe.serial("festa das professoras e professores", () => {
         // A leitura apenas identifica a pessoa; a entrada exige confirmação.
         await expect(page.getByTestId("gate-status-title")).toHaveText("LIBERADO PARA ENTRADA", { timeout: 45_000 });
         await expect(page.getByTestId("gate-person-name")).toHaveText(MEMBER.name);
-        // Professor(a) é autodeclarado(a): a portaria é lembrada de conferir.
-        await expect(page.getByTestId("teacher-check-reminder")).toBeVisible();
+        // Professor(a) é autodeclarado(a): a portaria é lembrada de conferir (na festa dos servidores, não há o que conferir).
+        await expect(page.getByTestId("teacher-check-reminder")).toHaveCount(EDITION.askTeacher ? 1 : 0);
         // A convidada já está lá dentro: o kit dela sai junto com a chegada da professora.
         const kitTile = page.getByTestId("kit-on-entry");
         await expect(kitTile).toContainText("Entregue 2 kits");
@@ -486,8 +527,8 @@ test.describe.serial("festa das professoras e professores", () => {
       await expect(admin).toHaveURL(/\/painel\/kits#comparativo$/);
       const board = admin.getByTestId("people-kits");
       await expect(board.getByTestId("people-planned")).toHaveText("2");
-      await expect(board.getByTestId("people-row-teachers")).toContainText("Professoras e professores");
-      await expect(board.getByTestId("people-row-teacher-guests")).toContainText("Convidados das professoras e professores");
+      await expect(board.getByTestId("people-row-teachers")).toContainText(T.People);
+      await expect(board.getByTestId("people-row-teacher-guests")).toContainText(`Convidados ${T.ofPeople}`);
       // Vouchers do grupo (professora + convidada) numa folha só, para imprimir.
       await admin.goto("/painel/inscricoes");
       const memberRow = admin.getByTestId("registration-row").filter({ hasText: MEMBER.name });
@@ -586,7 +627,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await page.fill("#f-registration", MEMBER.registrationNumber.replace(/\D/g, ""));
       await page.fill("#f-job", NEW_MEMBER.job);
       await page.fill("#f-admission", NEW_MEMBER.admission);
-      await page.getByTestId("teacher-yes").click();
+      await answerTeacher(page);
       await page.getByTestId("wizard-next").click();
 
       await page.locator("label[for=authorization]").click();
@@ -1202,8 +1243,9 @@ test.describe.serial("festa das professoras e professores", () => {
       await page.fill("#member-whatsapp", MEMBER.whatsapp);
       await page.fill("#member-registration", "99999-1");
       await page.fill("#member-workplace", MEMBER.workplace);
-      await page.getByTestId("teacher-no").click();
+      await answerTeacher(page, false);
       await page.getByTestId("wizard-next").click();
+      await passGuestStepAlone(page);
       await page.locator("label[for=privacy-consent]").click();
       await page.getByTestId("submit-registration").click();
       const recovery = page.getByTestId("cpf-taken-recovery");
@@ -1305,8 +1347,9 @@ test.describe.serial("festa das professoras e professores", () => {
     await page.fill("#member-whatsapp", "86977776666");
     await page.fill("#member-registration", "55555-5");
     await page.fill("#member-workplace", "Escola Municipal Leste");
-    await page.getByTestId("teacher-no").click();
+    await answerTeacher(page, false);
     await page.getByTestId("wizard-next").click();
+    await passGuestStepAlone(page);
     await page.locator("label[for=privacy-consent]").click();
     await page.getByTestId("submit-registration").click();
     await page.waitForURL("**/vouchers/**");
@@ -1315,7 +1358,7 @@ test.describe.serial("festa das professoras e professores", () => {
     // O painel pergunta a cada 15 s: o aviso aparece com o nome e o atalho para conferir.
     const toast = staff.getByTestId("new-registration-toast");
     await expect(toast).toBeVisible({ timeout: 30_000 });
-    await expect(toast).toContainText("LEVEL UP! +1 INSCRIÇÃO");
+    await expect(toast).toContainText(`${GAME.levelUp} +1 INSCRIÇÃO`);
     await expect(toast).toContainText("Rita Radar Souza");
     await expect(toast).toContainText("Pelo site · para conferir");
     // A tela se atualiza sozinha: a fila do menu já conta a nova inscrição.
@@ -1342,7 +1385,7 @@ test.describe.serial("festa das professoras e professores", () => {
     await page.getByTestId("quick-whatsapp").fill("86988887777");
     await page.getByTestId("quick-registration-number").fill("RAPIDA-2026");
     await page.getByTestId("quick-workplace").fill("Escola Municipal Rapida");
-    await page.getByTestId("teacher-yes").click();
+    await answerTeacher(page);
     await page.getByTestId("guest-yes").click();
     await expect(page.getByTestId("guest-yes")).toContainText("Veio com convidado(a)");
     await page.getByTestId("guest-name").fill("Juca Convidado Rapido");
@@ -1463,7 +1506,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await page.fill("#f-registration", GOV.registration);
       await page.fill("#f-job", "Professora");
       await page.fill("#f-admission", "2012-02-01");
-      await page.getByTestId("teacher-yes").click();
+      await answerTeacher(page);
       await page.getByTestId("wizard-next").click();
       await page.locator("label[for=authorization]").click();
       await page.getByTestId("wizard-next").click();
@@ -1572,7 +1615,7 @@ test.describe.serial("festa das professoras e professores", () => {
       await page.fill("#member-whatsapp", FILA.whatsapp);
       await page.fill("#member-registration", FILA.registration);
       await page.fill("#member-workplace", "Escola Municipal Fila");
-      await page.getByTestId("teacher-yes").click();
+      await answerTeacher(page);
       await page.getByTestId("wizard-next").click();
       await page.getByTestId("guest-yes").click();
       await page.getByTestId("guest-name").fill(FILA.guest);
@@ -1736,7 +1779,7 @@ test.describe.serial("festa das professoras e professores", () => {
         await gate.getByTestId("quick-whatsapp").fill("86977776666");
         await gate.getByTestId("quick-registration-number").fill("HORA-2026");
         await gate.getByTestId("quick-workplace").fill("Escola Municipal Hora");
-        await gate.getByTestId("teacher-yes").click();
+        await answerTeacher(gate);
         await gate.locator("label[for=quick-consent]").click();
         await gate.getByTestId("quick-submit").click();
         await expect(gate.getByTestId("gate-person-name")).toHaveText(WALK_IN.name);
@@ -1834,7 +1877,7 @@ test.describe.serial("festa das professoras e professores", () => {
         await gate.getByTestId("quick-whatsapp").fill("86966665555");
         await gate.getByTestId("quick-registration-number").fill("AGORA-2026");
         await gate.getByTestId("quick-workplace").fill("Escola Municipal Agora");
-        await gate.getByTestId("teacher-yes").click();
+        await answerTeacher(gate);
         await gate.locator("label[for=quick-consent]").click();
         await gate.getByTestId("quick-submit").click();
         await expect(gate.getByTestId("gate-person-name")).toHaveText(SECOND.name);

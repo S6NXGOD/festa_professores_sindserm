@@ -243,7 +243,7 @@ export function MemberWizard({
                   <Input
                     id="member-workplace"
                     autoComplete="organization"
-                    placeholder="Ex.: Escola Municipal X, Secretaria de Saúde"
+                    placeholder={T.workplaceExample}
                     aria-invalid={Boolean(errors.member?.workplace)}
                     {...register("member.workplace")}
                   />

@@ -62,7 +62,7 @@ export function VoucherCard({
   return (
     <article
       className={cn(
-        "relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border-2 bg-[#0e0e0f] text-fg print:border-black print:bg-white print:text-black print:shadow-none",
+        "voucher-card relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border-2 bg-[#0e0e0f] text-fg print:border-black print:bg-white print:text-black print:shadow-none",
         // Inscrição na hora: o voucher é amarelo (kit da gordura), para a mesa dos kits reconhecer de longe.
         card.walkIn
           ? "border-[#ffd23f]/85 shadow-[0_0_46px_-16px_rgb(255_210_63/0.6),0_30px_60px_-30px_rgb(0_0_0/0.9)]"
@@ -75,7 +75,7 @@ export function VoucherCard({
     >
       <div className="relative bg-ink print:bg-white">
         <FestaEmblem className="mx-auto w-[82%] pt-2" sizes="320px" eager={eager} />
-        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0e0e0f] to-transparent print:hidden" />
+        <div className="voucher-card-fade absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0e0e0f] to-transparent print:hidden" />
       </div>
       {card.walkIn ? (
         <p
@@ -208,7 +208,7 @@ function EmployeePass({
   return (
     <article
       className={cn(
-        "relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border-2 bg-[#0e0e0f] text-fg print:border-black print:bg-white print:text-black print:shadow-none",
+        "voucher-card relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border-2 bg-[#0e0e0f] text-fg print:border-black print:bg-white print:text-black print:shadow-none",
         metal.card,
         className,
       )}
@@ -219,7 +219,7 @@ function EmployeePass({
     >
       <div className="relative bg-ink print:bg-white">
         <FestaEmblem className="mx-auto w-[82%] pt-2" sizes="320px" eager={eager} />
-        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0e0e0f] to-transparent print:hidden" />
+        <div className="voucher-card-fade absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0e0e0f] to-transparent print:hidden" />
       </div>
       {/* Faixa no metal da categoria: é assim que a portaria reconhece de longe o passe da casa. */}
       <div className={cn("flex items-center justify-between px-5 py-2 print:border-y print:border-black print:bg-none", metal.band)}>
