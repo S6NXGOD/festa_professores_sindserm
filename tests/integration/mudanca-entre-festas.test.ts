@@ -1,8 +1,9 @@
 /**
  * Mudança entre festas (um sistema por festa): o pacote trancado com senha leva
- * a equipe (mesmo login, senha nova no primeiro acesso), os colaboradores e
- * cortesias e as filiações já conferidas. No sistema da outra festa, quem já
- * foi conferido(a) e se inscreve é confirmado(a) na hora.
+ * a equipe (mesmo login, senha nova no primeiro acesso) e as filiações já
+ * conferidas. Ninguém entra na festa nova por estar no pacote (tem gente da
+ * festa passada que não vai na nova): quem já foi conferido(a) e se inscreve é
+ * confirmado(a) na hora.
  */
 import { verifyPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
@@ -13,7 +14,16 @@ import type { StaffActor } from "@/server/services/actor";
 import { decideAffiliation } from "@/server/services/affiliation";
 import { addCompanion, createEmployee, listEmployees } from "@/server/services/employees";
 import { DomainError } from "@/server/services/errors";
-import { exportFestaPackage, importFestaPackage, openFestaPackage, previewFestaPackage } from "@/server/services/festa-package";
+import {
+  type FestaPackage,
+  exportFestaPackage,
+  getPriorAffiliationOverview,
+  importFestaPackage,
+  openFestaPackage,
+  previewFestaPackage,
+  sealFestaPackage,
+} from "@/server/services/festa-package";
+import { getDashboardStats } from "@/server/services/stats";
 import { registerDeclaredMember } from "@/server/services/membership";
 import { createStaffUser } from "@/server/services/users";
 import { configureEvent, createStaff, randomCpf, registerMember, resetDatabase } from "../helpers/factories";
@@ -59,7 +69,7 @@ const statusOf = async (registrationId: string) =>
   (await db.select({ status: registration.status, note: registration.statusNote }).from(registration).where(eq(registration.id, registrationId)))[0];
 
 describe("pacote de mudança entre festas", () => {
-  it("leva a equipe com a mesma senha (nova no primeiro acesso), colaboradores, cortesias e só as filiações conferidas", async () => {
+  it("leva a equipe com a mesma senha (nova no primeiro acesso) e só as filiações conferidas; colaboradores e cortesias não vão", async () => {
     await createStaffUser(admin, { name: "Sergio Seguranca", email: "sergio@teste.local", role: "SECURITY", password: "senha-forte-123" });
     const rosa = await createEmployee(admin, { fullName: "Rosa Financeiro Lima", cpf: "", whatsapp: "", jobTitle: "Financeiro", category: "STAFF", guest: null });
     await createEmployee(admin, { fullName: "Carla Mendes Silva", cpf: "", whatsapp: "", jobTitle: "Presidência", category: "COURTESY", withKit: false, isMinor: true, guest: null });
@@ -68,24 +78,23 @@ describe("pacote de mudança entre festas", () => {
     await registerMember({ memberName: "Pedro Pendente Alves" });
 
     const { content, counts } = await exportFestaPackage(admin, PASS);
-    // Os 3 da equipe, os 3 da lista e só a filiação conferida (a pendente fica).
-    expect(counts).toEqual({ users: 3, employees: 3, affiliations: 1 });
+    // Os 3 da equipe e só a filiação conferida (a pendente fica). Colaboradores e cortesias não vão.
+    expect(counts).toEqual({ users: 3, affiliations: 1 });
     // Trancado: nada legível no arquivo.
     expect(content).not.toContain("Maria");
     expect(content).not.toContain(maria.cpf);
     expect(content).not.toContain("sergio@teste.local");
     const [exported] = await db.select().from(auditLog).where(eq(auditLog.action, "FESTA_PACKAGE_EXPORTED"));
-    expect(exported?.summary).toBe("Pacote de mudança gerado: 3 da equipe, 3 colaboradores e cortesias, 1 filiação conferida.");
+    expect(exported?.summary).toBe("Pacote de mudança gerado: 3 da equipe e 1 filiação conferida.");
 
     const there = await otherParty();
     expect(await previewFestaPackage(there, content, PASS)).toMatchObject({ source: SOURCE, counts, usersAlreadyHere: 0 });
 
     const summary = await importFestaPackage(there, content, PASS);
     // Quem foi criado(a) sem senha de login (só nos testes) não vem.
-    expect(summary).toMatchObject({
+    expect(summary).toEqual({
       source: SOURCE,
       users: { created: 1, skipped: 2 },
-      employees: { created: 3, skipped: 0, problems: [] },
       affiliations: { added: 1, skipped: 0 },
     });
 
@@ -94,26 +103,41 @@ describe("pacote de mudança entre festas", () => {
     const [login] = await db.select().from(account).where(and(eq(account.userId, sergio!.id), eq(account.providerId, "credential")));
     expect(await verifyPassword({ hash: login!.password!, password: "senha-forte-123" })).toBe(true);
 
-    expect((await listEmployees(db, { kind: "collaborators" })).map((row) => row.fullName)).toEqual(["Rosa Financeiro Lima"]);
-    const courtesies = await listEmployees(db, { kind: "courtesies" });
-    const newRosa = (await listEmployees(db, { kind: "collaborators" }))[0]!;
-    expect(courtesies.find((row) => row.fullName === "Carla Mendes Silva")).toMatchObject({ withKit: false, isMinor: true, jobTitle: "Presidência" });
-    expect(courtesies.find((row) => row.fullName === "Joana Amiga Rosa")).toMatchObject({ withKit: false, hostEmployeeId: newRosa.employeeId });
+    // Ninguém entra na festa nova por estar no pacote: nem colaboradores, nem cortesias, nem inscrições.
+    expect(await listEmployees(db, { kind: "all", includeRemoved: true })).toEqual([]);
+    expect(await db.select().from(registration)).toEqual([]);
+    expect(await getDashboardStats(db)).toMatchObject({ registrationsExpected: 0, organizationExpected: 0, expected: 0 });
 
     expect(await db.select().from(priorAffiliation)).toEqual([
       expect.objectContaining({ cpf: maria.cpf, fullName: "Maria Aparecida Souza", source: SOURCE }),
     ]);
     const [imported] = await db.select().from(auditLog).where(eq(auditLog.action, "FESTA_PACKAGE_IMPORTED"));
-    expect(imported?.summary).toBe(`Pacote de mudança importado (${SOURCE}): 1 da equipe, 3 colaboradores e cortesias, 1 filiação conferida.`);
+    expect(imported?.summary).toBe(`Pacote de mudança importado (${SOURCE}): 1 da equipe e 1 filiação conferida.`);
+    expect(await getPriorAffiliationOverview(db)).toEqual({ total: 1, sources: [SOURCE], confirmedHere: 0 });
 
     // Importar de novo não duplica ninguém.
     expect(await importFestaPackage(there, content, PASS)).toMatchObject({
       users: { created: 0, skipped: 3 },
-      employees: { created: 0, skipped: 3 },
       affiliations: { added: 0, skipped: 1 },
     });
-    expect(await listEmployees(db, { kind: "all" })).toHaveLength(3);
     expect((await previewFestaPackage(there, content, PASS)).usersAlreadyHere).toBe(1);
+  });
+
+  it("pacote antigo, que ainda trazia colaboradores e cortesias: essa parte é ignorada", async () => {
+    const maria = await confirmedMember("Maria Aparecida Souza");
+    const oldFormat = {
+      version: 1,
+      createdAt: new Date().toISOString(),
+      source: SOURCE,
+      users: [],
+      employees: [{ key: "a", fullName: "Rosa Financeiro Lima", cpf: null, whatsapp: null, isMinor: false, category: "STAFF", jobTitle: "Financeiro", withKit: true, hostKey: null }],
+      affiliations: [{ cpf: maria.cpf, fullName: "Maria Aparecida Souza", registrationNumber: null, confirmedAt: new Date().toISOString() }],
+    };
+    const content = sealFestaPackage(oldFormat as unknown as FestaPackage, PASS);
+    const there = await otherParty();
+    expect(await previewFestaPackage(there, content, PASS)).toMatchObject({ counts: { users: 0, affiliations: 1 } });
+    expect(await importFestaPackage(there, content, PASS)).toMatchObject({ affiliations: { added: 1, skipped: 0 } });
+    expect(await listEmployees(db, { kind: "all", includeRemoved: true })).toEqual([]);
   });
 
   it("quem já foi conferido(a) se inscreve e é confirmado(a) na hora; com outro nome, fica para a conferência com o recado", async () => {
@@ -128,6 +152,7 @@ describe("pacote de mudança entre festas", () => {
     expect(await statusOf(again.registrationId)).toEqual({ status: "CONFIRMED", note: `Filiação já conferida na ${SOURCE} (RG e contracheque).` });
     const [audit] = await db.select().from(auditLog).where(eq(auditLog.action, "AFFILIATION_PRIOR_CONFIRMED"));
     expect(audit?.summary).toBe(`Filiação de MARIA SOUZA confirmada na hora: já tinha sido conferida na ${SOURCE}.`);
+    expect((await getPriorAffiliationOverview(db)).confirmedHere).toBe(1);
 
     // Mesmo CPF, outra pessoa no nome: a equipe confere o documento.
     const other = await registerMember({ memberCpf: jose.cpf, memberName: "Joaquim Pereira Costa" });

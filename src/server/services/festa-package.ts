@@ -4,25 +4,29 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Executor } from "@/server/db";
 import { db } from "@/server/db";
-import { account, employee, eventConfig, person, priorAffiliation, registration, user } from "@/server/db/schema";
+import { account, eventConfig, person, priorAffiliation, registration, user } from "@/server/db/schema";
 import { can } from "@/domain/access";
-import { EMPLOYEE_CATEGORIES, STAFF_ROLES } from "@/domain/types";
+import { STAFF_ROLES } from "@/domain/types";
 import { normalizeCpf } from "@/lib/cpf";
 import { plural } from "@/lib/plural";
-import { toSearchText } from "@/lib/text";
 import { type Actor, assertPermission, type StaffActor } from "./actor";
 import { writeAudit } from "./audit";
-import { addCompanion, createEmployee } from "./employees";
 import { DomainError } from "./errors";
 import { withTx } from "./tx";
 
 /*
  * Pacote de mudança entre festas (decisão da organização: um sistema por
  * festa). O sistema de uma festa gera um arquivo, trancado com uma senha que o
- * administrador escolhe, com a equipe (logins e perfis), os colaboradores e
- * cortesias e as filiações já conferidas (com RG e contracheque). O sistema da
- * outra festa abre o arquivo com a mesma senha e importa. Documentos (fotos de
- * RG e contracheque) não vão no pacote: só o fato de a filiação ter sido conferida.
+ * administrador escolhe, com a equipe (logins e perfis) e as filiações já
+ * conferidas (com RG e contracheque). O sistema da outra festa abre o arquivo
+ * com a mesma senha e importa.
+ *
+ * O pacote não coloca ninguém na festa nova (decisão da organização: tem gente
+ * da festa passada que não vai na nova). As filiações conferidas só servem para
+ * confirmar na hora quem se inscrever com o mesmo CPF e nome. Colaboradores e
+ * cortesias são cadastrados de novo em cada festa; pacotes antigos que ainda
+ * os trazem são aceitos, e essa parte é ignorada. Documentos (fotos de RG e
+ * contracheque) não vão no pacote: só o fato de a filiação ter sido conferida.
  */
 
 const FORMAT = "festa-sindserm";
@@ -39,19 +43,6 @@ const packageSchema = z.object({
       role: z.enum(STAFF_ROLES),
       permissions: z.string().max(4000).nullable(),
       passwordHash: z.string().min(10).max(1000).nullable(),
-    }),
-  ),
-  employees: z.array(
-    z.object({
-      key: z.string().min(1).max(64),
-      fullName: z.string().min(1).max(160),
-      cpf: z.string().max(14).nullable(),
-      whatsapp: z.string().max(20).nullable(),
-      isMinor: z.boolean(),
-      category: z.enum(EMPLOYEE_CATEGORIES),
-      jobTitle: z.string().max(120).nullable(),
-      withKit: z.boolean(),
-      hostKey: z.string().max(64).nullable(),
     }),
   ),
   affiliations: z.array(
@@ -80,7 +71,7 @@ function checkPassphrase(passphrase: string) {
   }
 }
 
-/** Monta o pacote desta festa: equipe ativa, colaboradores e cortesias na lista e filiações confirmadas. */
+/** Monta o pacote desta festa: a equipe ativa e as filiações confirmadas. */
 export async function buildFestaPackage(ex: Executor): Promise<FestaPackage> {
   const [config] = await ex.select({ name: eventConfig.name }).from(eventConfig).where(eq(eventConfig.id, 1)).limit(1);
   const users = await ex
@@ -89,22 +80,6 @@ export async function buildFestaPackage(ex: Executor): Promise<FestaPackage> {
     .leftJoin(account, and(eq(account.userId, user.id), eq(account.providerId, "credential")))
     .where(and(eq(user.active, true), isNull(user.deletedAt)))
     .orderBy(asc(user.name));
-  const employees = await ex
-    .select({
-      id: employee.id,
-      hostEmployeeId: employee.hostEmployeeId,
-      fullName: person.fullName,
-      cpf: person.cpf,
-      whatsapp: person.whatsapp,
-      isMinor: person.isMinor,
-      category: employee.category,
-      jobTitle: employee.jobTitle,
-      withKit: employee.withKit,
-    })
-    .from(employee)
-    .innerJoin(person, eq(person.id, employee.personId))
-    .where(isNull(employee.removedAt))
-    .orderBy(asc(employee.createdAt));
   const affiliations = await ex
     .select({
       cpf: person.cpf,
@@ -116,7 +91,6 @@ export async function buildFestaPackage(ex: Executor): Promise<FestaPackage> {
     .innerJoin(person, eq(person.id, registration.memberPersonId))
     .where(inArray(registration.status, ["CONFIRMED", "JOINED_AT_EVENT"]))
     .orderBy(asc(person.fullName));
-  const active = new Set(employees.map((row) => row.id));
   return {
     version: 1,
     createdAt: new Date().toISOString(),
@@ -127,18 +101,6 @@ export async function buildFestaPackage(ex: Executor): Promise<FestaPackage> {
       role: row.role,
       permissions: row.permissions,
       passwordHash: row.passwordHash ?? null,
-    })),
-    employees: employees.map((row) => ({
-      key: row.id,
-      fullName: row.fullName,
-      cpf: row.cpf,
-      whatsapp: row.whatsapp,
-      isMinor: row.isMinor,
-      category: row.category,
-      jobTitle: row.jobTitle,
-      withKit: row.withKit,
-      // Convidado sem kit de um(a) colaborador(a): só vem junto se quem trouxe também vier.
-      hostKey: row.hostEmployeeId && active.has(row.hostEmployeeId) ? row.hostEmployeeId : null,
     })),
     affiliations: affiliations
       .filter((row) => row.cpf)
@@ -186,11 +148,24 @@ export function openFestaPackage(content: string, passphrase: string): FestaPack
     const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(envelope.iv, "base64"));
     decipher.setAuthTag(Buffer.from(envelope.tag, "base64"));
     const json = Buffer.concat([decipher.update(Buffer.from(envelope.data, "base64")), decipher.final()]).toString("utf8");
+    // Pacotes antigos também traziam colaboradores e cortesias: o campo a mais é descartado aqui.
     return packageSchema.parse(JSON.parse(json));
   } catch {
     throw new DomainError("VALIDATION", "Senha do pacote errada (ou o arquivo foi alterado).", { passphrase: "Senha errada" });
   }
 }
+
+export type PackageCounts = {
+  users: number;
+  affiliations: number;
+};
+
+function countsOf(pkg: FestaPackage): PackageCounts {
+  return { users: pkg.users.length, affiliations: pkg.affiliations.length };
+}
+
+const countsText = (users: number, affiliations: number) =>
+  `${users} da equipe e ${plural(affiliations, "filiação conferida", "filiações conferidas")}`;
 
 /** Gera o arquivo do pacote desta festa (fica na auditoria: tem dados pessoais e os logins da equipe). */
 export async function exportFestaPackage(actor: Actor, passphrase: string): Promise<{ content: string; counts: PackageCounts }> {
@@ -203,26 +178,15 @@ export async function exportFestaPackage(actor: Actor, passphrase: string): Prom
     action: "FESTA_PACKAGE_EXPORTED",
     entityType: "event",
     entityId: "1",
-    summary: `Pacote de mudança gerado: ${counts.users} da equipe, ${plural(counts.employees, "colaborador(a) ou cortesia", "colaboradores e cortesias")}, ${plural(counts.affiliations, "filiação conferida", "filiações conferidas")}.`,
+    summary: `Pacote de mudança gerado: ${countsText(counts.users, counts.affiliations)}.`,
     after: counts,
   });
   return { content, counts };
 }
 
-export type PackageCounts = {
-  users: number;
-  employees: number;
-  affiliations: number;
-};
-
-function countsOf(pkg: FestaPackage): PackageCounts {
-  return { users: pkg.users.length, employees: pkg.employees.length, affiliations: pkg.affiliations.length };
-}
-
 export interface ImportSummary {
   source: string;
   users: { created: number; skipped: number };
-  employees: { created: number; skipped: number; problems: string[] };
   affiliations: { added: number; skipped: number };
 }
 
@@ -238,8 +202,8 @@ export async function previewFestaPackage(actor: Actor, content: string, passphr
 /**
  * Importa o pacote. A equipe entra com o mesmo login e a mesma senha, mas cria
  * uma senha nova no primeiro acesso (e refaz o tutorial e os treinos desta
- * festa). Colaboradores e cortesias ganham vouchers novos. Filiações conferidas
- * ficam guardadas para confirmar na hora quem se inscrever. O que já existe
+ * festa). As filiações conferidas ficam guardadas para confirmar na hora quem
+ * se inscrever: ninguém entra na festa por estar no pacote. O que já existe
  * aqui (mesmo e-mail ou mesmo CPF) fica como está.
  */
 export async function importFestaPackage(actor: Actor, content: string, passphrase: string): Promise<ImportSummary> {
@@ -248,7 +212,6 @@ export async function importFestaPackage(actor: Actor, content: string, passphra
   const summary: ImportSummary = {
     source: pkg.source,
     users: { created: 0, skipped: 0 },
-    employees: { created: 0, skipped: 0, problems: [] },
     affiliations: { added: 0, skipped: 0 },
   };
 
@@ -274,62 +237,7 @@ export async function importFestaPackage(actor: Actor, content: string, passphra
       await tx.insert(account).values({ id: randomUUID(), accountId: id, providerId: "credential", userId: id, password: member.passwordHash });
       summary.users.created += 1;
     }
-  });
 
-  // Colaboradores e cortesias pelo cadastro de sempre (voucher novo, auditoria, regras); depois, os convidados sem kit.
-  // Nome igual a alguém que já está na lista é pulado (como na lista colada): importar duas vezes não duplica ninguém.
-  const current = await db
-    .select({ searchName: person.searchName })
-    .from(employee)
-    .innerJoin(person, eq(person.id, employee.personId))
-    .where(isNull(employee.removedAt));
-  const known = new Set(current.map((row) => row.searchName));
-  const isKnown = (fullName: string) => {
-    const key = toSearchText(fullName);
-    if (known.has(key)) return true;
-    known.add(key);
-    return false;
-  };
-  const created = new Map<string, string>();
-  for (const row of pkg.employees.filter((entry) => !entry.hostKey)) {
-    if (isKnown(row.fullName)) {
-      summary.employees.skipped += 1;
-      continue;
-    }
-    try {
-      const result = await createEmployee(actor, {
-        fullName: row.fullName,
-        cpf: row.cpf ?? "",
-        whatsapp: row.whatsapp ?? "",
-        jobTitle: row.jobTitle ?? "",
-        category: row.category,
-        isMinor: row.isMinor,
-        withKit: row.withKit,
-        guest: null,
-      });
-      created.set(row.key, result.employeeId);
-      summary.employees.created += 1;
-    } catch (error) {
-      summary.employees.skipped += 1;
-      if (summary.employees.problems.length < 10) summary.employees.problems.push(`${row.fullName}: ${error instanceof DomainError ? error.message : "não deu para cadastrar"}`);
-    }
-  }
-  for (const row of pkg.employees.filter((entry) => entry.hostKey)) {
-    const hostEmployeeId = created.get(row.hostKey!);
-    if (!hostEmployeeId || isKnown(row.fullName)) {
-      summary.employees.skipped += 1;
-      continue;
-    }
-    try {
-      await addCompanion(actor, { hostEmployeeId, fullName: row.fullName, cpf: row.cpf ?? "", isMinor: row.isMinor });
-      summary.employees.created += 1;
-    } catch (error) {
-      summary.employees.skipped += 1;
-      if (summary.employees.problems.length < 10) summary.employees.problems.push(`${row.fullName}: ${error instanceof DomainError ? error.message : "não deu para cadastrar"}`);
-    }
-  }
-
-  await withTx(async (tx) => {
     for (const row of pkg.affiliations) {
       const cpf = normalizeCpf(row.cpf);
       if (!cpf) {
@@ -348,11 +256,29 @@ export async function importFestaPackage(actor: Actor, content: string, passphra
       action: "FESTA_PACKAGE_IMPORTED",
       entityType: "event",
       entityId: "1",
-      summary:
-        `Pacote de mudança importado (${pkg.source}): ${summary.users.created} da equipe, ` +
-        `${plural(summary.employees.created, "colaborador(a) ou cortesia", "colaboradores e cortesias")}, ${plural(summary.affiliations.added, "filiação conferida", "filiações conferidas")}.`,
-      after: { users: summary.users, employees: { created: summary.employees.created, skipped: summary.employees.skipped }, affiliations: summary.affiliations },
+      summary: `Pacote de mudança importado (${pkg.source}): ${countsText(summary.users.created, summary.affiliations.added)}.`,
+      after: { users: summary.users, affiliations: summary.affiliations },
     });
   });
   return summary;
+}
+
+export interface PriorAffiliationOverview {
+  /** Filiações conferidas guardadas (vindas de outra festa). */
+  total: number;
+  /** De qual(is) festa(s) vieram. */
+  sources: string[];
+  /** Inscrições desta festa já confirmadas na hora por elas. */
+  confirmedHere: number;
+}
+
+/** O que já foi trazido de outra festa: quantas filiações estão guardadas e quantas já confirmaram inscrições aqui. */
+export async function getPriorAffiliationOverview(ex: Executor): Promise<PriorAffiliationOverview> {
+  const result = await ex.execute<{ total: number; sources: string[] | null; confirmed_here: number }>(sql`
+    SELECT (SELECT count(*) FROM prior_affiliation)::int AS total,
+           (SELECT array_agg(DISTINCT source ORDER BY source) FROM prior_affiliation) AS sources,
+           (SELECT count(*) FROM audit_log WHERE action = 'AFFILIATION_PRIOR_CONFIRMED')::int AS confirmed_here
+  `);
+  const row = result.rows[0];
+  return { total: Number(row?.total ?? 0), sources: row?.sources ?? [], confirmedHere: Number(row?.confirmed_here ?? 0) };
 }

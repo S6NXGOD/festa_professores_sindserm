@@ -141,12 +141,11 @@ Na festa das servidoras e servidores não existe a pergunta "é professor(a)?": 
 
 **No Railway:** no mesmo projeto, **New → Database → PostgreSQL** (banco novo) e **New → GitHub Repo** (este repositório de novo). No serviço novo, gere o domínio e cole as variáveis do passo 4 da seção 4, com o banco novo, **segredos novos** (`npm run env:secrets`) e `NEXT_PUBLIC_FESTA_EDICAO="servidores"`. Depois, `/setup/evento` com a data, o local, os horários e o estoque desta festa.
 
-**Levar a equipe e as listas** (Configurações → Mudança entre festas; para quem administra o acesso e as configurações): no sistema de origem, **Gerar e baixar o pacote** com uma senha de 8 ou mais caracteres; no novo, escolha o arquivo, digite a senha, toque **Ver o que vem** e **Trazer agora**. Vêm:
+**Levar a equipe e as filiações conferidas** (Configurações → Mudança entre festas; para quem administra o acesso e as configurações): no sistema de origem, **Gerar e baixar o pacote** com uma senha de 8 ou mais caracteres; no novo, escolha o arquivo, digite a senha, toque **Ver o que vem** e **Trazer agora**. Vêm:
 
 - a equipe, com o mesmo e-mail e a mesma senha (cada pessoa cria uma senha nova no primeiro acesso e refaz o tutorial e os treinos);
-- os colaboradores e as cortesias, inclusive os convidados sem kit, com vouchers novos;
-- as filiações já conferidas: quem se inscrever com o mesmo CPF e o mesmo nome é **confirmado(a) na hora**; com outro nome, fica para a conferência, com o aviso.
+- as filiações já conferidas: quem se inscrever com o mesmo CPF e o mesmo nome é **confirmado(a) na hora**; com outro nome, fica para a conferência, com o aviso. O painel mostra quantas estão guardadas e quantas inscrições já foram confirmadas assim.
 
-Não vêm inscrições, convidados (os com kit, dos colaboradores, também não), entradas, kits, documentos e configurações. Quem já existe no destino (mesmo e-mail, mesmo CPF ou mesmo nome na lista) fica como está, então importar de novo não duplica ninguém. O arquivo é cifrado com a senha (AES-256-GCM): sem ela, não abre. Apague o arquivo depois.
+**Ninguém entra na festa nova por estar no pacote** (tem gente da festa passada que não vai na nova): não vêm inscrições, convidados, colaboradores, cortesias, entradas, kits, documentos nem configurações. Colaboradores e cortesias são cadastrados de novo em cada festa; um pacote antigo que ainda os traga é aceito, e essa parte é ignorada. Quem já tem login no destino (mesmo e-mail) e as filiações já guardadas (mesmo CPF) ficam como estão, então importar de novo não duplica nada. O arquivo é cifrado com a senha (AES-256-GCM): sem ela, não abre. Apague o arquivo depois.
 
 **Arte da festa** ("Quem luta também se diverte"): a original fica em `public/quem_luta_se_diverte.png`, de fundo transparente. O `npm run brand` gera `public/brand/servidores/emblema.webp` e `emblema.png`, usados pelo site, pela prévia do link, pelo voucher em imagem, pelos PDFs e pelo ícone padrão. Arte nova: troque o arquivo original (mesmo nome) e rode o comando.

@@ -9,19 +9,25 @@ import { CountUp } from "@/components/count-up";
 import { Check, Download, Key, Loader, Upload, Users } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { confettiLook } from "@/lib/confetti-look";
 import { plural } from "@/lib/plural";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { confettiLook } from "@/lib/confetti-look";
 
-type Counts = { users: number; employees: number; affiliations: number };
+type Counts = { users: number; affiliations: number };
 type Preview = { source: string; createdAt: string; counts: Counts; usersAlreadyHere: number };
 type Summary = {
   source: string;
   users: { created: number; skipped: number };
-  employees: { created: number; skipped: number; problems: string[] };
   affiliations: { added: number; skipped: number };
 };
+
+/** O que já veio de outra festa (filiações guardadas) e quantas inscrições daqui já foram confirmadas por elas. */
+export interface PriorAffiliationStatus {
+  total: number;
+  sources: string[];
+  confirmedHere: number;
+}
 
 async function post<T>(url: string, body: unknown): Promise<{ ok: true; data: T; response: Response } | { ok: false; error: string }> {
   try {
@@ -37,15 +43,37 @@ async function post<T>(url: string, body: unknown): Promise<{ ok: true; data: T;
 }
 
 /**
- * Mudança entre festas (um sistema por festa): levar a equipe, os colaboradores
- * e cortesias e as filiações já conferidas para o sistema da outra festa, num
- * arquivo trancado com senha. Do outro lado, a prévia mostra o que vem antes de importar.
+ * Mudança entre festas (um sistema por festa): levar a equipe e as filiações
+ * já conferidas para o sistema da outra festa, num arquivo trancado com senha.
+ * Ninguém entra na outra festa por estar no pacote: as filiações só confirmam
+ * na hora quem se inscrever com o mesmo CPF e nome.
  */
-export function FestaPackageSettings() {
+export function FestaPackageSettings({ prior }: { prior: PriorAffiliationStatus }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <ExportCard />
-      <ImportCard />
+    <div className="space-y-4">
+      {prior.total > 0 ? <PriorStatus prior={prior} /> : null}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ExportCard />
+        <ImportCard />
+      </div>
+    </div>
+  );
+}
+
+/** As filiações que vieram de outra festa trabalhando nesta: quantas estão guardadas e quantas já confirmaram inscrições. */
+function PriorStatus({ prior }: { prior: PriorAffiliationStatus }) {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-success/40 bg-success-soft p-4" data-testid="prior-affiliation-status">
+      <Check className="mt-0.5 size-5 shrink-0 text-success-text" />
+      <p className="text-sm text-fg">
+        <strong className="tabular">{plural(prior.total, "filiação conferida", "filiações conferidas")}</strong> de {prior.sources.join(", ")}{" "}
+        {prior.total === 1 ? "está guardada" : "estão guardadas"}: quem se inscrever com o mesmo CPF e nome é confirmado(a) na hora.{" "}
+        <span className="text-fg-muted">
+          {prior.confirmedHere > 0
+            ? `${plural(prior.confirmedHere, "inscrição já foi confirmada", "inscrições já foram confirmadas")} assim.`
+            : "Nenhuma inscrição confirmada assim ainda."}
+        </span>
+      </p>
     </div>
   );
 }
@@ -84,7 +112,8 @@ function ExportCard() {
         <Download className="size-5 text-red" /> Levar para outra festa
       </p>
       <p className="text-sm text-fg-muted">
-        Gera um arquivo com a equipe (logins e perfis), os colaboradores e cortesias e as filiações já conferidas. Fotos de documentos não vão.
+        Gera um arquivo com a equipe (logins e perfis) e as filiações já conferidas (com RG e contracheque). Ninguém entra na outra festa por
+        estar no pacote: as filiações só confirmam na hora quem se inscrever. Fotos de documentos não vão.
       </p>
       <label className="block space-y-1.5">
         <span className="flex items-center gap-1.5 text-xs font-bold tracking-[0.08em] text-fg-muted uppercase">
@@ -104,8 +133,8 @@ function ExportCard() {
       {done ? (
         <p className="flex items-start gap-2 rounded-lg border border-success/40 bg-success-soft px-3 py-2 text-sm text-fg" data-testid="package-export-done">
           <Check className="mt-0.5 size-4 shrink-0 text-success-text" />
-          {done.users} da equipe, {plural(done.employees, "colaborador(a) ou cortesia", "colaboradores e cortesias")} e {plural(done.affiliations, "filiação conferida", "filiações conferidas")}. Leve o
-          arquivo e a senha ao sistema da outra festa e apague o arquivo depois.
+          {done.users} da equipe e {plural(done.affiliations, "filiação conferida", "filiações conferidas")}. Leve o arquivo e a senha ao
+          sistema da outra festa e apague o arquivo depois.
         </p>
       ) : null}
     </div>
@@ -161,8 +190,8 @@ function ImportCard() {
         <Upload className="size-5 text-red" /> Trazer de outra festa
       </p>
       <p className="text-sm text-fg-muted">
-        A equipe entra com o mesmo login e cria senha nova no primeiro acesso. Quem já tem login aqui (mesmo e-mail) ou já está na lista (mesmo
-        CPF ou mesmo nome) fica como está: trazer de novo não duplica ninguém.
+        A equipe entra com o mesmo login e cria senha nova no primeiro acesso. As filiações conferidas não colocam ninguém nesta festa: quem
+        se inscrever com o mesmo CPF e nome é confirmado(a) na hora. Quem já tem login aqui (mesmo e-mail) fica como está.
       </p>
       <input ref={fileRef} type="file" accept=".festa,application/json,application/octet-stream" className="sr-only" onChange={(event) => void pick(event.target.files?.[0])} data-testid="package-file" />
       <Button type="button" variant="outline" className="w-full justify-start" onClick={() => fileRef.current?.click()}>
@@ -184,9 +213,8 @@ function ImportCard() {
         {preview ? (
           <motion.div key="preview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3 rounded-xl border border-red/40 bg-brand-soft p-3" data-testid="package-preview-box">
             <p className="text-xs font-bold tracking-[0.08em] text-fg-muted uppercase">De: {preview.source}</p>
-            <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="grid grid-cols-2 gap-2 text-center">
               <Counter label="da equipe" value={preview.counts.users} />
-              <Counter label={preview.counts.employees === 1 ? "colaborador(a) ou cortesia" : "colaboradores e cortesias"} value={preview.counts.employees} />
               <Counter label={preview.counts.affiliations === 1 ? "filiação conferida" : "filiações conferidas"} value={preview.counts.affiliations} />
             </div>
             {preview.usersAlreadyHere ? (
@@ -205,26 +233,11 @@ function ImportCard() {
             <ul className="space-y-1 text-sm text-fg">
               <SummaryLine created={summary.users.created} skipped={summary.users.skipped} label="da equipe" />
               <SummaryLine
-                created={summary.employees.created}
-                skipped={summary.employees.skipped}
-                label={`${summary.employees.created === 1 ? "colaborador(a) ou cortesia" : "colaboradores e cortesias"} (vouchers novos)`}
-              />
-              <SummaryLine
                 created={summary.affiliations.added}
                 skipped={summary.affiliations.skipped}
                 label={`${summary.affiliations.added === 1 ? "filiação conferida" : "filiações conferidas"} (confirmam na hora da inscrição)`}
               />
             </ul>
-            {summary.employees.problems.length ? (
-              <details className="text-xs text-fg-muted">
-                <summary className="cursor-pointer font-semibold">Ficaram de fora ({summary.employees.problems.length})</summary>
-                <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                  {summary.employees.problems.map((problem) => (
-                    <li key={problem}>{problem}</li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
           </motion.div>
         ) : null}
       </AnimatePresence>

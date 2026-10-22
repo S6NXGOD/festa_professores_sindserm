@@ -12,6 +12,7 @@ import { APP_TIME_ZONE, utcToZonedLocalInput } from "@/lib/datetime";
 import { formatPhone, maskPhoneInput } from "@/lib/phone";
 import { db } from "@/server/db";
 import { getConfig, getSiteIcon } from "@/server/queries/config";
+import { getPriorAffiliationOverview } from "@/server/services/festa-package";
 import { getEventPhotoMeta } from "@/server/services/venue";
 import { can } from "@/domain/access";
 import { requirePageActor } from "@/server/session";
@@ -20,7 +21,7 @@ export const metadata: Metadata = { title: "Configurações" };
 
 export default async function SettingsPage() {
   const actor = await requirePageActor("manageSettings");
-  const [config, photo, icon] = await Promise.all([getConfig(), getEventPhotoMeta(db), getSiteIcon()]);
+  const [config, photo, icon, prior] = await Promise.all([getConfig(), getEventPhotoMeta(db), getSiteIcon(), getPriorAffiliationOverview(db)]);
   if (!config) redirect("/setup/evento");
 
   return (
@@ -98,10 +99,10 @@ export default async function SettingsPage() {
       {can(actor.access, "manageUsers") ? (
         <Panel title="Mudança entre festas" icon={Repeat}>
           <p className="mb-4 text-sm text-fg-muted">
-            Cada festa tem o seu sistema. Para começar a próxima sem recadastrar tudo, gere o pacote aqui e importe no sistema da outra
-            festa (ou o contrário). Tudo fica na auditoria.
+            Cada festa tem o seu sistema. O pacote leva a equipe e as filiações já conferidas para o sistema da outra festa: ninguém entra
+            na festa nova por isso, mas quem se inscrever e já foi conferido(a) é confirmado(a) na hora. Tudo fica na auditoria.
           </p>
-          <FestaPackageSettings />
+          <FestaPackageSettings prior={prior} />
         </Panel>
       ) : null}
     </div>
