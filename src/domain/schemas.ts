@@ -453,6 +453,17 @@ export const bulkEmployeesSchema = z.object({
   withKit: z.boolean().default(true),
 });
 
+/**
+ * Vários colaboradores e cortesias de uma vez: apagar de vez (quem nunca entrou
+ * nem recebeu kit) ou só tirar da lista (dá para trazer de volta).
+ */
+export const MAX_BULK_SELECTION = 500;
+export const bulkEmployeeActionSchema = z.object({
+  employeeIds: z.array(z.uuid()).min(1, "Selecione pelo menos uma pessoa").max(MAX_BULK_SELECTION, `No máximo ${MAX_BULK_SELECTION} de uma vez`),
+  mode: z.enum(["delete", "remove"]),
+});
+export type BulkEmployeeActionInput = z.input<typeof bulkEmployeeActionSchema>;
+
 /** Convidado(a) sem kit que chegou com um(a) colaborador(a) (ou foi avisado antes). */
 export const companionSchema = z.object({
   hostEmployeeId: z.uuid(),

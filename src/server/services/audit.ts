@@ -59,6 +59,8 @@ export const AUDIT_ACTIONS = {
   EMPLOYEE_UPDATED: "Colaborador(a) do SINDSERM alterado(a)",
   EMPLOYEE_REMOVED: "Colaborador(a) tirado(a) da lista",
   EMPLOYEE_RESTORED: "Colaborador(a) de volta à lista",
+  EMPLOYEES_DELETED: "Colaboradores e cortesias apagados de vez (em massa)",
+  EMPLOYEES_BULK_REMOVED: "Colaboradores e cortesias tirados da lista (em massa)",
   DOCUMENT_ATTACHED: "Documento anexado à ficha",
   DOCUMENT_VIEWED: "Documento da ficha aberto",
   DOCUMENT_REMOVED: "Documento da ficha apagado",

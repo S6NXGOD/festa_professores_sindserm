@@ -1322,8 +1322,36 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await expect(admin.getByTestId("stat-courtesies")).toHaveText("5");
       await expect(admin.locator("a", { has: admin.getByTestId("stat-courtesies") })).toContainText("2 já entraram");
       await expect(admin.getByTestId("stat-employees")).toHaveText("3");
-      await expect(admin.getByTestId("expected-breakdown")).toContainText("3 colaboradores · 5 cortesias");
+      // Colaboradores e cortesias não entram no "prontos para entrar": ficam numa linha da organização.
+      await expect(admin.getByTestId("organization-breakdown")).toContainText("3 colaboradores · 5 cortesias");
       await expect(admin.locator("li", { hasText: "Helena Presidente Costa" }).first()).toContainText("Cort. ·");
+    });
+
+    await test.step("apagar em massa: marca o grupo de um convite e apaga de vez quem nunca entrou", async () => {
+      await admin.goto("/painel/cortesias");
+      await admin.getByTestId("bulk-courtesies").click();
+      await admin.getByTestId("bulk-courtesy-inviter").fill("Veio de outra festa");
+      await admin.getByTestId("bulk-courtesies-text").fill(["Apagar Primeira Souza", "Apagar Segunda Souza", "Apagar Terceira Souza"].join("\n"));
+      await admin.getByTestId("save-bulk-courtesies").click();
+      await expect(admin.getByTestId("courtesy-row")).toHaveCount(8);
+
+      await admin.getByTestId("bulk-toggle").click();
+      const bar = admin.getByTestId("bulk-bar");
+      await expect(bar.getByTestId("bulk-count")).toHaveText("0");
+      const group = admin.getByTestId("courtesy-group").filter({ hasText: "Convite: Veio de outra festa" });
+      await group.getByTestId("bulk-group-checkbox").click();
+      await expect(bar.getByTestId("bulk-count")).toHaveText("3");
+      // Quem já entrou (Helena) não pode ser marcada.
+      await expect(admin.getByTestId("courtesy-row").filter({ hasText: "Helena Presidente Costa" }).getByTestId("bulk-checkbox")).toBeDisabled();
+      await bar.getByTestId("bulk-delete").click();
+      const confirm = admin.getByTestId("bulk-confirm");
+      await expect(confirm).toContainText("Apagar 3 cortesias?");
+      await expect(confirm.getByTestId("bulk-confirm-names")).toContainText("Apagar Primeira Souza");
+      await confirm.getByTestId("bulk-confirm-delete").click();
+      await expect(admin.getByText("3 pessoas apagadas de vez")).toBeVisible();
+      await expect(admin.getByTestId("courtesy-row")).toHaveCount(5);
+      await expect(admin.getByTestId("courtesy-group").filter({ hasText: "Convite: Veio de outra festa" })).toHaveCount(0);
+      await expect(admin.getByTestId("bulk-bar")).toHaveCount(0);
     });
 
     await context.close();

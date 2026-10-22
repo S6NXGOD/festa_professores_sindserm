@@ -73,12 +73,15 @@ export default async function DashboardPage() {
   const stock = stats.stock;
   const shareUrl = `${publicBaseUrl() ?? ""}/`;
   const employeePool = stock?.pools.find((pool) => pool.pool === "EMPLOYEE") ?? null;
-  const presence = stats.expected > 0 ? Math.round((stats.present / stats.expected) * 100) : 0;
+  // O placar é das inscrições (filiados e os convidados deles). Colaboradores e cortesias são
+  // listas da organização: aparecem à parte, sem inflar o "prontos para entrar" (decisão da organização).
+  const presence = stats.registrationsExpected > 0 ? Math.round((stats.registrationsPresent / stats.registrationsExpected) * 100) : 0;
   // Antes da festa (e enquanto ninguém entrou), "quem falta" não faz sentido: o placar mostra
   // quantos já estão prontos para entrar e o que ainda depende do Atendimento.
   const preEvent = Boolean(event && !event.started && stats.present === 0);
-  const readiness = stats.expected > 0 ? Math.round((stats.ready / stats.expected) * 100) : 0;
-  const notReady = Math.max(0, stats.expected - stats.ready);
+  const readiness = stats.registrationsExpected > 0 ? Math.round((stats.registrationsReady / stats.registrationsExpected) * 100) : 0;
+  const notReady = Math.max(0, stats.registrationsExpected - stats.registrationsReady);
+  const registrationsAbsent = Math.max(0, stats.registrationsExpected - stats.registrationsPresent);
   const toResolve = [
     stats.pending > 0 ? plural(stats.pending, "inscrição para conferir", "inscrições para conferir") : null,
     stats.awaitingSignature > 0 ? plural(stats.awaitingSignature, "ficha para assinar", "fichas para assinar") : null,
@@ -93,12 +96,12 @@ export default async function DashboardPage() {
   const employeeKitsOwed = Math.max(0, stats.kitsOwedEmployee - stats.kitsOwedCourtesy);
   const kitParts = (member: number, guest: number, employee: number, courtesy: number) =>
     [`${member} ${T.short}`, `${guest} conv.`, employee ? `${employee} colab.` : null, courtesy ? `${courtesy} cort.` : null].filter(Boolean).join(" · ");
-  // Quem são os esperados (o total do placar e da portaria): todo mundo que tem voucher.
-  const expectedBreakdown = [
-    plural(stats.teachers + stats.otherMembers, "inscrito", "inscritos"),
-    plural(stats.guests + stats.employeeGuests, "convidado", "convidados"),
+  // Quem conta no placar: as inscrições. A organização vem numa linha própria.
+  const registrationBreakdown = [plural(stats.teachers + stats.otherMembers, "inscrito", "inscritos"), plural(stats.guests, "convidado", "convidados")].join(" · ");
+  const organizationBreakdown = [
     employeesOnly ? plural(employeesOnly, "colaborador", "colaboradores") : null,
     stats.courtesies ? plural(stats.courtesies, "cortesia", "cortesias") : null,
+    stats.employeeGuests ? plural(stats.employeeGuests, "convidado de colaborador", "convidados de colaboradores") : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -240,23 +243,23 @@ export default async function DashboardPage() {
             </div>
             <p className="relative mt-3 flex items-end gap-3">
               <span className="display text-7xl leading-none text-fg neon tabular" data-testid="stat-ready">
-                {stats.ready}
+                {stats.registrationsReady}
               </span>
-              <span className="display mb-1.5 text-2xl text-fg-muted tabular">/ {stats.expected}</span>
+              <span className="display mb-1.5 text-2xl text-fg-muted tabular">/ {stats.registrationsExpected}</span>
               <span className="pixel mb-2 ml-auto text-sm text-red tabular">{readiness}%</span>
             </p>
             <p className="relative mt-1 text-sm font-semibold text-fg">prontos para entrar</p>
-            {stats.expected > 0 ? (
+            {stats.registrationsExpected > 0 ? (
               <p className="relative mt-0.5 text-xs text-fg-muted" data-testid="expected-breakdown">
-                Os {stats.expected} esperados: {expectedBreakdown}
+                Das inscrições: {registrationBreakdown}
               </p>
             ) : null}
             <SegmentMeter
               className="relative mt-3"
-              value={stats.ready}
-              max={stats.expected}
+              value={stats.registrationsReady}
+              max={stats.registrationsExpected}
               segments={24}
-              label={`${stats.ready} de ${stats.expected} prontos para entrar`}
+              label={`${stats.registrationsReady} de ${stats.registrationsExpected} prontos para entrar`}
             />
             <p className="relative mt-3 text-xs text-fg-muted" data-testid="pre-event-note">
               {notReady > 0 ? (
@@ -269,12 +272,17 @@ export default async function DashboardPage() {
                     </Link>
                   ) : null}
                 </>
-              ) : stats.expected > 0 ? (
+              ) : stats.registrationsExpected > 0 ? (
                 `Todo mundo já está liberado: agora é só a ${GAME.floor} abrir.`
               ) : (
-                "Ainda sem inscritos."
+                "Ainda sem inscrições."
               )}
             </p>
+            {stats.organizationExpected > 0 ? (
+              <p className="relative mt-3 border-t border-line/60 pt-3 text-xs text-fg-muted" data-testid="organization-breakdown">
+                <strong className="text-fg">Fora desta conta, da organização:</strong> {organizationBreakdown} (cada um com voucher próprio).
+              </p>
+            ) : null}
           </div>
         ) : (
           <div className="relative overflow-clip rounded-2xl border border-red/40 bg-[linear-gradient(135deg,rgb(227_0_15/0.2),rgb(8_8_8/0.9)_55%)] p-5 shadow-[0_0_40px_-24px_var(--glow)]">
@@ -286,25 +294,37 @@ export default async function DashboardPage() {
             </div>
             <p className="relative mt-3 flex items-end gap-3">
               <span className="display text-7xl leading-none text-fg neon tabular" data-testid="stat-present">
-                {stats.present}
+                {stats.registrationsPresent}
               </span>
-              <span className="display mb-1.5 text-2xl text-fg-muted tabular">/ {stats.expected}</span>
+              <span className="display mb-1.5 text-2xl text-fg-muted tabular">/ {stats.registrationsExpected}</span>
               <span className="pixel mb-2 ml-auto text-sm text-red tabular">{presence}%</span>
             </p>
-            {stats.expected > 0 ? (
+            {stats.registrationsExpected > 0 ? (
               <p className="relative mt-2 text-xs text-fg-muted" data-testid="expected-breakdown">
-                Os {stats.expected} esperados: {expectedBreakdown}
+                Das inscrições: {registrationBreakdown}
               </p>
             ) : null}
-            <SegmentMeter className="relative mt-4" value={stats.present} max={stats.expected} segments={24} label={`${stats.present} de ${stats.expected} presentes`} />
+            <SegmentMeter
+              className="relative mt-4"
+              value={stats.registrationsPresent}
+              max={stats.registrationsExpected}
+              segments={24}
+              label={`${stats.registrationsPresent} de ${stats.registrationsExpected} presentes`}
+            />
             <p className="relative mt-3 text-xs text-fg-muted">
-              {stats.absent === 1 ? "1 esperado ainda não entrou" : `${plural(stats.absent, "esperado", "esperados")} ainda não entraram`} ·{" "}
+              {registrationsAbsent === 1 ? "1 esperado ainda não entrou" : `${plural(registrationsAbsent, "esperado", "esperados")} ainda não entraram`} ·{" "}
               {canRegistrations ? (
                 <Link href="/painel/inscricoes?filtro=ausentes" className="font-semibold text-red hover:underline">
                   ver quem falta
                 </Link>
               ) : null}
             </p>
+            {stats.organizationExpected > 0 ? (
+              <p className="relative mt-3 border-t border-line/60 pt-3 text-xs text-fg-muted" data-testid="organization-breakdown">
+                <strong className="text-fg">Da organização</strong> ({organizationBreakdown}): {stats.organizationPresent} de {stats.organizationExpected}{" "}
+                já entraram · {plural(stats.present, "pessoa", "pessoas")} na festa ao todo.
+              </p>
+            ) : null}
           </div>
         )}
 

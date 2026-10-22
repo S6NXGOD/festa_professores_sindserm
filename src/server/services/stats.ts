@@ -25,6 +25,17 @@ export interface DashboardStats {
   ready: number;
   present: number;
   absent: number;
+  /**
+   * Só as inscrições (filiados e os convidados deles): o placar "prontos para
+   * entrar" e "na piscina" contam estas. Colaboradores e cortesias são listas da
+   * organização e aparecem à parte (decisão da organização).
+   */
+  registrationsExpected: number;
+  registrationsReady: number;
+  registrationsPresent: number;
+  /** A organização: colaboradores, cortesias e os convidados dos colaboradores. */
+  organizationExpected: number;
+  organizationPresent: number;
   kitsDeliveredMember: number;
   kitsDeliveredGuest: number;
   kitsDeliveredEmployee: number;
@@ -60,7 +71,7 @@ const ACTIVE_STATUSES = sql`('CONFIRMED', 'JOINED_AT_EVENT')`;
 
 export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
   const result = await ex.execute<Record<string, number>>(sql`
-    WITH expected_people AS (
+    WITH registration_people AS (
       SELECT r.member_person_id AS person_id
         FROM registration r
        WHERE r.status IN ${EXPECTED_STATUSES}
@@ -69,15 +80,8 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
         FROM guest_link gl
         JOIN registration r ON r.id = gl.registration_id
        WHERE gl.status = 'ACTIVE' AND r.status IN ${EXPECTED_STATUSES}
-      UNION
-      SELECT e.person_id FROM employee e WHERE e.removed_at IS NULL
-      UNION
-      SELECT gl.guest_person_id
-        FROM guest_link gl
-        JOIN employee e ON e.id = gl.employee_id
-       WHERE gl.status = 'ACTIVE' AND e.removed_at IS NULL
     ),
-    ready_people AS (
+    registration_ready AS (
       SELECT r.member_person_id AS person_id
         FROM registration r
        WHERE r.status IN ${ACTIVE_STATUSES}
@@ -86,13 +90,20 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
         FROM guest_link gl
         JOIN registration r ON r.id = gl.registration_id
        WHERE gl.status = 'ACTIVE' AND r.status IN ${ACTIVE_STATUSES}
-      UNION
+    ),
+    organization_people AS (
       SELECT e.person_id FROM employee e WHERE e.removed_at IS NULL
       UNION
       SELECT gl.guest_person_id
         FROM guest_link gl
         JOIN employee e ON e.id = gl.employee_id
        WHERE gl.status = 'ACTIVE' AND e.removed_at IS NULL
+    ),
+    expected_people AS (
+      SELECT person_id FROM registration_people UNION SELECT person_id FROM organization_people
+    ),
+    ready_people AS (
+      SELECT person_id FROM registration_ready UNION SELECT person_id FROM organization_people
     ),
     active_checkins AS (
       SELECT person_id FROM check_in WHERE cancelled_at IS NULL
@@ -113,6 +124,11 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
       (SELECT count(*) FROM ready_people)::int AS ready,
       (SELECT count(*) FROM active_checkins)::int AS present,
       (SELECT count(*) FROM expected_people e JOIN active_checkins c ON c.person_id = e.person_id)::int AS present_expected,
+      (SELECT count(*) FROM registration_people)::int AS registrations_expected,
+      (SELECT count(*) FROM registration_ready)::int AS registrations_ready,
+      (SELECT count(*) FROM registration_people p JOIN active_checkins c ON c.person_id = p.person_id)::int AS registrations_present,
+      (SELECT count(*) FROM organization_people)::int AS organization_expected,
+      (SELECT count(*) FROM organization_people p JOIN active_checkins c ON c.person_id = p.person_id)::int AS organization_present,
       (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'MEMBER')::int AS delivered_member,
       (SELECT count(*) FROM kit_delivery WHERE cancelled_at IS NULL AND kit_type = 'GUEST' AND employee_id IS NULL)::int AS delivered_guest,
       (SELECT count(*) FROM registration WHERE status IN ${ACTIVE_STATUSES} AND is_teacher AND member_kit_waitlisted_at IS NULL)::int AS entitled_member,
@@ -169,6 +185,11 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
     ready: n("ready"),
     present: n("present"),
     absent: Math.max(0, n("expected") - n("present_expected")),
+    registrationsExpected: n("registrations_expected"),
+    registrationsReady: n("registrations_ready"),
+    registrationsPresent: n("registrations_present"),
+    organizationExpected: n("organization_expected"),
+    organizationPresent: n("organization_present"),
     kitsDeliveredMember: n("delivered_member"),
     kitsDeliveredGuest: n("delivered_guest"),
     kitsDeliveredEmployee: n("delivered_employee"),

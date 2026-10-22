@@ -5,6 +5,8 @@ import type { BulkEmployeesInput, CompanionInput, EmployeeInput, GateCourtesyInp
 import type { ActionResult } from "@/lib/action-result";
 import {
   addCompanion,
+  type BulkEmployeesOutcome,
+  bulkEmployees,
   createCourtesyAtGate,
   createEmployee,
   createEmployeesFromList,
@@ -76,6 +78,20 @@ export async function removeEmployeeAction(employeeId: string): Promise<ActionRe
     const actor = await requireActionActor();
     await removeEmployee(actor, { employeeId: String(employeeId) });
     refresh();
+  });
+}
+
+/** Vários de uma vez: "delete" apaga de vez quem nunca entrou; "remove" só tira da lista. */
+export async function bulkEmployeesAction(input: { employeeIds: string[]; mode: "delete" | "remove" }): Promise<ActionResult<BulkEmployeesOutcome>> {
+  return runAction(async () => {
+    const actor = await requireActionActor();
+    // Vindo da tela: só "remove" vira "só tirar"; qualquer outra coisa é o apagar (que já protege quem tem histórico).
+    const outcome = await bulkEmployees(actor, {
+      employeeIds: Array.isArray(input?.employeeIds) ? input.employeeIds.map(String) : [],
+      mode: input?.mode === "remove" ? "remove" : "delete",
+    });
+    refresh();
+    return outcome;
   });
 }
 

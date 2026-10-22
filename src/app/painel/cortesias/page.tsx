@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ConfirmActionDialog } from "@/components/common/confirm-action-dialog";
 import { Gift, Heart, Info, Login, Pencil, Printer, QrCode, Reload, Trash, Warning } from "@/components/icons/pixel";
+import { BulkCheckbox, BulkGroupCheckbox, BulkSelect, BulkSelectToggle } from "@/components/staff/bulk-select";
 import { CATEGORY_AVATAR } from "@/components/staff/category-avatar";
 import { BulkEmployeesDialog, CourtesyDialog, EditEmployeeDialog } from "@/components/staff/employee-dialogs";
 import { ChipFilters, EmptyState, PageHeader, StatTile } from "@/components/staff/panel-ui";
@@ -75,6 +76,8 @@ export default async function CourtesiesPage({ searchParams }: PageProps<"/paine
           ? active.filter((row) => !row.checkedInAt)
           : active;
   const groups = groupByInviter(rows);
+  // Seleção em massa: quem já entrou não entra (estorne a entrada antes).
+  const bulkItems = canManage ? rows.filter((row) => !row.checkedInAt).map((row) => ({ id: row.employeeId, name: row.fullName })) : [];
   // Links dos vouchers de quem ainda vale (botão de mandar no WhatsApp). Quem vê a lista já pode abrir
   // e mandar cada voucher, então o botão do grupo vale também para quem só vê.
   const tokens = new Map<string, string>();
@@ -141,7 +144,10 @@ export default async function CourtesiesPage({ searchParams }: PageProps<"/paine
       </div>
 
       {kitsNeeded > 0 && !sharedStock && (!employeePool || employeePool.total < kitsNeeded) ? (
-        <p className="mb-5 flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft p-3.5 text-sm font-semibold text-fg" data-testid="courtesy-stock-warning">
+        <p
+          className="mb-5 flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft p-3.5 text-sm font-semibold text-fg"
+          data-testid="courtesy-stock-warning"
+        >
           <Warning className="mt-0.5 size-4 shrink-0 text-warning" />
           <span>
             {employeePool
@@ -154,61 +160,69 @@ export default async function CourtesiesPage({ searchParams }: PageProps<"/paine
         </p>
       ) : null}
 
-      <ChipFilters
-        basePath="/painel/cortesias"
-        current={filter}
-        params={{}}
-        options={(Object.keys(FILTERS) as (keyof typeof FILTERS)[]).map((value) => ({
-          value,
-          label: FILTERS[value],
-          count:
-            value === "removidos"
-              ? all.length - active.length
-              : value === "dentro"
-                ? present.length
-                : value === "fora"
-                  ? active.length - present.length
-                  : active.length,
-        }))}
-      />
+      <BulkSelect items={bulkItems} noun={{ one: "cortesia", many: "cortesias", markedOne: "marcada", markedMany: "marcadas" }} removedView={filter === "removidos"}>
+        <ChipFilters
+          basePath="/painel/cortesias"
+          current={filter}
+          params={{}}
+          options={(Object.keys(FILTERS) as (keyof typeof FILTERS)[]).map((value) => ({
+            value,
+            label: FILTERS[value],
+            count:
+              value === "removidos"
+                ? all.length - active.length
+                : value === "dentro"
+                  ? present.length
+                  : value === "fora"
+                    ? active.length - present.length
+                    : active.length,
+          }))}
+        />
 
-      {rows.length === 0 ? (
-        <EmptyState icon={Heart} title={filter ? "Ninguém aqui" : "Nenhuma cortesia ainda"}>
-          {filter
-            ? "Nenhuma cortesia neste filtro."
-            : canManage
-              ? "Cadastre amigos, familiares e convidados da organização, uma por uma (a família entra em sequência) ou colando a lista."
-              : "Quem administra o sistema cadastra as cortesias aqui."}
-        </EmptyState>
-      ) : (
-        <div className="space-y-5" data-testid="courtesy-groups">
-          {groups.map((group) => {
-            const shareable = group.rows
-              .filter((row) => !row.removedAt && tokens.has(row.personId))
-              .map((row) => ({ fullName: row.fullName, token: tokens.get(row.personId)!, withKit: row.withKit }));
-            return (
-              <section key={group.key} className="space-y-2" data-testid="courtesy-group">
-                <div className="flex flex-wrap items-center gap-2 px-1">
-                  <Heart className="size-4 text-[#ff8fd0]" />
-                  <h2 className="pixel text-[0.6rem] text-fg" data-testid="courtesy-group-title">
-                    {group.inviter ? `Convite: ${group.inviter}` : NO_INVITER}
-                  </h2>
-                  <span className="pixel text-[0.5rem] text-fg-dim tabular">· {plural(group.rows.length, "pessoa", "pessoas")}</span>
-                  <span aria-hidden className="h-px min-w-6 flex-1 bg-line" />
-                  {filter !== "removidos" ? <ShareCourtesyVouchersButton inviter={group.inviter} people={shareable} eventName={eventName} /> : null}
-                </div>
-                <div className="overflow-hidden rounded-xl border border-[#ff4fb4]/25 bg-surface">
-                  <ul className="divide-y divide-line">
-                    {group.rows.map((row) => (
-                      <CourtesyItem key={row.employeeId} row={row} canManage={canManage} inviters={inviters} />
-                    ))}
-                  </ul>
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      )}
+        {bulkItems.length > 0 ? (
+          <div className="mb-3 flex justify-end">
+            <BulkSelectToggle />
+          </div>
+        ) : null}
+        {rows.length === 0 ? (
+          <EmptyState icon={Heart} title={filter ? "Ninguém aqui" : "Nenhuma cortesia ainda"}>
+            {filter
+              ? "Nenhuma cortesia neste filtro."
+              : canManage
+                ? "Cadastre amigos, familiares e convidados da organização, uma por uma (a família entra em sequência) ou colando a lista."
+                : "Quem administra o sistema cadastra as cortesias aqui."}
+          </EmptyState>
+        ) : (
+          <div className="space-y-5" data-testid="courtesy-groups">
+            {groups.map((group) => {
+              const shareable = group.rows
+                .filter((row) => !row.removedAt && tokens.has(row.personId))
+                .map((row) => ({ fullName: row.fullName, token: tokens.get(row.personId)!, withKit: row.withKit }));
+              return (
+                <section key={group.key} className="space-y-2" data-testid="courtesy-group">
+                  <div className="flex flex-wrap items-center gap-2 px-1">
+                    {canManage ? <BulkGroupCheckbox ids={group.rows.map((row) => row.employeeId)} label={group.inviter ?? NO_INVITER} /> : null}
+                    <Heart className="size-4 text-[#ff8fd0]" />
+                    <h2 className="pixel text-[0.6rem] text-fg" data-testid="courtesy-group-title">
+                      {group.inviter ? `Convite: ${group.inviter}` : NO_INVITER}
+                    </h2>
+                    <span className="pixel text-[0.5rem] text-fg-dim tabular">· {plural(group.rows.length, "pessoa", "pessoas")}</span>
+                    <span aria-hidden className="h-px min-w-6 flex-1 bg-line" />
+                    {filter !== "removidos" ? <ShareCourtesyVouchersButton inviter={group.inviter} people={shareable} eventName={eventName} /> : null}
+                  </div>
+                  <div className="overflow-hidden rounded-xl border border-[#ff4fb4]/25 bg-surface">
+                    <ul className="divide-y divide-line">
+                      {group.rows.map((row) => (
+                        <CourtesyItem key={row.employeeId} row={row} canManage={canManage} inviters={inviters} />
+                      ))}
+                    </ul>
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </BulkSelect>
     </div>
   );
 }
@@ -227,6 +241,7 @@ function groupByInviter(rows: EmployeeRow[]) {
 function CourtesyItem({ row, canManage, inviters }: { row: EmployeeRow; canManage: boolean; inviters: string[] }) {
   return (
     <li className={cn("flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5", row.removedAt && "opacity-60")} data-testid="courtesy-row">
+      {canManage ? <BulkCheckbox id={row.employeeId} name={row.fullName} blockedReason={row.checkedInAt ? "Já entrou na festa" : undefined} /> : null}
       <span className={cn("pixel inline-flex size-10 shrink-0 items-center justify-center rounded-md text-[0.6rem]", CATEGORY_AVATAR.COURTESY)}>
         {initials(row.fullName)}
       </span>

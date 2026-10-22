@@ -1,8 +1,10 @@
 import "server-only";
 import { and, asc, eq, inArray, isNull, ne, type SQL, sql } from "drizzle-orm";
 import type { Executor, Tx } from "@/server/db";
-import { checkIn, employee, guestLink, kitDelivery, person } from "@/server/db/schema";
+import { checkIn, employee, guestLink, kitDelivery, person, voucher } from "@/server/db/schema";
 import {
+  type BulkEmployeeActionInput,
+  bulkEmployeeActionSchema,
   type BulkEmployeesInput,
   bulkEmployeesSchema,
   type CompanionInput,
@@ -27,9 +29,9 @@ import { type Actor, assertPermission, type StaffActor } from "./actor";
 import { writeAudit } from "./audit";
 import { DomainError, isUniqueViolation } from "./errors";
 import { attachGuest, endGuestLink, type GuestHost, hostFromEmployee, mapGuestError } from "./group";
-import { lockEmployeeGroup, lockEmployeeGroupWithPeople } from "./locks";
+import { lockEmployeeGroup, lockEmployeeGroupWithPeople, lockEmployeeRows } from "./locks";
 import { personSearchFields } from "./registration";
-import { findActiveGuestLink, findRegistrationIdByMember } from "./state";
+import { type EmployeeGroupState, findActiveGuestLink, findRegistrationIdByMember } from "./state";
 import { withTx } from "./tx";
 import { ensureActiveVoucher, revokeActiveVoucher } from "./vouchers";
 
@@ -414,21 +416,9 @@ export async function removeEmployee(actor: Actor, input: { employeeId: string }
       throw new DomainError("FORBIDDEN", "Seu perfil só tira da lista convidados sem kit de colaboradores.");
     }
     if (!current.active) return { removed: false };
-    if (current.checkIn) {
-      throw new DomainError("INVALID_STATE", "Já entrou na festa. Para tirar da lista, estorne a entrada antes (os kits voltam ao estoque).");
-    }
-    let guestName: string | null = null;
-    if (current.guest) {
-      if (current.guest.checkIn) {
-        throw new DomainError(
-          "INVALID_STATE",
-          `O convidado ${current.guest.fullName} já entrou na festa. Para tirar da lista, estorne a entrada dele antes.`,
-        );
-      }
-      guestName = (await endGuestLink(tx, actor, hostFromEmployee(current), "Colaborador(a) saiu da lista")).fullName;
-    }
-    await tx.update(employee).set({ removedAt: new Date(), removedByUserId: actor.userId }).where(eq(employee.id, current.id));
-    await revokeActiveVoucher(tx, current.person.id, actor.userId, `Removido(a) da lista de ${listName(current.category)}`);
+    const blocked = entryBlock(current);
+    if (blocked) throw new DomainError("INVALID_STATE", blocked);
+    const { guestName } = await takeOffList(tx, actor, current);
     await writeAudit(tx, actor, {
       action: "EMPLOYEE_REMOVED",
       entityType: "employee",
@@ -439,6 +429,170 @@ export async function removeEmployee(actor: Actor, input: { employeeId: string }
     });
     return { removed: true, guestRemoved: Boolean(guestName) };
   });
+}
+
+/** Quem está dentro da festa (a pessoa ou o convidado dela) só sai da lista estornando a entrada. */
+function entryBlock(current: EmployeeGroupState): string | null {
+  if (current.checkIn) return "Já entrou na festa. Para tirar da lista, estorne a entrada antes (os kits voltam ao estoque).";
+  if (current.guest?.checkIn) {
+    return `O convidado ${current.guest.fullName} já entrou na festa. Para tirar da lista, estorne a entrada dele antes.`;
+  }
+  return null;
+}
+
+/** Tira da lista (grupo já bloqueado): o voucher deixa de valer e o convite do convidado acaba. */
+async function takeOffList(tx: Tx, actor: StaffActor, current: EmployeeGroupState): Promise<{ guestName: string | null }> {
+  const guestName = current.guest ? (await endGuestLink(tx, actor, hostFromEmployee(current), "Colaborador(a) saiu da lista")).fullName : null;
+  await tx.update(employee).set({ removedAt: new Date(), removedByUserId: actor.userId }).where(eq(employee.id, current.id));
+  await revokeActiveVoucher(tx, current.person.id, actor.userId, `Removido(a) da lista de ${listName(current.category)}`);
+  return { guestName };
+}
+
+export interface BulkEmployeesOutcome {
+  /** Apagados de vez: nunca entraram nem receberam kit (com o convidado e os convidados sem kit de quem trouxe). */
+  deleted: string[];
+  /** Só tirados da lista: o pedido era esse, ou já tinham entrada ou kit no histórico (o histórico fica). */
+  removed: string[];
+  /** Não mexidos, com o motivo (já entrou, já estava fora da lista). */
+  skipped: { name: string; reason: string }[];
+}
+
+/**
+ * Vários colaboradores e cortesias de uma vez (ex.: o que veio de outra festa
+ * e não vale nesta). "Apagar" faz sumir de vez quem nunca entrou nem recebeu
+ * kit: o cadastro, o voucher, o convidado e os convidados sem kit que a pessoa
+ * trouxe. Quem tem entrada ou kit no histórico (mesmo estornados) só sai da
+ * lista, como no botão de cada pessoa. Quem está dentro da festa não sai.
+ * Tudo numa transação: ou faz tudo, ou nada.
+ */
+export async function bulkEmployees(actor: Actor, raw: BulkEmployeeActionInput): Promise<BulkEmployeesOutcome> {
+  assertPermission(actor, "manageEmployees");
+  const input = bulkEmployeeActionSchema.parse(raw);
+  return withTx(async (tx) => {
+    const outcome: BulkEmployeesOutcome = { deleted: [], removed: [], skipped: [] };
+    const handled = new Set<string>();
+    for (const employeeId of [...new Set(input.employeeIds)]) {
+      if (handled.has(employeeId)) continue;
+      // Pode já ter saído junto com quem trouxe (convidado sem kit selecionado com o(a) colaborador(a)).
+      const [exists] = await tx.select({ id: employee.id }).from(employee).where(eq(employee.id, employeeId)).limit(1);
+      if (!exists) continue;
+      const current = await lockEmployeeGroupWithPeople(tx, employeeId);
+      const name = current.person.fullName;
+      handled.add(employeeId);
+      if (input.mode === "remove" && !current.active) {
+        outcome.skipped.push({ name, reason: "já estava fora da lista" });
+        continue;
+      }
+      const blocked = entryBlock(current);
+      if (blocked && current.active) {
+        outcome.skipped.push({ name, reason: current.checkIn ? "já entrou (estorne a entrada antes)" : "o convidado já entrou (estorne antes)" });
+        continue;
+      }
+      if (input.mode === "delete" && !(await groupHasHistory(tx, current.id))) {
+        const companions = await deleteForGood(tx, actor, current);
+        for (const companion of companions) handled.add(companion.employeeId);
+        outcome.deleted.push(name, ...companions.map((companion) => companion.fullName));
+        continue;
+      }
+      if (!current.active) {
+        outcome.skipped.push({ name, reason: "tem entrada ou kit no histórico: continua em Tirados da lista" });
+        continue;
+      }
+      await takeOffList(tx, actor, current);
+      outcome.removed.push(name);
+    }
+    const names = (list: string[]) => `${list.slice(0, 12).join(", ")}${list.length > 12 ? ` e mais ${list.length - 12}` : ""}`;
+    if (outcome.deleted.length) {
+      await writeAudit(tx, actor, {
+        action: "EMPLOYEES_DELETED",
+        entityType: "employee",
+        summary: `${plural(outcome.deleted.length, "pessoa apagada", "pessoas apagadas")} de vez da lista de colaboradores e cortesias: ${names(outcome.deleted)}.`,
+        after: { deleted: outcome.deleted },
+      });
+    }
+    if (outcome.removed.length) {
+      await writeAudit(tx, actor, {
+        action: "EMPLOYEES_BULK_REMOVED",
+        entityType: "employee",
+        summary: `${plural(outcome.removed.length, "pessoa tirada", "pessoas tiradas")} da lista de colaboradores e cortesias (os vouchers foram cancelados): ${names(outcome.removed)}.`,
+        after: { removed: outcome.removed },
+      });
+    }
+    return outcome;
+  });
+}
+
+/** O grupo (a pessoa, o convidado e os convidados sem kit que trouxe) já teve entrada ou kit, mesmo estornados? */
+async function groupHasHistory(tx: Tx, employeeId: string): Promise<boolean> {
+  const result = await tx.execute<{ history: boolean }>(sql`
+    WITH group_employees AS (
+      SELECT id, person_id FROM employee WHERE id = ${employeeId} OR host_employee_id = ${employeeId}
+    ),
+    group_links AS (
+      SELECT id, guest_person_id FROM guest_link WHERE employee_id = ${employeeId}
+    ),
+    group_people AS (
+      SELECT person_id FROM group_employees UNION SELECT guest_person_id FROM group_links
+    )
+    SELECT EXISTS (
+             SELECT 1 FROM check_in c
+              WHERE c.person_id IN (SELECT person_id FROM group_people)
+                 OR c.employee_id IN (SELECT id FROM group_employees)
+                 OR c.guest_link_id IN (SELECT id FROM group_links)
+           )
+        OR EXISTS (
+             SELECT 1 FROM kit_delivery k
+              WHERE k.employee_id IN (SELECT id FROM group_employees)
+                 OR k.guest_link_id IN (SELECT id FROM group_links)
+                 OR k.recipient_person_id IN (SELECT person_id FROM group_people)
+                 OR k.beneficiary_person_id IN (SELECT person_id FROM group_people)
+           ) AS history
+  `);
+  return Boolean(result.rows[0]?.history);
+}
+
+/** Apaga de vez o grupo sem histórico; devolve os convidados sem kit que saíram junto. */
+async function deleteForGood(tx: Tx, actor: StaffActor, current: EmployeeGroupState) {
+  const companions = await tx
+    .select({ employeeId: employee.id, personId: employee.personId, fullName: person.fullName })
+    .from(employee)
+    .innerJoin(person, eq(person.id, employee.personId))
+    .where(eq(employee.hostEmployeeId, current.id));
+  await lockEmployeeRows(
+    tx,
+    companions.map((companion) => companion.employeeId),
+  );
+  for (const companion of companions) {
+    await tx.delete(employee).where(eq(employee.id, companion.employeeId));
+    await dropPerson(tx, actor, companion.personId);
+  }
+  const links = await tx.select({ guestPersonId: guestLink.guestPersonId }).from(guestLink).where(eq(guestLink.employeeId, current.id));
+  if (links.length) await tx.delete(guestLink).where(eq(guestLink.employeeId, current.id));
+  for (const link of links) await dropPerson(tx, actor, link.guestPersonId);
+  await tx.delete(employee).where(eq(employee.id, current.id));
+  await dropPerson(tx, actor, current.person.id);
+  return companions;
+}
+
+/**
+ * A pessoa some com os vouchers se não tiver mais nada no sistema (inscrição,
+ * convite, entrada, kit, ficha). Se tiver, fica, e só o voucher deixa de valer.
+ */
+async function dropPerson(tx: Tx, actor: StaffActor, personId: string) {
+  const result = await tx.execute<{ used: boolean }>(sql`
+    SELECT (EXISTS (SELECT 1 FROM registration WHERE member_person_id = ${personId})
+         OR EXISTS (SELECT 1 FROM guest_link WHERE guest_person_id = ${personId})
+         OR EXISTS (SELECT 1 FROM employee WHERE person_id = ${personId})
+         OR EXISTS (SELECT 1 FROM check_in WHERE person_id = ${personId})
+         OR EXISTS (SELECT 1 FROM kit_delivery WHERE recipient_person_id = ${personId} OR beneficiary_person_id = ${personId})
+         OR EXISTS (SELECT 1 FROM affiliation_form WHERE person_id = ${personId})) AS used
+  `);
+  if (result.rows[0]?.used) {
+    await revokeActiveVoucher(tx, personId, actor.userId, "Apagado(a) da lista de colaboradores e cortesias");
+    return;
+  }
+  await tx.delete(voucher).where(eq(voucher.personId, personId));
+  await tx.delete(person).where(eq(person.id, personId));
 }
 
 /** Volta para a lista com um voucher novo (o antigo continua cancelado). O convidado é cadastrado de novo, se houver. */
