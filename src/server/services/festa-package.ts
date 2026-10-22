@@ -12,6 +12,7 @@ import { plural } from "@/lib/plural";
 import { type Actor, assertPermission, type StaffActor } from "./actor";
 import { writeAudit } from "./audit";
 import { DomainError } from "./errors";
+import { applyPriorAffiliationToWaiting } from "./prior-affiliation";
 import { withTx } from "./tx";
 
 /*
@@ -188,6 +189,8 @@ export interface ImportSummary {
   source: string;
   users: { created: number; skipped: number };
   affiliations: { added: number; skipped: number };
+  /** Inscrições que já esperavam a conferência e foram confirmadas ao trazer o pacote. */
+  waitingConfirmed: number;
 }
 
 /** O que o pacote traria, sem gravar nada (prévia antes de confirmar). */
@@ -203,8 +206,9 @@ export async function previewFestaPackage(actor: Actor, content: string, passphr
  * Importa o pacote. A equipe entra com o mesmo login e a mesma senha, mas cria
  * uma senha nova no primeiro acesso (e refaz o tutorial e os treinos desta
  * festa). As filiações conferidas ficam guardadas para confirmar na hora quem
- * se inscrever: ninguém entra na festa por estar no pacote. O que já existe
- * aqui (mesmo e-mail ou mesmo CPF) fica como está.
+ * se inscrever (e quem já está esperando a conferência): ninguém entra na festa
+ * por estar no pacote. O que já existe aqui (mesmo e-mail ou mesmo CPF) fica
+ * como está, então trazer o mesmo pacote de novo só confere a fila outra vez.
  */
 export async function importFestaPackage(actor: Actor, content: string, passphrase: string): Promise<ImportSummary> {
   assertPackageAdmin(actor);
@@ -213,6 +217,7 @@ export async function importFestaPackage(actor: Actor, content: string, passphra
     source: pkg.source,
     users: { created: 0, skipped: 0 },
     affiliations: { added: 0, skipped: 0 },
+    waitingConfirmed: 0,
   };
 
   await withTx(async (tx) => {
@@ -252,12 +257,17 @@ export async function importFestaPackage(actor: Actor, content: string, passphra
       if (inserted.length) summary.affiliations.added += 1;
       else summary.affiliations.skipped += 1;
     }
+    // Quem se inscreveu antes de o pacote chegar e está na fila: a mesma regra de quem se inscreve depois.
+    summary.waitingConfirmed = await applyPriorAffiliationToWaiting(tx, actor);
+    const waiting = summary.waitingConfirmed
+      ? `; ${plural(summary.waitingConfirmed, "inscrição que esperava conferência confirmada", "inscrições que esperavam conferência confirmadas")}`
+      : "";
     await writeAudit(tx, actor, {
       action: "FESTA_PACKAGE_IMPORTED",
       entityType: "event",
       entityId: "1",
-      summary: `Pacote de mudança importado (${pkg.source}): ${countsText(summary.users.created, summary.affiliations.added)}.`,
-      after: { users: summary.users, affiliations: summary.affiliations },
+      summary: `Pacote de mudança importado (${pkg.source}): ${countsText(summary.users.created, summary.affiliations.added)}${waiting}.`,
+      after: { users: summary.users, affiliations: summary.affiliations, waitingConfirmed: summary.waitingConfirmed },
     });
   });
   return summary;

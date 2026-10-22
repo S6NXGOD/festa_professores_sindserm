@@ -14,11 +14,9 @@ async function main() {
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
-    await client.query(`
-      TRUNCATE TABLE audit_log, rate_limit, kit_delivery, check_in, voucher, employee, affiliation_document, affiliation_form,
-        guest_link, registration, person, kit_stock, event_photo, site_icon, event_config, verification, session, account, "user"
-      RESTART IDENTITY CASCADE
-    `);
+    // Todas as tabelas, inclusive as que vierem depois: nada de uma rodada (ou de um teste à mão) vaza para a próxima.
+    const { rows } = await client.query<{ tablename: string }>(`SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`);
+    if (rows.length) await client.query(`TRUNCATE TABLE ${rows.map((row) => `"${row.tablename}"`).join(", ")} RESTART IDENTITY CASCADE`);
   } finally {
     await client.end();
   }

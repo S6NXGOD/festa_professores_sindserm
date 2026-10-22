@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { account, auditLog, priorAffiliation, registration, user } from "@/server/db/schema";
 import type { StaffActor } from "@/server/services/actor";
-import { decideAffiliation } from "@/server/services/affiliation";
+import { decideAffiliation, reopenAffiliation } from "@/server/services/affiliation";
 import { addCompanion, createEmployee, listEmployees } from "@/server/services/employees";
 import { DomainError } from "@/server/services/errors";
 import {
@@ -96,6 +96,7 @@ describe("pacote de mudança entre festas", () => {
       source: SOURCE,
       users: { created: 1, skipped: 2 },
       affiliations: { added: 1, skipped: 0 },
+      waitingConfirmed: 0,
     });
 
     const [sergio] = await db.select().from(user).where(eq(user.email, "sergio@teste.local"));
@@ -164,6 +165,55 @@ describe("pacote de mudança entre festas", () => {
     // Quem não veio no pacote segue a conferência de sempre.
     const fresh = await registerMember({ memberName: "Lucas Novo Filiado" });
     expect(await statusOf(fresh.registrationId)).toEqual({ status: "PENDING", note: null });
+  });
+
+  it("quem se inscreveu antes de o pacote chegar e espera a conferência: confirmado(a) ao trazer; o que a equipe decidiu ou reabriu fica", async () => {
+    const maria = await confirmedMember("Maria Aparecida Souza");
+    const jose = await confirmedMember("José Antônio Lima");
+    const rita = await confirmedMember("Rita Reaberta Nunes");
+    const iara = await confirmedMember("Iara Convidada Rocha");
+    const { content } = await exportFestaPackage(admin, PASS);
+    const there = await otherParty();
+
+    // As inscrições abriram antes de o pacote chegar.
+    const early = await registerMember({ memberCpf: maria.cpf, memberName: "Maria Souza" });
+    const otherName = await registerMember({ memberCpf: jose.cpf, memberName: "Joaquim Pereira Costa" });
+    const reopened = await registerMember({ memberCpf: rita.cpf, memberName: "Rita Reaberta Nunes" });
+    await decideAffiliation(there, { registrationId: reopened.registrationId, decision: "REJECT" });
+    await reopenAffiliation(there, { registrationId: reopened.registrationId, justification: "Conferir de novo o contracheque" });
+    const fresh = await registerMember({ memberName: "Lucas Novo Filiado" });
+    const host = await registerMember({ guest: true, guestName: "Iara Convidada Rocha", guestCpf: iara.cpf });
+    await decideAffiliation(there, { registrationId: host.registrationId, decision: "CONFIRM" });
+    const declared = await registerDeclaredMember(there, {
+      personId: host.state.guest!.personId,
+      whatsapp: "86999990000",
+      registrationNumber: "4455-1",
+      workplace: "Escola Municipal Leste",
+      isTeacher: true,
+    });
+    expect(await statusOf(early.registrationId)).toEqual({ status: "PENDING", note: null });
+
+    const summary = await importFestaPackage(there, content, PASS);
+    expect(summary).toMatchObject({ affiliations: { added: 4, skipped: 0 }, waitingConfirmed: 1 });
+    // Convidada que se declarou filiada: só o recado, como no cadastro (o Confirmar da equipe desfaz o vínculo de convidado).
+    expect(await statusOf(declared.registrationId)).toEqual({ status: "PENDING", note: `Filiação já conferida na ${SOURCE} (RG e contracheque): pode confirmar.` });
+    expect(await statusOf(early.registrationId)).toEqual({ status: "CONFIRMED", note: `Filiação já conferida na ${SOURCE} (RG e contracheque).` });
+    expect(await statusOf(otherName.registrationId)).toEqual({
+      status: "PENDING",
+      note: `CPF com filiação conferida na ${SOURCE}, mas com outro nome (José Antônio Lima): confira o documento.`,
+    });
+    // Reaberta pela equipe: a decisão continua com ela.
+    expect(await statusOf(reopened.registrationId)).toEqual({ status: "PENDING", note: "Conferir de novo o contracheque" });
+    expect(await statusOf(fresh.registrationId)).toEqual({ status: "PENDING", note: null });
+    const [imported] = await db.select().from(auditLog).where(eq(auditLog.action, "FESTA_PACKAGE_IMPORTED"));
+    expect(imported?.summary).toBe(
+      `Pacote de mudança importado (${SOURCE}): 0 da equipe e 4 filiações conferidas; 1 inscrição que esperava conferência confirmada.`,
+    );
+    expect((await getPriorAffiliationOverview(db)).confirmedHere).toBe(1);
+
+    // Trazer o mesmo pacote de novo não duplica nada nem mexe em quem já foi confirmado(a).
+    expect(await importFestaPackage(there, content, PASS)).toMatchObject({ affiliations: { added: 0, skipped: 4 }, waitingConfirmed: 0 });
+    expect((await getPriorAffiliationOverview(db)).confirmedHere).toBe(1);
   });
 
   it("convidado(a) que se declara filiado(a) e já foi conferido(a): só o recado (o Confirmar da equipe desfaz o vínculo de convidado)", async () => {

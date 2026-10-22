@@ -1,7 +1,7 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { Tx } from "@/server/db";
-import { priorAffiliation, registration } from "@/server/db/schema";
+import { person, priorAffiliation, registration } from "@/server/db/schema";
 import { toSearchText } from "@/lib/text";
 import type { Actor } from "./actor";
 import { writeAudit } from "./audit";
@@ -66,4 +66,33 @@ export async function applyPriorAffiliation(
     after: { source: prior.source, confirmedAt: prior.confirmedAt.toISOString() },
   });
   return true;
+}
+
+/**
+ * Filiações que chegam (pacote de mudança) com gente já esperando a
+ * conferência: a mesma regra de quem se inscreve depois. Só inscrições que a
+ * equipe ainda não decidiu nem reabriu; a ficha de filiação segue o caminho dela.
+ */
+export async function applyPriorAffiliationToWaiting(tx: Tx, actor: Actor): Promise<number> {
+  const waiting = await tx
+    .select({ id: registration.id, cpf: person.cpf, fullName: person.fullName, origin: registration.origin })
+    .from(registration)
+    .innerJoin(person, eq(person.id, registration.memberPersonId))
+    .innerJoin(priorAffiliation, eq(priorAffiliation.cpf, person.cpf))
+    .where(
+      and(
+        eq(registration.status, "PENDING"),
+        isNull(registration.statusChangedAt),
+        inArray(registration.origin, ["PUBLIC_FORM", "STAFF", "GUEST_CONVERSION"]),
+      ),
+    )
+    .orderBy(asc(registration.createdAt))
+    .for("update", { of: registration });
+  let confirmed = 0;
+  for (const row of waiting) {
+    // Convidado(a) que se declarou filiado(a): só o recado, como no cadastro (o Confirmar da equipe desfaz o vínculo de convidado).
+    const mode = row.origin === "GUEST_CONVERSION" ? "note" : "confirm";
+    if (await applyPriorAffiliation(tx, actor, row.id, row.cpf, row.fullName, mode)) confirmed += 1;
+  }
+  return confirmed;
 }

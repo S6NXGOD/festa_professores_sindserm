@@ -20,6 +20,7 @@ type Summary = {
   source: string;
   users: { created: number; skipped: number };
   affiliations: { added: number; skipped: number };
+  waitingConfirmed: number;
 };
 
 /** O que já veio de outra festa (filiações guardadas) e quantas inscrições daqui já foram confirmadas por elas. */
@@ -191,7 +192,8 @@ function ImportCard() {
       </p>
       <p className="text-sm text-fg-muted">
         A equipe entra com o mesmo login e cria senha nova no primeiro acesso. As filiações conferidas não colocam ninguém nesta festa: quem
-        se inscrever com o mesmo CPF e nome é confirmado(a) na hora. Quem já tem login aqui (mesmo e-mail) fica como está.
+        se inscrever com o mesmo CPF e nome (ou já estiver esperando a conferência) é confirmado(a) na hora. Quem já tem login aqui (mesmo
+        e-mail) fica como está.
       </p>
       <input ref={fileRef} type="file" accept=".festa,application/json,application/octet-stream" className="sr-only" onChange={(event) => void pick(event.target.files?.[0])} data-testid="package-file" />
       <Button type="button" variant="outline" className="w-full justify-start" onClick={() => fileRef.current?.click()}>
@@ -237,6 +239,13 @@ function ImportCard() {
                 skipped={summary.affiliations.skipped}
                 label={`${summary.affiliations.added === 1 ? "filiação conferida" : "filiações conferidas"} (confirmam na hora da inscrição)`}
               />
+              {summary.waitingConfirmed ? (
+                <SummaryLine
+                  created={summary.waitingConfirmed}
+                  skipped={0}
+                  label={summary.waitingConfirmed === 1 ? "inscrição que esperava conferência foi confirmada" : "inscrições que esperavam conferência foram confirmadas"}
+                />
+              ) : null}
             </ul>
           </motion.div>
         ) : null}
