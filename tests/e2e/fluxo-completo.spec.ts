@@ -1322,8 +1322,11 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await expect(admin.getByTestId("stat-courtesies")).toHaveText("5");
       await expect(admin.locator("a", { has: admin.getByTestId("stat-courtesies") })).toContainText("2 já entraram");
       await expect(admin.getByTestId("stat-employees")).toHaveText("3");
-      // Colaboradores e cortesias não entram no "prontos para entrar": ficam numa linha da organização.
-      await expect(admin.getByTestId("organization-breakdown")).toContainText("3 colaboradores · 5 cortesias");
+      // O placar conta todo mundo: a conta mostra a parte da organização (e um atalho para quem falta).
+      const organization = admin.getByTestId("breakdown-organization");
+      await expect(organization).toContainText("3 colaboradores · 5 cortesias · 2 convidados de colaboradores");
+      await expect(organization.getByRole("link", { name: "cortesias que faltam" })).toHaveAttribute("href", "/painel/cortesias?filtro=fora");
+      await expect(admin.getByTestId("breakdown-total")).toContainText("Todo mundo");
       await expect(admin.locator("li", { hasText: "Helena Presidente Costa" }).first()).toContainText("Cort. ·");
     });
 

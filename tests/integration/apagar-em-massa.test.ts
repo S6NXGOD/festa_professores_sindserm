@@ -113,11 +113,15 @@ describe("apagar em massa", () => {
   });
 });
 
-describe("placar: prontos para entrar são as inscrições", () => {
-  it("colaboradores e cortesias (ex.: trazidos de outra festa) ficam numa conta à parte", async () => {
-    await courtesy("Carla Mendes Silva");
-    await createEmployee(admin, { fullName: "Rosa Financeiro Lima", cpf: "", whatsapp: "", jobTitle: "Financeiro", category: "STAFF", guest: null });
-    const stats = await getDashboardStats(db);
-    expect(stats).toMatchObject({ registrationsExpected: 0, registrationsReady: 0, organizationExpected: 2, organizationPresent: 0 });
+describe("placar: prontos para entrar é todo mundo que tem voucher", () => {
+  it("colaboradores e cortesias contam (já liberados), na parte da organização; apagados, saem da conta", async () => {
+    const carla = await courtesy("Carla Mendes Silva");
+    const rosa = await createEmployee(admin, { fullName: "Rosa Financeiro Lima", cpf: "", whatsapp: "", jobTitle: "Financeiro", category: "STAFF", guest: null });
+    let stats = await getDashboardStats(db);
+    expect(stats).toMatchObject({ expected: 2, ready: 2, registrationsExpected: 0, registrationsReady: 0, organizationExpected: 2, organizationPresent: 0 });
+
+    await bulkEmployees(admin, { employeeIds: [carla.employeeId, rosa.employeeId], mode: "delete" });
+    stats = await getDashboardStats(db);
+    expect(stats).toMatchObject({ expected: 0, ready: 0, organizationExpected: 0 });
   });
 });

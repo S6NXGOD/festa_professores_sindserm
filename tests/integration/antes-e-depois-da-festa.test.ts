@@ -117,8 +117,10 @@ describe("placar antes da festa", () => {
     // Prontos: a confirmada e o convidado dela + os dois da colaboradora. A pendente e o convidado dela, não.
     let stats = await getDashboardStats(db);
     expect(stats).toMatchObject({ expected: 6, ready: 4, present: 0, pending: 1 });
-    // O placar conta as inscrições; a colaboradora e o convidado dela vêm à parte (organização).
+    // A conta do placar: inscrições (4, 2 prontos) + organização (2, já liberados) = todo mundo.
     expect(stats).toMatchObject({ registrationsExpected: 4, registrationsReady: 2, organizationExpected: 2 });
+    expect(stats.registrationsExpected + stats.organizationExpected).toBe(stats.expected);
+    expect(stats.registrationsReady + stats.organizationExpected).toBe(stats.ready);
 
     await decideAffiliation(attendant, { registrationId: pendente.registrationId, decision: "CONFIRM" });
     stats = await getDashboardStats(db);

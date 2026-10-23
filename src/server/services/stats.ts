@@ -19,21 +19,22 @@ export interface DashboardStats {
   expected: number;
   /**
    * Esperados que já podem entrar: filiação confirmada (e os convidados deles),
-   * colaboradores na lista e os convidados deles. O resto depende de conferência
-   * (inscrição) ou de assinatura (ficha) — e trava na portaria se ficar para a hora.
+   * colaboradores e cortesias na lista e os convidados dos colaboradores. O resto
+   * depende de conferência (inscrição) ou de assinatura (ficha) — e trava na
+   * portaria se ficar para a hora.
    */
   ready: number;
   present: number;
   absent: number;
   /**
-   * Só as inscrições (filiados e os convidados deles): o placar "prontos para
-   * entrar" e "na piscina" contam estas. Colaboradores e cortesias são listas da
-   * organização e aparecem à parte (decisão da organização).
+   * As duas partes do placar, que somadas dão os totais acima (decisão da
+   * organização: o placar conta todo mundo que tem voucher). Inscrições: filiados
+   * e os convidados deles.
    */
   registrationsExpected: number;
   registrationsReady: number;
   registrationsPresent: number;
-  /** A organização: colaboradores, cortesias e os convidados dos colaboradores. */
+  /** A organização: colaboradores, cortesias e os convidados dos colaboradores (já saem liberados). */
   organizationExpected: number;
   organizationPresent: number;
   kitsDeliveredMember: number;
