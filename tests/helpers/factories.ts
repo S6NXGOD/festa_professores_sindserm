@@ -151,6 +151,7 @@ export function registrationInput(options: MemberOptions = {}): RegistrationInpu
       : null,
     privacyConsent: true,
     acceptKitWaitlist: true,
+    memberDeclaration: true,
   };
 }
 

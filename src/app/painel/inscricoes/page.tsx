@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Cancel, Check, ChevronRight, ClipboardNote, Gift, List, Login, UserPlus } from "@/components/icons/pixel";
 import { PlayerTag } from "@/components/retro/bits";
 import { AnimatedList } from "@/components/staff/animated-list";
+import { BulkConfirmPending } from "@/components/staff/bulk-confirm-pending";
 import { ChipFilters, DayHeading, EmptyState, FilterBar, OrderToggle, PageHeader, Pagination } from "@/components/staff/panel-ui";
 import { VerificationCard } from "@/components/staff/queue-cards";
 import { ReportButton } from "@/components/staff/report-button";
@@ -145,6 +146,9 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
   const todayKey = todayInZone();
   const listTime = (row: { createdAt: Date; statusChangedAt: Date | null }) => (byDecision ? (row.statusChangedAt ?? row.createdAt) : row.createdAt);
   const canOpenPeople = can(actor.access, "viewPeople");
+  const canDecide = can(actor.access, "validateAffiliation");
+  // Confirmar todas de uma vez: só quem já estava na fila quando a tela abriu (quem chegar depois espera).
+  const snapshotAt = new Date().toISOString();
 
   return (
     <div>
@@ -205,15 +209,18 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
             </Button>
           </EmptyState>
         ) : (
-          <AnimatedList
-            items={groupByDay(queue.rows, (row) => row.createdAt).flatMap((group) => [
-              { key: `dia-${group.key}`, content: <DayHeading title={group.title} count={group.rows.length} /> },
-              ...group.rows.map((row) => ({
-                key: row.registrationId,
-                content: <VerificationCard row={row} canDecide={can(actor.access, "validateAffiliation")} eventName={eventName} />,
-              })),
-            ])}
-          />
+          <>
+            {canDecide && !q && counts.pending >= 2 ? <BulkConfirmPending count={counts.pending} upTo={snapshotAt} /> : null}
+            <AnimatedList
+              items={groupByDay(queue.rows, (row) => row.createdAt).flatMap((group) => [
+                { key: `dia-${group.key}`, content: <DayHeading title={group.title} count={group.rows.length} /> },
+                ...group.rows.map((row) => ({
+                  key: row.registrationId,
+                  content: <VerificationCard row={row} canDecide={canDecide} eventName={eventName} />,
+                })),
+              ])}
+            />
+          </>
         )
       ) : list && list.rows.length === 0 ? (
         <EmptyState icon={List} title={q || status || absent ? "Nada encontrado" : "Nenhuma inscrição"}>

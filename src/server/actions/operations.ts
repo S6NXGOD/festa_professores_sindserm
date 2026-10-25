@@ -8,7 +8,7 @@ import type { ActionResult } from "@/lib/action-result";
 import { escapeLike, toSearchText } from "@/lib/text";
 import { db } from "@/server/db";
 import { guestLink, person, registration } from "@/server/db/schema";
-import { confirmAfterProof, decideAffiliation, reopenAffiliation } from "@/server/services/affiliation";
+import { confirmAfterProof, confirmPendingInBulk, decideAffiliation, reopenAffiliation, revokeAffiliation } from "@/server/services/affiliation";
 import { assertPermission } from "@/server/services/actor";
 import { cancelCheckIn } from "@/server/services/checkin";
 import { addGuest, removeGuest, setTeacherStatus } from "@/server/services/group";
@@ -62,6 +62,23 @@ export async function confirmAfterProofAction(input: { registrationId: string; j
 export async function reopenAffiliationAction(input: { registrationId: string; justification: string }): Promise<ActionResult> {
   return runAction(async () => {
     await reopenAffiliation(await staff(), input);
+    refreshStaffViews();
+  });
+}
+
+/** Confirma de uma vez quem estava na fila de conferência quando a tela foi aberta (`upTo`). */
+export async function confirmPendingInBulkAction(input: { upTo: string }): Promise<ActionResult<{ confirmed: number; stillPending: number }>> {
+  return runAction(async () => {
+    const result = await confirmPendingInBulk(await staff(), { upTo: new Date(String(input.upTo)) });
+    refreshStaffViews();
+    return result;
+  });
+}
+
+/** O SINDSERM constatou que a pessoa não é filiada: desfaz a filiação confirmada (não entra nem recebe o kit). */
+export async function revokeAffiliationAction(input: { registrationId: string; justification: string }): Promise<ActionResult> {
+  return runAction(async () => {
+    await revokeAffiliation(await staff(), { registrationId: String(input.registrationId), justification: String(input.justification) });
     refreshStaffViews();
   });
 }

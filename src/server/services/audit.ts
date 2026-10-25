@@ -29,6 +29,8 @@ export const AUDIT_ACTIONS = {
   AFFILIATION_REOPENED: "Conferência de filiação reaberta",
   AFFILIATION_PROVEN: "Filiação confirmada após comprovação",
   AFFILIATION_PRIOR_CONFIRMED: "Filiação confirmada (já conferida em outra festa)",
+  AFFILIATIONS_BULK_CONFIRMED: "Filiações confirmadas em massa (sem conferência)",
+  AFFILIATION_REVOKED: "Não é filiado(a): filiação desfeita",
   FESTA_PACKAGE_EXPORTED: "Pacote de mudança gerado",
   FESTA_PACKAGE_IMPORTED: "Pacote de mudança importado",
   AFFILIATION_FORM_SAVED: "Ficha de filiação salva",
@@ -96,14 +98,24 @@ export interface AuditEntry {
  * use CPF mascarado e apenas os campos relevantes para a auditoria.
  */
 export async function writeAudit(ex: Executor, actor: Actor, entry: AuditEntry) {
-  await ex.insert(auditLog).values({
-    actorUserId: actorUserId(actor),
-    actorLabel: actorLabel(actor),
-    action: entry.action,
-    entityType: entry.entityType,
-    entityId: entry.entityId ?? null,
-    summary: entry.summary,
-    before: entry.before ?? null,
-    after: entry.after ?? null,
-  });
+  await writeAudits(ex, actor, [entry]);
+}
+
+/** Várias entradas de uma vez (operações em massa: cada pessoa fica com a sua linha no histórico). */
+export async function writeAudits(ex: Executor, actor: Actor, entries: AuditEntry[]) {
+  // Em blocos: o Postgres aceita até 65.535 parâmetros por comando.
+  for (let start = 0; start < entries.length; start += 500) {
+    await ex.insert(auditLog).values(
+      entries.slice(start, start + 500).map((entry) => ({
+        actorUserId: actorUserId(actor),
+        actorLabel: actorLabel(actor),
+        action: entry.action,
+        entityType: entry.entityType,
+        entityId: entry.entityId ?? null,
+        summary: entry.summary,
+        before: entry.before ?? null,
+        after: entry.after ?? null,
+      })),
+    );
+  }
 }

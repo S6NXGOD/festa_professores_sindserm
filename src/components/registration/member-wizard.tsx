@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { FormField } from "@/components/forms/form-field";
 import { CpfInput, PhoneInput } from "@/components/forms/masked-input";
 import { useEventName } from "@/components/help/help";
-import { Gift, Info, Printer } from "@/components/icons/pixel";
+import { Gift, MemberCard, Printer, Warning } from "@/components/icons/pixel";
 import { PixelTag, PlayerTag } from "@/components/retro/bits";
 import { CassetteProgress } from "@/components/retro/cassette";
 import { ScrollHint } from "@/components/retro/scroll-hint";
@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { CopyLinkBox } from "@/components/voucher/copy-link-box";
 import {
   guestNameClash,
+  publicRegistrationSchema,
   type RegistrationData,
   type RegistrationInput,
   registrationSchema,
@@ -70,7 +71,8 @@ export function MemberWizard({
   const [staffResult, setStaffResult] = useState<{ registrationId: string; accessToken: string } | null>(null);
 
   const form = useForm<RegistrationInput, unknown, RegistrationData>({
-    resolver: zodResolver(registrationSchema),
+    // No site, a declaração de filiação é obrigatória; na hora, quem cadastra avisa a pessoa.
+    resolver: zodResolver(mode === "staff" ? registrationSchema : publicRegistrationSchema),
     mode: "onTouched",
     defaultValues: {
       submissionId,
@@ -81,6 +83,7 @@ export function MemberWizard({
       guest: null,
       privacyConsent: false,
       acceptKitWaitlist: false,
+      memberDeclaration: false,
     },
   });
   const { control, register, formState, trigger, handleSubmit, setError, setValue, clearErrors } = form;
@@ -172,6 +175,8 @@ export function MemberWizard({
     if (!staff && kitWaits && !form.getValues("acceptKitWaitlist")) {
       event.preventDefault();
       setError("acceptKitWaitlist", { type: "manual", message: "Confirme que leu o aviso dos kits" });
+      // O que mais falta (declaração e aceite) aparece junto, para não descobrir um por vez.
+      void trigger(["memberDeclaration", "privacyConsent"]);
       playSound("warn");
       toast.error("Os kits acabaram: confirme que o kit entra na fila.");
       document.getElementById("kit-waitlist-consent")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -352,10 +357,36 @@ export function MemberWizard({
               </Callout>
               )}
 
-              <Callout tone="warning" icon={Info}>
-                {staff ? "O SINDSERM confirma a filiação" : "O SINDSERM vai confirmar se você é filiado(a)"}. Os vouchers já
-                ficam prontos, mas a entrada só é liberada <strong>depois dessa confirmação</strong>.
+              <Callout tone="warning" icon={Warning} testId="member-declaration-notice">
+                <strong className="font-bold">Inscrição só para quem é filiado(a).</strong>{" "}
+                {staff ? "O SINDSERM confere a filiação nos sistemas dele" : "O SINDSERM confere nos sistemas dele se você é filiado(a)"}: os
+                vouchers já ficam prontos, mas a entrada só é liberada depois dessa confirmação.{" "}
+                <strong className="font-bold">
+                  {staff ? "Avise a pessoa: se" : "Se"} o SINDSERM constatar que {staff ? "ela não é filiada, ela" : "você não é filiado(a), você"} não
+                  entra na festa{isTeacher ? " nem recebe o kit" : ""}, mesmo com o voucher na mão
+                  {guest ? ` (e ${guest.fullName ? firstName(guest.fullName) : "o convidado"} também não entra)` : ""}.
+                </strong>
               </Callout>
+
+              {staff ? null : (
+                <Controller
+                  control={control}
+                  name="memberDeclaration"
+                  render={({ field }) => (
+                    <ConsentBox
+                      id="member-declaration"
+                      checked={Boolean(field.value)}
+                      onChange={field.onChange}
+                      error={errors.memberDeclaration?.message}
+                      testId="member-declaration"
+                      icon={MemberCard}
+                    >
+                      <strong className="font-bold text-fg">Declaro que sou filiado(a) ao SINDSERM</strong> e que os meus dados são verdadeiros.
+                      Sei que, se o SINDSERM constatar que não sou, não entro na festa{isTeacher ? " nem recebo o kit" : ""}.
+                    </ConsentBox>
+                  )}
+                />
+              )}
 
               <PrivacyNotice />
               <Controller
@@ -380,7 +411,13 @@ export function MemberWizard({
         </StepFrame>
       </div>
 
-      {step === "review" ? <ScrollHint targetId="privacy-consent" label="Falta o aceite" className="bottom-28 sm:bottom-6" /> : null}
+      {step === "review" ? (
+        <ScrollHint
+          targetId={!staff && !values.memberDeclaration ? "member-declaration" : "privacy-consent"}
+          label={!staff && !values.memberDeclaration ? "Falta a declaração" : "Falta o aceite"}
+          className="bottom-28 sm:bottom-6"
+        />
+      ) : null}
       <WizardNav
         canGoBack={index > 0 || Boolean(onExit)}
         onBack={back}

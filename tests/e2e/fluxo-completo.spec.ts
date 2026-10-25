@@ -337,8 +337,12 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await expect(page.getByText("Não informado")).toBeVisible();
 
       await expect(page.getByTestId("kit-summary")).toContainText(GUEST.name);
+      // Só para quem é filiado(a): o aviso diz o que acontece com quem não for, e sem a declaração não grava.
+      await expect(page.getByTestId("member-declaration-notice")).toContainText("não entra na festa nem recebe o kit");
       await page.getByTestId("submit-registration").click();
+      await expect(page.getByText("Confirme que você é filiado(a) ao SINDSERM")).toBeVisible();
       await expect(page.getByText("É necessário concordar com o aviso de privacidade")).toBeVisible();
+      await page.locator("label[for=member-declaration]").click();
       await page.locator("label[for=privacy-consent]").click();
       await page.getByTestId("submit-registration").click();
 
@@ -1246,6 +1250,7 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await answerTeacher(page, false);
       await page.getByTestId("wizard-next").click();
       await passGuestStepAlone(page);
+      await page.locator("label[for=member-declaration]").click();
       await page.locator("label[for=privacy-consent]").click();
       await page.getByTestId("submit-registration").click();
       const recovery = page.getByTestId("cpf-taken-recovery");
@@ -1381,6 +1386,7 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
     await answerTeacher(page, false);
     await page.getByTestId("wizard-next").click();
     await passGuestStepAlone(page);
+    await page.locator("label[for=member-declaration]").click();
     await page.locator("label[for=privacy-consent]").click();
     await page.getByTestId("submit-registration").click();
     await page.waitForURL("**/vouchers/**");
@@ -1657,6 +1663,7 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       // Os dois jeitos de o kit sair da fila: se vagar antes, ou como sobra depois do horário dos kits guardados.
       await expect(notice.getByTestId("kit-waitlist-ways")).toContainText("Se vagar antes");
       await expect(notice.getByTestId("kit-waitlist-ways")).toContainText("Na festa, depois das 22:30");
+      await page.locator("label[for=member-declaration]").click();
       await page.locator("label[for=privacy-consent]").click();
       // Sem confirmar o aviso dos kits, não grava.
       await page.getByTestId("submit-registration").click();
@@ -1935,5 +1942,68 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await client.end();
       await adminContext.close();
     }
+  });
+
+  test("sem tempo de conferir: a fila é confirmada de uma vez; quem não é filiado(a) é desfeito(a) e não entra", async ({ browser }) => {
+    const LIAR = { name: "Marcos Mentiu Alves", cpf: "73518462946", whatsapp: "86955554444", registration: "77777-7" };
+
+    await test.step("no site: o aviso de que o SINDSERM confere e a declaração obrigatória", async () => {
+      const visitor = await browser.newContext({ ...devices["Pixel 7"] });
+      const page = await visitor.newPage();
+      await page.goto("/inscricao");
+      await expect(page.getByTestId("member-honesty-notice")).toContainText("não entra na festa nem recebe o kit");
+      await page.getByTestId("answer-member-yes").click();
+      await page.fill("#member-name", LIAR.name);
+      await page.fill("#member-cpf", LIAR.cpf);
+      await page.fill("#member-whatsapp", LIAR.whatsapp);
+      await page.fill("#member-registration", LIAR.registration);
+      await page.fill("#member-workplace", "Escola Municipal Sul");
+      await answerTeacher(page);
+      await page.getByTestId("wizard-next").click();
+      await page.getByTestId("guest-yes").click();
+      await page.getByTestId("guest-name").fill("Bruna Convidada Alves");
+      await page.getByTestId("wizard-next").click();
+      await expect(page.getByTestId("member-declaration-notice")).toContainText("Bruna também não entra");
+      await page.locator("label[for=privacy-consent]").click();
+      await page.getByTestId("submit-registration").click();
+      await expect(page.getByText("Confirme que você é filiado(a) ao SINDSERM")).toBeVisible();
+      await page.locator("label[for=member-declaration]").click();
+      // Os kits acabaram no teste da fila do kit: o aviso aparece junto com a declaração, e os dois são confirmados.
+      if (await page.locator("label[for=kit-waitlist-consent]").count()) await page.locator("label[for=kit-waitlist-consent]").click();
+      await page.getByTestId("submit-registration").click();
+      await page.waitForURL("**/vouchers/**");
+      await visitor.close();
+    });
+
+    const adminContext = await browser.newContext();
+    const admin = await adminContext.newPage();
+    await login(admin, ADMIN);
+
+    await test.step("a fila inteira de uma vez, com o aviso do que acontece", async () => {
+      await admin.goto("/painel/inscricoes?filtro=conferir");
+      const waiting = await admin.getByTestId("queue-item").count();
+      expect(waiting).toBeGreaterThanOrEqual(2);
+      await expect(admin.getByTestId("bulk-confirm-pending")).toContainText(`Confirmar todas (${waiting})`);
+      await admin.getByTestId("bulk-confirm-pending").click();
+      await expect(admin.getByTestId("bulk-confirm-terms")).toContainText("Não é filiado(a)");
+      await admin.getByTestId("confirm-dialog-action").click();
+      await expect(admin.getByText(`${waiting} inscrições confirmadas.`)).toBeVisible();
+      await expect(admin.getByText("Fila zerada")).toBeVisible();
+    });
+
+    await test.step("o SINDSERM constatou que não é filiado: a filiação é desfeita e a portaria barra (o convidado também)", async () => {
+      await openPersonAtGate(admin, "Marcos Mentiu", LIAR.name);
+      // Na portaria, fica em "Mais ações do atendimento" (a dica avisa que a filiação está lá).
+      await expect(admin.getByTestId("gate-more-actions")).toContainText("Filiação, convidado, kits e cadastro");
+      await admin.getByTestId("gate-more-actions").getByRole("button").first().click();
+      await admin.getByTestId("revoke-affiliation").click();
+      await admin.getByRole("dialog").getByRole("textbox").fill("Não consta como filiado no sistema do SINDSERM");
+      await admin.getByTestId("confirm-dialog-action").click();
+      await expect(admin.getByText("Filiação desfeita: não entra nem recebe o kit.")).toBeVisible();
+      await expect(admin.getByTestId("gate-status-title")).toHaveText("FILIAÇÃO NÃO CONFIRMADA");
+      await openPersonAtGate(admin, "Bruna Convidada", "Bruna Convidada Alves");
+      await expect(admin.getByTestId("gate-status-title")).toHaveText("FILIAÇÃO DO RESPONSÁVEL NÃO CONFIRMADA");
+    });
+    await adminContext.close();
   });
 });

@@ -33,6 +33,9 @@ describe("tutorial do primeiro acesso", () => {
     const attendant = tutorialSteps(ROLE_PRESETS.ATTENDANT, "Maria Souza");
     const queue = attendant.find((step) => step.id === "inscricoes")!;
     expect(queue.bullets.join(" ")).toContain("toque em Confirmar");
+    // Sem tempo de conferir: a fila inteira de uma vez, e o caminho para desfazer quem não for filiado(a).
+    expect(queue.bullets.join(" ")).toContain("Confirmar todas");
+    expect(queue.bullets.join(" ")).toContain("Não é filiado(a)");
     expect(queue.bullets.join(" ")).toContain("Cadastrar na hora");
     expect(queue.bullets.join(" ")).toContain("level up");
     expect(attendant.find((step) => step.id === "portaria")!.bullets.join(" ")).toContain("Confirmar entrada");

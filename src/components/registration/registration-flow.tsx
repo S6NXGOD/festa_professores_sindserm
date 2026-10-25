@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, ClipboardNote, Gift, MemberCard, UserPlus, Users } from "@/components/icons/pixel";
+import { ArrowLeft, ArrowRight, ClipboardNote, Gift, MemberCard, UserPlus, Users, Warning } from "@/components/icons/pixel";
 import { PixelTag } from "@/components/retro/bits";
 import { Button } from "@/components/ui/button";
 import { playSound } from "@/lib/sound";
@@ -73,6 +73,16 @@ export function RegistrationFlow({
                 testId="answer-member-no"
               />
             </div>
+            <p
+              className="mt-4 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning-soft p-4 text-left text-sm leading-relaxed text-fg"
+              data-testid="member-honesty-notice"
+            >
+              <Warning className="mt-0.5 size-5 shrink-0 text-warning" />
+              <span>
+                <strong>Só responda &quot;Sim&quot; se você é filiado(a).</strong> O SINDSERM confere cada inscrição nos sistemas dele: quem se
+                inscrever como filiado(a) sem ser não entra na festa nem recebe o kit. Ainda não é? Dá para se filiar agora mesmo.
+              </span>
+            </p>
             {venue ? <div className="mt-8">{venue}</div> : null}
           </div>
         ) : null}

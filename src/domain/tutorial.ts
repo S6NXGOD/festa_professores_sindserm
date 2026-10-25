@@ -88,6 +88,9 @@ export function tutorialSteps(access: AccessMap, name: string): TutorialStep[] {
             can(access, "validateAffiliation")
               ? "Em Inscrições → Para conferir estão as pessoas que disseram ser filiadas. Confira e toque em Confirmar (ou Não confirmar)."
               : `Em Inscrições você vê cada grupo (${T.person} e convidado), quem já entrou e os kits.`,
+            ...(can(access, "validateAffiliation")
+              ? ["Sem tempo de conferir todas? Confirmar todas libera a fila de uma vez; quem não for filiado(a) você desfaz depois em Não é filiado(a)."]
+              : []),
             "O botão verde abre o WhatsApp da pessoa com a mensagem pronta.",
             ...(can(access, "registerAtEvent") ? ["Chegou alguém sem inscrição? Use Cadastrar na hora."] : []),
             "A cada inscrição nova, o painel toca um level up e mostra o nome.",

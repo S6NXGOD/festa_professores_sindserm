@@ -5,6 +5,7 @@ import { affiliationForm, guestLink, person, registration } from "@/server/db/sc
 import { authorizationText } from "@/domain/affiliation-text";
 import { T } from "@/domain/edition";
 import {
+  MEMBER_DECLARATION_MESSAGE,
   type PreAffiliationInput,
   preAffiliationSchema,
   type RegistrationInput,
@@ -173,6 +174,10 @@ export async function createRegistration(actor: Actor, rawInput: RegistrationInp
   const input = registrationSchema.parse(rawInput);
   const origin = actor.kind === "public" ? "PUBLIC_FORM" : "STAFF";
   if (actor.kind === "staff") assertPermission(actor, "registerAtEvent");
+  // No site, a pessoa declara que é filiada (e que, se não for, não entra nem recebe o kit).
+  if (actor.kind === "public" && input.memberDeclaration !== true) {
+    throw new DomainError("VALIDATION", MEMBER_DECLARATION_MESSAGE, { memberDeclaration: MEMBER_DECLARATION_MESSAGE });
+  }
 
   try {
     return await withTx(async (tx): Promise<CreatedRegistration> => {
@@ -229,6 +234,8 @@ export async function createRegistration(actor: Actor, rawInput: RegistrationInp
           guest: guestAudit(input.guest),
           origin,
           kits,
+          // A prova de que a pessoa declarou ser filiada (e foi avisada do que acontece se não for).
+          ...(actor.kind === "public" ? { memberDeclaration: true } : {}),
         },
       });
       // Filiação já conferida em outra festa do SINDSERM (pacote de mudança): confirmada na hora.

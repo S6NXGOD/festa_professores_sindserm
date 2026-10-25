@@ -66,6 +66,7 @@ import {
   reissueVoucherAction,
   removeGuestAction,
   reopenAffiliationAction,
+  revokeAffiliationAction,
   searchMembersAction,
   setTeacherStatusAction,
 } from "@/server/actions/operations";
@@ -861,7 +862,16 @@ function MembershipSection({ view, onChanged }: { view: GateView; onChanged?: ()
 
   // Na festa sem a pergunta "é professor(a)?", todo filiado(a) tem kit: não há o que corrigir.
   const canToggleTeacher = EDITION.askTeacher && Boolean(own) && p.manageGuests && own?.status !== "REJECTED";
-  if (!canNewAffiliation && !canDeclare && !canLinkAsGuest && !p.manageGuests) return null;
+  // Confirmada (inclusive em massa) e o SINDSERM constatou que não é filiado(a): desfaz antes de entrar ou receber kit.
+  const canRevoke =
+    own?.status === "CONFIRMED" &&
+    p.validateAffiliation &&
+    view.entry.kind !== "ALREADY_IN" &&
+    !own.guest?.checkedIn &&
+    own.kits.MEMBER.kind !== "DELIVERED" &&
+    own.kits.GUEST.kind !== "DELIVERED";
+  if (!canNewAffiliation && !canDeclare && !canLinkAsGuest && !canRevoke && !p.manageGuests) return null;
+  const firstName = firstNameOf(view.fullName);
 
   return (
     <Panel title="Atendimento" icon={ClipboardNote}>
@@ -903,6 +913,26 @@ function MembershipSection({ view, onChanged }: { view: GateView; onChanged?: ()
               onDone={onChanged}
             />
           </>
+        ) : null}
+        {canRevoke && own ? (
+          <ConfirmActionDialog
+            trigger={
+              <Button variant="destructive" data-testid="revoke-affiliation">
+                <Cancel /> Não é filiado(a)
+              </Button>
+            }
+            title={`${firstName} não é filiado(a)?`}
+            description={`Se o SINDSERM constatou nos sistemas dele que ${view.fullName} não é filiado(a), a filiação é desfeita: ${firstName} não entra na festa nem recebe o kit${
+              own.guest ? `, e ${own.guest.fullName} também não entra` : ""
+            }. Se depois comprovar que é filiado(a), dá para confirmar de novo.`}
+            confirmLabel="Não é filiado(a)"
+            tone="danger"
+            justification="required"
+            justificationLabel="O que foi constatado? (ex.: não consta como filiado(a) no sistema do SINDSERM)"
+            onConfirm={(text) => revokeAffiliationAction({ registrationId: own.id, justification: text })}
+            successMessage="Filiação desfeita: não entra nem recebe o kit."
+            onDone={onChanged}
+          />
         ) : null}
       </div>
     </Panel>

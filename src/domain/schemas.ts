@@ -242,8 +242,22 @@ export const registrationSchema = z
     privacyConsent: consentField(PRIVACY_MESSAGE),
     /** Kits esgotados: a pessoa leu o aviso e aceita entrar na fila do kit. */
     acceptKitWaitlist: z.boolean().optional(),
+    /**
+     * A pessoa declara que é filiada e que sabe que, se o SINDSERM constatar que
+     * não é, não entra na festa nem recebe o kit. Obrigatória no site; na hora,
+     * quem cadastra avisa a pessoa.
+     */
+    memberDeclaration: z.boolean().optional(),
   })
   .superRefine((data, ctx) => refineGuest(data, data.member, ctx));
+
+export const MEMBER_DECLARATION_MESSAGE = "Confirme que você é filiado(a) ao SINDSERM";
+
+/** A inscrição pelo site: a mesma, com a declaração de filiação obrigatória. */
+export const publicRegistrationSchema = registrationSchema.refine((data) => data.memberDeclaration === true, {
+  path: ["memberDeclaration"],
+  message: MEMBER_DECLARATION_MESSAGE,
+});
 
 export type RegistrationInput = z.input<typeof registrationSchema>;
 
