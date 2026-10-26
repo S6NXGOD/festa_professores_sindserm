@@ -113,7 +113,13 @@ export function RegistrationFlow({
               <Gift className="mt-0.5 size-5 shrink-0 text-red" />
               <span>
                 Qualquer servidor(a) municipal pode se filiar e vir à festa.{" "}
-                <strong>{EDITION.askTeacher ? `O kit de consumação (e o convidado) é só para ${T.people}.` : "E já ganha o kit de consumação e 1 convidado."}</strong>
+                <strong>
+                  {EDITION.askTeacher
+                    ? `O kit de consumação (e o convidado) é só para ${T.people}.`
+                    : EDITION.sharedKit
+                      ? "E já ganha o kit de consumação, para dividir com 1 convidado."
+                      : "E já ganha o kit de consumação e 1 convidado."}
+                </strong>
               </span>
             </p>
             <Button variant="ghost" className="mt-6" onClick={() => setPath("choose")}>

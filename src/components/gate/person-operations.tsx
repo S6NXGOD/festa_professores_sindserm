@@ -486,19 +486,31 @@ function SignatureSection({
 
 function KitsSection({ view, onChanged }: { view: GateView; onChanged?: () => void }) {
   const own = view.ownRegistration!;
+  // Kit dividido: um kit só, para os dois (o cartão do kit do convidado só aparece se um já saiu antes da mudança).
+  const shared = EDITION.sharedKit;
+  const guestCard: KitCard = {
+    type: "GUEST",
+    label: KIT_TYPE_LABEL.GUEST,
+    detail: guestKitDetail(own.kits.GUEST, own.guest),
+    state: own.kits.GUEST,
+    guestName: own.guest?.fullName,
+  };
   return (
     <GroupKitsSection
       view={view}
-      intro={`Os kits saem sozinhos com as entradas e o estoque baixa na hora. O do convidado só sai depois que ${T.thePerson} chegar: se o convidado chegou antes, o kit dele sai junto com a entrada ${T.ofPerson}.`}
+      intro={
+        shared
+          ? `O kit sai sozinho com a entrada ${T.ofPerson} e o estoque baixa na hora. É um kit para os dois: o convidado não tem kit próprio.`
+          : `Os kits saem sozinhos com as entradas e o estoque baixa na hora. O do convidado só sai depois que ${T.thePerson} chegar: se o convidado chegou antes, o kit dele sai junto com a entrada ${T.ofPerson}.`
+      }
       cards={[
-        { type: "MEMBER", label: KIT_TYPE_LABEL.MEMBER, detail: `Para ${view.fullName}, na entrada dele(a)`, state: own.kits.MEMBER },
         {
-          type: "GUEST",
-          label: KIT_TYPE_LABEL.GUEST,
-          detail: guestKitDetail(own.kits.GUEST, own.guest),
-          state: own.kits.GUEST,
-          guestName: own.guest?.fullName,
+          type: "MEMBER",
+          label: KIT_TYPE_LABEL.MEMBER,
+          detail: shared && own.guest ? `Para ${view.fullName} e ${own.guest.fullName} dividirem, na entrada dele(a)` : `Para ${view.fullName}, na entrada dele(a)`,
+          state: own.kits.MEMBER,
         },
+        ...(shared && own.kits.GUEST.kind !== "DELIVERED" ? [] : [guestCard]),
       ]}
       onChanged={onChanged}
     />

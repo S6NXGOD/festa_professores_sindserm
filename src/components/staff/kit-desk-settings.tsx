@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { callAction } from "@/lib/call-action";
 import { playSound } from "@/lib/sound";
+import { EDITION } from "@/domain/edition";
 import { plural } from "@/lib/plural";
 import { cn } from "@/lib/utils";
 import { updateKitDeskSettingsAction } from "@/server/actions/desk";
@@ -82,7 +83,9 @@ export function KitDeskSettings({
               value: true,
               icon: Package,
               title: "Na mesa dos kits",
-              text: "A segurança só registra a entrada; a mesa confere quem entrou e entrega. Convidado não espera quem convidou.",
+              text: EDITION.sharedKit
+                ? "A segurança só registra a entrada; a mesa confere quem entrou e entrega. O kit da inscrição é para os dois; convidado de colaborador não espera quem convidou."
+                : "A segurança só registra a entrada; a mesa confere quem entrou e entrega. Convidado não espera quem convidou.",
               testId: "kits-at-desk",
             },
           ].map((option) => (

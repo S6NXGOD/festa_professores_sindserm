@@ -57,12 +57,13 @@ import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { uuidv4 } from "@/lib/uuid";
 import { updateKitPlanAction } from "@/server/actions/setup";
-import { T } from "@/domain/edition";
+import { EDITION, T } from "@/domain/edition";
 
 const KIND_ICON: Record<KitKind, typeof Gift> = { MEMBER: PersonIcon, GUEST: Users, EMPLOYEE: Building, EMPLOYEE_GUEST: Users, COURTESY: Heart };
 /** Nome curto de quem recebe cada kit (nos tíquetes). */
 const KIND_SHORT: Record<KitKind, string> = {
-  MEMBER: T.People,
+  // Kit dividido: o kit da inscrição é para o(a) filiado(a) e o convidado.
+  MEMBER: EDITION.sharedKit ? `${T.People} (kit para os dois)` : T.People,
   GUEST: "Convidados delas e deles",
   EMPLOYEE: "Colaboradores",
   EMPLOYEE_GUEST: "Convidados dos colaboradores",
@@ -317,12 +318,16 @@ export function KitPlanStudio({
 
 /** Os kits como tíquetes de festa: um para cada kit diferente (e o de menor de 18, se houver). */
 function KitTickets({ plan, counts, hasPrices }: { plan: KitPlan; counts: KitCounts; hasPrices: boolean }) {
-  const groups = kitGroups(plan);
+  // Kit dividido: não há kit de convidado de inscrito (o da inscrição é para os dois).
+  const shownKinds = KIT_KINDS.filter((kind) => !(EDITION.sharedKit && kind === "GUEST"));
+  const groups = kitGroups(plan)
+    .map((group) => ({ ...group, kinds: group.kinds.filter((kind) => shownKinds.includes(kind)) }))
+    .filter((group) => group.kinds.length > 0);
   const minors = KIT_KINDS.reduce((sum, kind) => sum + counts.minors[kind], 0);
   return (
     <div className="grid gap-3 sm:grid-cols-2" data-testid="kit-tickets">
       {groups.map((group) => {
-        const everyone = group.kinds.length === KIT_KINDS.length;
+        const everyone = group.kinds.length === shownKinds.length;
         const kits = group.kinds.reduce((sum, kind) => sum + counts.kits[kind], 0);
         return (
           <Ticket
@@ -336,7 +341,13 @@ function KitTickets({ plan, counts, hasPrices }: { plan: KitPlan; counts: KitCou
                     ? "Kit principal"
                     : "Kit"
             }
-            audience={everyone ? `${T.People}, convidados, colaboradores e cortesias` : group.kinds.map((kind) => KIND_SHORT[kind]).join(" · ")}
+            audience={
+              everyone
+                ? EDITION.sharedKit
+                  ? `${T.People} (kit para os dois), colaboradores, convidados deles e cortesias`
+                  : `${T.People}, convidados, colaboradores e cortesias`
+                : group.kinds.map((kind) => KIND_SHORT[kind]).join(" · ")
+            }
             plan={plan}
             lines={group.lines}
             footer={plural(kits, "kit previsto", "kits previstos")}
@@ -604,7 +615,11 @@ function KitEditor({
         <Phase
           n={1}
           title="O que vem no kit"
-          hint={`Este é o kit ${T.ofPair}. Os outros kits usam o mesmo, a não ser que você mude na fase 2. O preço é opcional (serve para a conta).`}
+          hint={
+            EDITION.sharedKit
+              ? `Este é o kit ${T.ofPair}, para dividir com o convidado: monte com o suficiente para os dois. Os outros kits usam o mesmo, a não ser que você mude na fase 2. O preço é opcional (serve para a conta).`
+              : `Este é o kit ${T.ofPair}. Os outros kits usam o mesmo, a não ser que você mude na fase 2. O preço é opcional (serve para a conta).`
+          }
           extra={hasPrices ? `${formatCents(memberCost.cents)} por kit` : null}
           testId="kit-kind-member"
         >
@@ -682,7 +697,8 @@ function KitEditor({
           <>
             <Phase n={2} title="Os outros kits são iguais?" hint="Quase sempre, sim. Toque em Diferente só no kit que muda.">
               <div className="grid gap-2">
-                {KIT_KINDS.filter((kind) => kind !== "MEMBER").map((kind) => (
+                {/* Kit dividido: o convidado de inscrito não tem kit próprio, então não há kit dele para montar. */}
+                {KIT_KINDS.filter((kind) => kind !== "MEMBER" && !(EDITION.sharedKit && kind === "GUEST")).map((kind) => (
                   <KindChoice key={kind} kind={kind} plan={plan} lines={plan.kits[kind]} onLines={(lines) => onChange({ ...plan, kits: { ...plan.kits, [kind]: lines } })} />
                 ))}
               </div>

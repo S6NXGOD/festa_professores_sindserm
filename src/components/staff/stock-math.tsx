@@ -12,14 +12,22 @@ import { callAction } from "@/lib/call-action";
 import { plural } from "@/lib/plural";
 import { cn } from "@/lib/utils";
 import { updateStockSettingsAction } from "@/server/actions/setup";
-import { T } from "@/domain/edition";
+import { EDITION, T } from "@/domain/edition";
 
 /** Nome curto de cada estoque e para quem ele é. */
 function poolInfo(pool: StockPool, mode?: StockMode): { name: string; audience: string } {
   if (pool === "ALL") {
     return mode === "UNIFIED"
-      ? { name: "Estoque único", audience: `Todo mundo: ${T.peopleList}, convidados, colaboradores e cortesias` }
-      : { name: "Estoque geral", audience: `${T.PeopleList} e os convidados delas e deles` };
+      ? {
+          name: "Estoque único",
+          audience: EDITION.sharedKit
+            ? `Todo mundo: ${T.peopleList} (1 kit por inscrição, para os dois), colaboradores, convidados deles e cortesias`
+            : `Todo mundo: ${T.peopleList}, convidados, colaboradores e cortesias`,
+        }
+      : {
+          name: "Estoque geral",
+          audience: EDITION.sharedKit ? `${T.PeopleList}: 1 kit por inscrição, para os dois` : `${T.PeopleList} e os convidados delas e deles`,
+        };
   }
   if (pool === "MEMBER") return { name: `Estoque de ${T.person}`, audience: T.People };
   if (pool === "GUEST") return { name: "Estoque de convidado", audience: `Convidados ${T.ofPeople}` };
@@ -182,7 +190,10 @@ export function StockMath({
 
       <p className="mt-3 text-xs leading-relaxed text-fg-muted">
         <strong className="text-fg">Cadastrados</strong>: os kits que vocês têm, contando os que já saíram.{" "}
-        <strong className="text-fg">Previstos</strong>: 1 por pessoa com direito a kit, inclusive quem ainda aguarda conferência.
+        <strong className="text-fg">Previstos</strong>:{" "}
+        {EDITION.sharedKit
+          ? "1 por inscrição (o kit é para os dois: o convidado não tem kit próprio) e 1 por colaborador(a), convidado dele(a) e cortesia com kit, inclusive quem ainda aguarda conferência."
+          : "1 por pessoa com direito a kit, inclusive quem ainda aguarda conferência."}
         {waitlist
           ? ` A fila do kit (${plural(waitlist, "kit", "kits")}) fica fora da conta: ganha kit se vagar ou se sobrar na festa.`
           : ""}

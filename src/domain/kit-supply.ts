@@ -4,6 +4,8 @@
  * acabaram e a pessoa confirma que entra na fila do kit.
  */
 
+import { EDITION } from "./edition";
+
 export interface KitSupply {
   /** Estoque único: o kit do(a) professor(a) e o do convidado saem do mesmo saldo. */
   shared: boolean;
@@ -27,8 +29,15 @@ export interface KitOutlook {
   position: { member: number | null; guest: number | null };
 }
 
-/** O que acontece com os kits de quem se inscreve agora: a mesma ordem da decisão no servidor. */
-export function kitOutlook(supply: KitSupply | null, wants: { teacher: boolean; guest: boolean }): KitOutlook {
+/**
+ * O que acontece com os kits de quem se inscreve agora: a mesma ordem da decisão
+ * no servidor. Kit dividido (`sharedKit`): o convidado não tem kit próprio.
+ */
+export function kitOutlook(
+  supply: KitSupply | null,
+  wants: { teacher: boolean; guest: boolean },
+  sharedKit: boolean = EDITION.sharedKit,
+): KitOutlook {
   const outlook: KitOutlook = { member: null, guest: null, position: { member: null, guest: null } };
   if (!wants.teacher) return outlook;
   let member = supply?.member ?? null;
@@ -46,7 +55,7 @@ export function kitOutlook(supply: KitSupply | null, wants: { teacher: boolean; 
     queueMember += 1;
     if (supply?.shared) queueGuest += 1;
   }
-  if (wants.guest) {
+  if (wants.guest && !sharedKit) {
     if (guest === null || guest >= 1) {
       outlook.guest = "KIT";
     } else {

@@ -9,7 +9,7 @@ import { properName } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import type { EventInfo } from "@/server/queries/config";
 import type { VoucherCardData } from "@/server/queries/vouchers";
-import { GAME, T } from "@/domain/edition";
+import { EDITION, GAME, T } from "@/domain/edition";
 
 export interface VoucherEventInfo {
   name: string;
@@ -135,6 +135,12 @@ export function VoucherCard({
                 ? ` Na festa, depois das ${event.kitDeadlineLabel}, os kits de quem não veio saem por ordem de chegada, enquanto houver.`
                 : ""}{" "}
               A entrada está garantida.
+            </Note>
+          ) : !isMember && EDITION.sharedKit && !card.hostIsEmployee ? (
+            // Kit dividido: o convidado de filiado(a) não tem kit próprio; o de quem convidou é para os dois.
+            <Note tone="red" icon={Gift} testId="voucher-guest-kit">
+              <strong className="font-bold">Kit dividido:</strong> o kit de consumação de {card.hostName ? properName(card.hostName) : "quem te convidou"} é
+              para vocês dois. Ele sai na entrada de {card.hostName ? properName(card.hostName) : "quem te convidou"}.
             </Note>
           ) : !isMember ? (
             <Note tone="red" icon={Gift} testId="voucher-guest-kit">
@@ -352,6 +358,8 @@ function VoucherFooter({ helpWhatsapp }: { helpWhatsapp?: string | null }) {
 
 function MemberNotes({ card, active, kitDeadline }: { card: VoucherCardData; active: boolean; kitDeadline?: string | null }) {
   const status = card.affiliationStatus;
+  // Kit dividido: com convidado, o kit é um só, para os dois.
+  const shared = EDITION.sharedKit && Boolean(card.guestName);
   return (
     <>
       {status === "PENDING" ? (
@@ -372,7 +380,8 @@ function MemberNotes({ card, active, kitDeadline }: { card: VoucherCardData; act
       {card.isTeacher && card.kitWaitlist?.self ? (
         <Note tone="warning" icon={Hourglass} testId="voucher-kits">
           <strong className="font-bold">
-            {card.kitWaitlist.guest ? "Seus kits estão na fila do kit" : "Seu kit está na fila do kit"} (nº {card.kitWaitlist.self}).
+            {card.kitWaitlist.guest ? "Seus kits estão na fila do kit" : shared ? "O kit de vocês dois está na fila do kit" : "Seu kit está na fila do kit"} (nº{" "}
+            {card.kitWaitlist.self}).
           </strong>{" "}
           Os kits acabaram antes da sua inscrição: se vagar kit (alguém desistir ou o SINDSERM comprar mais), ele sai na recepção, por
           ordem de inscrição.
@@ -384,6 +393,18 @@ function MemberNotes({ card, active, kitDeadline }: { card: VoucherCardData; act
           <strong className="font-bold">O seu kit está garantido; o de {card.guestName ? properName(card.guestName) : "seu convidado"} está na fila do kit (nº {card.kitWaitlist.guest}).</strong>{" "}
           Se vagar, sai na recepção, por ordem de inscrição
           {kitDeadline ? `; depois das ${kitDeadline}, se sobrar, por ordem de chegada. O seu fica guardado até as ${kitDeadline}.` : "."}
+        </Note>
+      ) : card.isTeacher && shared ? (
+        <Note tone="red" icon={Gift} testId="voucher-kits">
+          <strong className="font-bold">1 kit de consumação</strong> — para você e{" "}
+          <span data-testid="voucher-guest-name">{properName(card.guestName!)}</span> dividirem.{" "}
+          {status === "AWAITING_SIGNATURE"
+            ? "Liberado depois que você assinar a ficha. "
+            : !active && status !== "REJECTED"
+              ? "Liberado depois que o SINDSERM confirmar a sua filiação. "
+              : ""}
+          Entregue na recepção, junto com a sua entrada.
+          {kitDeadline ? ` O kit fica guardado até as ${kitDeadline}.` : ""}
         </Note>
       ) : card.isTeacher ? (
         <Note tone="red" icon={Gift} testId="voucher-kits">

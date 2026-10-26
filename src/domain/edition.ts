@@ -108,6 +108,14 @@ export interface Edition {
    * das servidoras e servidores), todo filiado(a) tem 1 kit e leva 1 convidado.
    */
   askTeacher: boolean;
+  /**
+   * Um kit por inscrição, dividido com o convidado (decisão da organização para a
+   * festa das servidoras e servidores, 26/10/2026): o kit do(a) filiado(a) é
+   * para os dois e o convidado não tem kit próprio. Sem isso (festa das
+   * professoras e professores), o convidado tem o kit dele. Colaboradores e
+   * convidados deles não mudam.
+   */
+  sharedKit: boolean;
   /** Nome da festa enquanto o painel não tem um configurado. */
   defaultEventName: string;
   /** A arte da festa (emblema; no site, a versão WEBP importada em brand.tsx) e o texto alternativo dela. */
@@ -131,6 +139,7 @@ export const EDITIONS: Record<EditionId, Edition> = {
     id: "professores",
     theme: "anos80",
     askTeacher: true,
+    sharedKit: false,
     defaultEventName: "Festa das Professoras e Professores – SINDSERMTHE",
     emblem: {
       raster: "/brand/festa-emblema.jpg",
@@ -192,6 +201,7 @@ export const EDITIONS: Record<EditionId, Edition> = {
     id: "servidores",
     theme: "verao",
     askTeacher: false,
+    sharedKit: true,
     defaultEventName: "Festa das Servidoras e Servidores – SINDSERMTHE",
     emblem: {
       raster: "/brand/servidores/emblema.png",

@@ -15,7 +15,7 @@ import {
   stockPoolFor,
 } from "@/domain/rules";
 import { isKitDeadlinePassed } from "@/domain/kit-deadline";
-import { T } from "@/domain/edition";
+import { EDITION, T } from "@/domain/edition";
 import { KIT_BLOCK_MESSAGE, KIT_TYPE_LABEL } from "@/domain/labels";
 import { justificationField } from "@/domain/schemas";
 import type { EmployeeKitType, GroupKitType, KitType, StockPool } from "@/domain/types";
@@ -57,6 +57,7 @@ export function kitInput(
     deadlinePassed,
     memberReceivedGuestKit: state.memberReceivedGuestKit,
     waitlisted: { MEMBER: Boolean(state.kitWaitlist.MEMBER), GUEST: Boolean(state.kitWaitlist.GUEST) },
+    sharedKit: EDITION.sharedKit,
     ...overrides,
   };
 }
@@ -278,7 +279,9 @@ export async function deliverKit(
         if (await findActiveGuestLink(tx, input.personId)) {
           throw new DomainError(
             "GUEST_CANNOT_RECEIVE_KIT",
-            "O kit do convidado sai na entrada dele. Se não saiu, entregue pelo cadastro de quem convidou.",
+            EDITION.sharedKit
+              ? "O convidado não tem kit próprio: o kit de quem convidou é para os dois."
+              : "O kit do convidado sai na entrada dele. Se não saiu, entregue pelo cadastro de quem convidou.",
           );
         }
         if (!own) throw new DomainError("NOT_FOUND", "Esta pessoa não possui inscrição como filiada.");

@@ -277,7 +277,7 @@ export function GuestFields({
           }}
           icon={UserPlus}
           title={words.yes}
-          hint="1 pessoa, com direito ao kit"
+          hint={EDITION.sharedKit ? "1 pessoa, dividindo o seu kit" : "1 pessoa, com direito ao kit"}
           testId="guest-yes"
         />
         <ChoiceButton
@@ -360,7 +360,9 @@ export function GuestFields({
             <p className="relative mt-4 flex items-start gap-2 rounded-lg bg-ink/60 p-3 text-sm text-fg-muted">
               <Gift className="mt-0.5 size-4 shrink-0 text-red" />
               <span>
-                O convidado tem direito ao kit de consumação. Ele é entregue na recepção depois que {T.thePerson} chegar.
+                {EDITION.sharedKit
+                  ? `O convidado não tem kit próprio: o kit de consumação ${T.ofPerson} é para os dois e sai na entrada dele(a).`
+                  : `O convidado tem direito ao kit de consumação. Ele é entregue na recepção depois que ${T.thePerson} chegar.`}
               </span>
             </p>
           </motion.div>

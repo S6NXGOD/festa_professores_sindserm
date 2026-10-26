@@ -2,6 +2,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import type { Executor } from "@/server/db";
 import { eventConfig } from "@/server/db/schema";
+import { EDITION } from "@/domain/edition";
 import { type KitCounts, type KitPlan, type KitPlanInput, kitPlanSchema } from "@/domain/kit-plan";
 import { type Actor, assertPermission } from "./actor";
 import { writeAudit } from "./audit";
@@ -9,6 +10,8 @@ import { DomainError } from "./errors";
 import { withTx } from "./tx";
 
 const EXPECTED = sql`('PENDING', 'AWAITING_SIGNATURE', 'CONFIRMED', 'JOINED_AT_EVENT')`;
+/** Kit dividido (ver `Edition.sharedKit`): convidado de inscrito não tem kit próprio, então não entra na montagem. */
+const MEMBER_GUEST_KITS = sql.raw(EDITION.sharedKit ? "false" : "true");
 
 /** A montagem salva (null = ainda não montada; dado estranho também vira null). */
 export async function getKitPlan(ex: Executor): Promise<KitPlan | null> {
@@ -60,14 +63,14 @@ export async function getKitCounts(ex: Executor): Promise<KitScenarioCounts> {
     SELECT
       (SELECT count(*) FROM registration WHERE status IN ${EXPECTED} AND is_teacher AND member_kit_waitlisted_at IS NULL)::int AS f_member,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL
+        WHERE ${MEMBER_GUEST_KITS} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL
           AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
                OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS f_guest,
       (SELECT count(*) FROM registration r
          JOIN guest_link gl ON gl.registration_id = r.id AND gl.status = 'ACTIVE'
          JOIN person gp ON gp.id = gl.guest_person_id
-        WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL AND gp.is_minor)::int AS f_guest_minor,
+        WHERE ${MEMBER_GUEST_KITS} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL AND gp.is_minor)::int AS f_guest_minor,
       (SELECT count(*) FROM active_employees WHERE category <> 'COURTESY')::int AS f_employee,
       (SELECT count(*) FROM active_employees e
         WHERE EXISTS (SELECT 1 FROM guest_link gl WHERE gl.employee_id = e.id AND gl.status = 'ACTIVE')
@@ -84,11 +87,11 @@ export async function getKitCounts(ex: Executor): Promise<KitScenarioCounts> {
       (SELECT count(*) FROM registration WHERE status IN ${EXPECTED} AND is_teacher AND member_kit_waitlisted_at IS NOT NULL)::int AS w_member,
       (SELECT count(*) FROM registration r
          JOIN guest_link gl ON gl.registration_id = r.id AND gl.status = 'ACTIVE'
-        WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL)::int AS w_guest,
+        WHERE ${MEMBER_GUEST_KITS} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL)::int AS w_guest,
       (SELECT count(*) FROM registration r
          JOIN guest_link gl ON gl.registration_id = r.id AND gl.status = 'ACTIVE'
          JOIN person gp ON gp.id = gl.guest_person_id
-        WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL AND gp.is_minor)::int AS w_guest_minor,
+        WHERE ${MEMBER_GUEST_KITS} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL AND gp.is_minor)::int AS w_guest_minor,
 
       (SELECT count(*) FROM deliveries WHERE kit_type = 'MEMBER')::int AS d_member,
       (SELECT count(*) FROM deliveries WHERE kit_type = 'GUEST' AND registration_id IS NOT NULL)::int AS d_guest,

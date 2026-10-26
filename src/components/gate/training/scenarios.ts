@@ -1,5 +1,5 @@
 import { ENTRY_BLOCK_MESSAGE } from "@/domain/labels";
-import { GAME, T } from "@/domain/edition";
+import { EDITION, GAME, T } from "@/domain/edition";
 
 /*
  * Treino relâmpago da portaria: 8 situações em cartões curtos, com as mesmas
@@ -17,6 +17,8 @@ export interface TrainingContext {
   minorKit: boolean;
   /** O kit sai na mesa dos kits: a portaria só registra a entrada e manda a pessoa à mesa. */
   kitsAtDesk?: boolean;
+  /** Kit dividido (um por inscrição, para os dois); sem valor, o da festa (`Edition.sharedKit`). */
+  sharedKit?: boolean;
 }
 
 export type CardTone = "success" | "warning" | "danger";
@@ -48,6 +50,8 @@ export interface QuickQuestion {
 
 export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
   const after = ctx.kitDeadline;
+  // Kit dividido: o convidado de filiado(a) não tem kit próprio; o de quem convidou é para os dois.
+  const shared = ctx.sharedKit ?? EDITION.sharedKit;
   const questions: QuickQuestion[] = [
     {
       id: "verde",
@@ -75,28 +79,49 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
         name: "Júlia Mendes",
         role: "Convidada de Carla Mendes (ainda não chegou)",
         tags: ["P2"],
-        kit: { kind: "wait", title: "Fica para depois", detail: "Sai quando a Carla chegar" },
+        kit: shared
+          ? { kind: "none", title: "Sem kit próprio", detail: "O kit da Carla é para as duas" }
+          : { kind: "wait", title: "Fica para depois", detail: "Sai quando a Carla chegar" },
       },
-      right: "Confirmar a entrada (o kit espera a Carla)",
+      right: shared ? "Confirmar a entrada (o kit é o da Carla)" : "Confirmar a entrada (o kit espera a Carla)",
       wrong: "Pedir para ela esperar a Carla lá fora",
-      lesson: "Convidado pode entrar antes. O kit dele sai quando quem convidou chegar.",
+      lesson: shared
+        ? "Convidado pode entrar antes e não tem kit próprio: o kit de quem convidou é para os dois."
+        : "Convidado pode entrar antes. O kit dele sai quando quem convidou chegar.",
     },
-    {
-      id: "dois-kits",
-      card: {
-        tone: "success",
-        icon: "ok",
-        kicker: GAME.ready,
-        title: "LIBERADO PARA ENTRADA",
-        name: "Paulo Reis",
-        role: `${T.male} · Filiação confirmada`,
-        tags: ["P1"],
-        kit: { kind: "give", title: "Entregue 2 kits", detail: "O dele e o do convidado, que já entrou", count: 2 },
-      },
-      right: "Confirmar e entregar os 2 kits",
-      wrong: "Entregar só o kit do Paulo",
-      lesson: "A tela diz quantos kits saem: entregue todos.",
-    },
+    shared
+      ? {
+          id: "kit-para-dois",
+          card: {
+            tone: "success",
+            icon: "ok",
+            kicker: GAME.ready,
+            title: "LIBERADO PARA ENTRADA",
+            name: "Paulo Reis",
+            role: `${T.male} · Filiação confirmada`,
+            tags: ["P1"],
+            kit: { kind: "give", title: "Entregue 1 kit", detail: "Para o Paulo e o convidado dividirem" },
+          },
+          right: "Confirmar e entregar 1 kit, para os dois",
+          wrong: "Entregar 2 kits, um para cada",
+          lesson: "Um kit por inscrição: o kit de quem convidou é para os dois.",
+        }
+      : {
+          id: "dois-kits",
+          card: {
+            tone: "success",
+            icon: "ok",
+            kicker: GAME.ready,
+            title: "LIBERADO PARA ENTRADA",
+            name: "Paulo Reis",
+            role: `${T.male} · Filiação confirmada`,
+            tags: ["P1"],
+            kit: { kind: "give", title: "Entregue 2 kits", detail: "O dele e o do convidado, que já entrou", count: 2 },
+          },
+          right: "Confirmar e entregar os 2 kits",
+          wrong: "Entregar só o kit do Paulo",
+          lesson: "A tela diz quantos kits saem: entregue todos.",
+        },
     {
       id: "amarelo",
       card: {
@@ -183,7 +208,8 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
         kicker: GAME.ready,
         title: "LIBERADO PARA ENTRADA",
         name: "Theo Barros",
-        role: "Convidado de André Barros, que já entrou",
+        // Kit dividido: convidado de filiado(a) não tem kit próprio; o de colaborador(a), sim.
+        role: shared ? "Convidado de André Barros (colaborador do SINDSERM), que já entrou" : "Convidado de André Barros, que já entrou",
         tags: ["P2", "MINOR"],
         kit: { kind: "give", title: "Entregue 1 kit", detail: "Kit de menor de 18" },
       },
@@ -192,17 +218,17 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
       lesson: "Menor de 18: entregue o kit de menor (o cartão avisa).",
     });
   }
-  return ctx.kitsAtDesk ? atDesk(questions) : questions;
+  return ctx.kitsAtDesk ? atDesk(questions, shared) : questions;
 }
 
 /**
  * Kits na mesa dos kits: a portaria confirma a entrada e manda a pessoa à mesa.
  * Saem as situações de entregar kit na porta; entra o voucher amarelo (inscrição na hora).
  */
-function atDesk(questions: QuickQuestion[]): QuickQuestion[] {
+function atDesk(questions: QuickQuestion[], shared: boolean): QuickQuestion[] {
   const desk = { kind: "desk" as const, title: "Pega na mesa", detail: "O kit sai na mesa dos kits" };
   const adapted = questions
-    .filter((question) => question.id !== "dois-kits" && question.id !== "menor")
+    .filter((question) => question.id !== "dois-kits" && question.id !== "kit-para-dois" && question.id !== "menor")
     .map((question): QuickQuestion => {
       if (question.id === "verde") {
         return {
@@ -211,6 +237,14 @@ function atDesk(questions: QuickQuestion[]): QuickQuestion[] {
           right: "Confirmar a entrada e mandar à mesa dos kits",
           wrong: "Entregar o kit aqui na porta",
           lesson: "Verde: confirme a entrada. O kit sai na mesa dos kits, não na porta.",
+        };
+      }
+      if (question.id === "convidado-antes" && shared) {
+        // Kit dividido: o convidado não vai à mesa (o kit é o de quem convidou).
+        return {
+          ...question,
+          right: "Confirmar a entrada (sem kit próprio)",
+          lesson: "Convidado entra antes e não tem kit próprio: o kit de quem convidou é para os dois.",
         };
       }
       if (question.id === "convidado-antes") {

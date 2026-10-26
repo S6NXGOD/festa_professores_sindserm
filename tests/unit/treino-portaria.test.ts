@@ -38,6 +38,30 @@ describe("treino relâmpago da portaria", () => {
     expect(byId({ ...base, minorKit: true }, "menor").card.kit?.detail).toBe("Kit de menor de 18");
   });
 
+  it("kit dividido: o convidado entra sem kit próprio e quem convidou leva 1 kit, para os dois", () => {
+    const shared = { ...base, sharedKit: true };
+    const questions = quickQuestions(shared);
+    expect(questions).toHaveLength(8);
+    expect(questions.map((question) => question.id)).not.toContain("dois-kits");
+    for (const question of questions) {
+      expect(question.right.length, question.id).toBeLessThanOrEqual(55);
+      expect(question.wrong.length, question.id).toBeLessThanOrEqual(55);
+      expect(question.lesson.length, question.id).toBeLessThanOrEqual(110);
+    }
+    expect(byId(shared, "convidado-antes").card.kit).toEqual({ kind: "none", title: "Sem kit próprio", detail: "O kit da Carla é para as duas" });
+    expect(byId(shared, "kit-para-dois")).toMatchObject({
+      card: { kit: { kind: "give", title: "Entregue 1 kit" } },
+      right: "Confirmar e entregar 1 kit, para os dois",
+      wrong: "Entregar 2 kits, um para cada",
+    });
+    // Menor de 18 com kit próprio: o convidado de colaborador(a) (o de filiado(a) não tem kit).
+    expect(byId({ ...shared, minorKit: true }, "menor").card.role).toContain("colaborador");
+    // Na mesa dos kits, o convidado não vai à mesa.
+    const atDesk = quickQuestions({ ...shared, kitsAtDesk: true });
+    expect(atDesk.map((question) => question.id)).not.toContain("kit-para-dois");
+    expect(atDesk.find((question) => question.id === "convidado-antes")?.card.kit?.kind).toBe("none");
+  });
+
   it("a resposta certa troca de lugar sem sorteio (igual no servidor e no navegador)", () => {
     expect(shuffled(["right", "wrong"], 5)).toEqual(shuffled(["right", "wrong"], 5));
     const firsts = quickQuestions(base).map((_, index) => shuffled(["right", "wrong"], (index + 3) * 8)[0]);

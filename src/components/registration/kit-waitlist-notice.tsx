@@ -5,7 +5,7 @@ import { Clock, Gift, Hourglass } from "@/components/icons/pixel";
 import type { KitOutlook } from "@/domain/kit-supply";
 import { firstName } from "@/lib/text";
 import { ConsentBox } from "./wizard-parts";
-import { T } from "@/domain/edition";
+import { EDITION, T } from "@/domain/edition";
 
 /** Um dos jeitos de o kit sair da fila (numerado, como as fases do jogo). */
 function WayOut({ n, children }: { n: number; children: React.ReactNode }) {
@@ -84,7 +84,9 @@ export function KitWaitlistNotice({
   const memberWaits = outlook.member === "WAITLIST";
   const guestWaits = outlook.guest === "WAITLIST";
   const you = staff ? T.thePerson : "você";
-  const ownKit = staff ? `o kit ${T.ofPerson}` : "o seu kit";
+  // Kit dividido: com convidado, o kit que entra na fila é o dos dois.
+  const sharedWithGuest = EDITION.sharedKit && Boolean(guestName);
+  const ownKit = sharedWithGuest ? (staff ? `o kit ${T.ofPerson} (para os dois)` : "o kit de vocês dois") : staff ? `o kit ${T.ofPerson}` : "o seu kit";
   const { member: memberPosition, guest: guestPosition } = outlook.position;
   const places =
     memberPosition && guestPosition ? ` (lugares nº ${memberPosition} e ${guestPosition})` : memberPosition ? ` (nº ${memberPosition})` : "";
@@ -167,7 +169,7 @@ export function KitWaitlistNotice({
             ? `Entendi: os nossos kits entram na fila do kit (cada um ${unless}).`
             : guestWaits && !memberWaits
               ? `Entendi: o kit de ${guestFirst} entra na fila do kit e ${unless}.`
-              : `Entendi: o meu kit entra na fila do kit e ${unless}.`}
+              : `Entendi: ${sharedWithGuest ? "o nosso kit (para os dois)" : "o meu kit"} entra na fila do kit e ${unless}.`}
         </ConsentBox>
       ) : null}
     </div>

@@ -2,8 +2,9 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Tx } from "@/server/db";
 import { checkIn, person, voucher } from "@/server/db/schema";
+import { EDITION } from "@/domain/edition";
 import { eventStartLabel, hasEventStarted, isKitDeadlinePassed } from "@/domain/kit-deadline";
-import { EMPLOYEE_CATEGORY_INLINE, ENTRY_BLOCK_MESSAGE, ENTRY_KIT_MESSAGE } from "@/domain/labels";
+import { EMPLOYEE_CATEGORY_INLINE, ENTRY_BLOCK_MESSAGE, ENTRY_KIT_MESSAGE, sharedKitMessage } from "@/domain/labels";
 import {
   decideEntry,
   employeeKitAvailability,
@@ -121,9 +122,9 @@ async function deliverNow(
     return { kind: "NONE", message: kitType === "GUEST" ? ENTRY_KIT_MESSAGE.GUEST_KIT_USED : ENTRY_KIT_MESSAGE.ALREADY };
   }
   if (availability.kind === "BLOCKED") {
-    return availability.code === "HOST_NOT_CHECKED_IN"
-      ? { kind: "WAITING", message: `Sai quando ${group.member.fullName} chegar.` }
-      : { kind: "NONE", message: ENTRY_KIT_MESSAGE[availability.code] };
+    if (availability.code === "HOST_NOT_CHECKED_IN") return { kind: "WAITING", message: `Sai quando ${group.member.fullName} chegar.` };
+    if (availability.code === "SHARED_KIT") return { kind: "NONE", message: sharedKitMessage(group.member.fullName) };
+    return { kind: "NONE", message: ENTRY_KIT_MESSAGE[availability.code] };
   }
   try {
     const delivered = await recordKitDelivery(tx, actor, group, kitType, config, "ENTRY");
@@ -256,8 +257,8 @@ async function deliverKitsOnEntry(
   }
   const input = kitInput(group, deadlinePassed, { memberCheckedIn: true });
   const kit = await deliverNow(tx, actor, group, "MEMBER", config, input);
-  // O convidado chegou antes e está esperando: o kit dele sai agora.
-  const guestWaiting = Boolean(group.guest?.checkIn) && !group.deliveries.GUEST;
+  // O convidado chegou antes e está esperando: o kit dele sai agora (no kit dividido, ele não tem kit próprio).
+  const guestWaiting = !EDITION.sharedKit && Boolean(group.guest?.checkIn) && !group.deliveries.GUEST;
   const guestKit = guestWaiting ? await deliverNow(tx, actor, group, "GUEST", config, input) : null;
   return { kit, guestKit };
 }

@@ -449,17 +449,31 @@ function DetailRows({ view }: { view: GateView }) {
       ) : null}
 
       {own && !isGuest ? (
-        <InfoRow icon={Gift} label={view.kitsAtDesk ? "Kits de consumação (saem na mesa dos kits)" : "Kits de consumação (saem na entrada)"}>
+        <InfoRow
+          icon={Gift}
+          label={
+            EDITION.sharedKit
+              ? view.kitsAtDesk
+                ? "Kit de consumação (sai na mesa dos kits)"
+                : "Kit de consumação (sai na entrada)"
+              : view.kitsAtDesk
+                ? "Kits de consumação (saem na mesa dos kits)"
+                : "Kits de consumação (saem na entrada)"
+          }
+        >
           {own.isTeacher ? (
             <>
               <span className="block">
-                Seu kit: <KitStatusText kit={own.kits.MEMBER} />
+                {EDITION.sharedKit && own.guest ? `Kit para os dois (com ${own.guest.fullName})` : "Seu kit"}: <KitStatusText kit={own.kits.MEMBER} />
               </span>
-              <span className="mt-1 block">
-                Kit do convidado
-                {own.kits.GUEST.kind === "DELIVERED" ? ` (${own.kits.GUEST.beneficiaryName})` : own.guest ? ` (${own.guest.fullName})` : ""}:{" "}
-                <KitStatusText kit={own.kits.GUEST} />
-              </span>
+              {/* Kit dividido: o convidado não tem kit próprio (só aparece se um já saiu antes da mudança). */}
+              {EDITION.sharedKit && own.kits.GUEST.kind !== "DELIVERED" ? null : (
+                <span className="mt-1 block">
+                  Kit do convidado
+                  {own.kits.GUEST.kind === "DELIVERED" ? ` (${own.kits.GUEST.beneficiaryName})` : own.guest ? ` (${own.guest.fullName})` : ""}:{" "}
+                  <KitStatusText kit={own.kits.GUEST} />
+                </span>
+              )}
               {deadline}
             </>
           ) : (
@@ -469,9 +483,14 @@ function DetailRows({ view }: { view: GateView }) {
       ) : null}
 
       {isGuest && view.guestKit ? (
-        <InfoRow icon={Gift} label="Kit de consumação do convidado">
+        <InfoRow icon={Gift} label={EDITION.sharedKit && view.host?.kind === "MEMBER" ? "Kit de consumação" : "Kit de consumação do convidado"}>
           {view.guestKit.delivered && view.guestKit.deliveredAt ? (
             <span className="font-bold text-success-text">Entregue {formatShortDateTime(view.guestKit.deliveredAt)}.</span>
+          ) : EDITION.sharedKit && view.host?.kind === "MEMBER" ? (
+            // Kit dividido: o convidado de filiado(a) não tem kit próprio.
+            <span className="font-semibold text-fg" data-testid="shared-kit-note">
+              Kit dividido: o de <strong>{view.host.fullName}</strong> é para os dois (o convidado não tem kit próprio).
+            </span>
           ) : view.guestKit.deliveredForOther ? (
             <span className="text-fg-muted">O kit de convidado deste grupo já foi entregue a outra pessoa.</span>
           ) : view.kitsAtDesk ? (
@@ -660,7 +679,9 @@ export function GateResult({
             title="Detalhes"
             hint={
               own
-                ? "Filiação, kits e convidado"
+                ? EDITION.sharedKit
+                  ? "Filiação, kit e convidado"
+                  : "Filiação, kits e convidado"
                 : view.employee?.category === "COURTESY"
                   ? "Kit e quem convidou"
                   : view.employee

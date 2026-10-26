@@ -2,7 +2,7 @@ import "server-only";
 import { isKitDeadlinePassed } from "@/domain/kit-deadline";
 import { T } from "@/domain/edition";
 import { kitPlanSchema } from "@/domain/kit-plan";
-import { ENTRY_KIT_MESSAGE } from "@/domain/labels";
+import { ENTRY_KIT_MESSAGE, sharedKitMessage } from "@/domain/labels";
 import {
   employeeKitAvailability,
   employeeStockPool,
@@ -47,6 +47,7 @@ export const DESK_BLOCK_MESSAGE: Record<DeskKitCode, string> = {
   EMPLOYEE_NOT_CHECKED_IN: "Ainda não passou pela entrada.",
   WITHOUT_KIT: "Cadastro sem kit de consumação (combinado com a organização).",
   KIT_WAITLIST: "Na fila do kit: se inscreveu depois que os kits acabaram. As sobras saem depois do horário dos kits guardados.",
+  SHARED_KIT: "Sem kit próprio: o kit de quem convidou é para os dois (sai para quem convidou).",
   OUT_OF_STOCK: "O estoque acabou: não há kit para entregar agora.",
   NO_EMPLOYEE_STOCK: ENTRY_KIT_MESSAGE.NO_EMPLOYEE_STOCK,
   OTHER_GUEST: "O kit de convidado deste grupo já saiu para outra pessoa.",
@@ -138,7 +139,12 @@ export function evaluateDeskKit(
       if (group.guest?.personId !== state.person.id) return blocked("NO_KIT");
       const input = kitInput(group, deadlinePassed, { guestCheckedIn: true, guestIndependent });
       const pool = config ? registrationKitPool(group, "GUEST", config) : "ALL";
-      return decide(kitAvailability(input, "GUEST"), "GUEST", pool, Boolean(group.kitExtra.GUEST), false);
+      const availability = kitAvailability(input, "GUEST");
+      // Kit dividido: o convidado não tem kit próprio; o de quem convidou é para os dois.
+      if (availability.kind === "BLOCKED" && availability.code === "SHARED_KIT") {
+        return blocked("SHARED_KIT", `${sharedKitMessage(group.member.fullName)} Ele sai para ${group.member.fullName}.`);
+      }
+      return decide(availability, "GUEST", pool, Boolean(group.kitExtra.GUEST), false);
     }
     if (state.guestOfEmployee) {
       const group = state.guestOfEmployee.host;

@@ -277,7 +277,7 @@ export default async function RegistrationsPage({ searchParams }: PageProps<"/pa
                           <Presence at={row.checkedInAt} />
                           {row.isTeacher ? (
                             <span className="inline-flex items-center gap-1">
-                              <Gift className="size-3.5" /> {row.kitsDelivered}/{row.guestName ? 2 : 1} kits
+                              <Gift className="size-3.5" /> {row.kitsDelivered}/{row.guestName && !EDITION.sharedKit ? 2 : 1} {row.guestName && !EDITION.sharedKit ? "kits" : "kit"}
                             </span>
                           ) : null}
                           {byDecision ? null : (

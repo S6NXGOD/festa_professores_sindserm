@@ -236,10 +236,19 @@ export default async function HomePage() {
               <p className="display text-xl">{T.partyOf}</p>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-fg-muted">
-              O kit de consumação é para {T.peopleAffiliated}: um para você e outro para o seu convidado.{" "}
-              {event.kitsAtDesk
-                ? "Os kits saem na mesa dos kits, logo depois da entrada (o do convidado não precisa esperar você)."
-                : "O seu sai na recepção, junto com a sua entrada; o do convidado, depois que você chegar."}
+              {EDITION.sharedKit ? (
+                <>
+                  O kit de consumação é para {T.peopleAffiliated}: um kit por inscrição, para você e o seu convidado dividirem.{" "}
+                  {event.kitsAtDesk ? "Ele sai na mesa dos kits, logo depois da sua entrada." : "Ele sai na recepção, junto com a sua entrada."}
+                </>
+              ) : (
+                <>
+                  O kit de consumação é para {T.peopleAffiliated}: um para você e outro para o seu convidado.{" "}
+                  {event.kitsAtDesk
+                    ? "Os kits saem na mesa dos kits, logo depois da entrada (o do convidado não precisa esperar você)."
+                    : "O seu sai na recepção, junto com a sua entrada; o do convidado, depois que você chegar."}
+                </>
+              )}
               {EDITION.askTeacher ? ` Filiados(as) que não são ${T.people.replace(" e ", " ou ")} também podem participar, sem kit.` : ""}
             </p>
             <p className="mt-2 text-sm leading-relaxed text-fg-muted">
@@ -260,7 +269,9 @@ export default async function HomePage() {
               Preencha a ficha de filiação na própria inscrição. Na recepção da festa, é só assinar a autorização do desconto.{" "}
               {EDITION.askTeacher
                 ? `Qualquer servidor(a) pode se filiar; o kit de consumação é só para ${T.people}.`
-                : "Qualquer servidor(a) pode se filiar e já ganha o kit de consumação e 1 convidado."}
+                : EDITION.sharedKit
+                  ? "Qualquer servidor(a) pode se filiar e já ganha o kit de consumação, para dividir com 1 convidado."
+                  : "Qualquer servidor(a) pode se filiar e já ganha o kit de consumação e 1 convidado."}
             </p>
             {open ? (
               <Button asChild variant="outline" size="sm" className="mt-4">

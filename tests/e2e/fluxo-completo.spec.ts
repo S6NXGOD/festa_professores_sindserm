@@ -350,10 +350,13 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await expect(page.getByRole("heading", { name: `Você está na ${GAME.floor}!` })).toBeVisible();
       await expect(page.getByTestId("voucher-card")).toHaveCount(2);
       await expect(page.getByTestId("voucher-name")).toHaveText([MEMBER.name, GUEST.name]);
-      await expect(page.getByTestId("voucher-kits")).toContainText("2 kits de consumação");
+      // Na festa de kit dividido, 1 kit para os dois; na outra, 1 para cada.
+      await expect(page.getByTestId("voucher-kits")).toContainText(EDITION.sharedKit ? "1 kit de consumação" : "2 kits de consumação");
       await expect(page.getByTestId("voucher-guest-name")).toHaveText(GUEST.name);
-      await expect(page.getByTestId("voucher-guest-kit")).toContainText(`Ele é entregue na recepção depois que ${MEMBER.name} chegar`);
-      await expect(page.getByTestId("voucher-kits")).toContainText("o do convidado, depois que você chegar");
+      await expect(page.getByTestId("voucher-guest-kit")).toContainText(
+        EDITION.sharedKit ? `o kit de consumação de ${MEMBER.name} é para vocês dois` : `Ele é entregue na recepção depois que ${MEMBER.name} chegar`,
+      );
+      await expect(page.getByTestId("voucher-kits")).toContainText(EDITION.sharedKit ? "dividirem" : "o do convidado, depois que você chegar");
 
       // Logo depois da inscrição, o aviso para salvar os vouchers; salvar o próprio marca 1 de 2 na missão.
       const mission = page.getByTestId("save-mission");
@@ -424,8 +427,14 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await openPersonAtGate(page, "Luiza", GUEST.name);
       // Decisão rápida: quem convidou, o que acontece com o kit e o botão fixo no pé da tela.
       await expect(page.getByTestId("gate-person-role")).toHaveText(`Convidado(a) de ${MEMBER.name}`);
-      await expect(page.getByTestId("kit-on-entry")).toContainText("Fica para depois");
-      await expect(page.getByTestId("kit-on-entry")).toContainText(`O kit deste convidado sai quando ${MEMBER.name} chegar.`);
+      if (EDITION.sharedKit) {
+        // Kit dividido: a convidada não tem kit próprio (o da professora é para as duas).
+        await expect(page.getByTestId("kit-on-entry")).toContainText("Sem kit");
+        await expect(page.getByTestId("kit-on-entry")).toContainText(`o kit de ${MEMBER.name} é para os dois`);
+      } else {
+        await expect(page.getByTestId("kit-on-entry")).toContainText("Fica para depois");
+        await expect(page.getByTestId("kit-on-entry")).toContainText(`O kit deste convidado sai quando ${MEMBER.name} chegar.`);
+      }
       await expect(page.getByTestId("gate-details").getByRole("button", { name: /Detalhes/ })).toHaveAttribute("aria-expanded", "false");
       await expect(page.getByTestId("confirm-entry")).toBeInViewport();
       await expect(page.getByTestId("confirm-entry")).not.toContainText("kit");
@@ -433,8 +442,8 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await confirmEarlyEntry(page);
       await expect(page.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
       const banner = page.getByTestId("entry-kit-result");
-      await expect(banner).toContainText("Kit fica para depois");
-      await expect(banner).toContainText(`Sai quando ${MEMBER.name} chegar.`);
+      await expect(banner).toContainText(EDITION.sharedKit ? "Sem kit" : "Kit fica para depois");
+      await expect(banner).toContainText(EDITION.sharedKit ? `o kit de ${MEMBER.name} é para os dois` : `Sai quando ${MEMBER.name} chegar.`);
       await context.close();
     });
 
@@ -468,18 +477,18 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
         await expect(page.getByTestId("teacher-check-reminder")).toHaveCount(EDITION.askTeacher ? 1 : 0);
         // A convidada já está lá dentro: o kit dela sai junto com a chegada da professora.
         const kitTile = page.getByTestId("kit-on-entry");
-        await expect(kitTile).toContainText("Entregue 2 kits");
-        await expect(kitTile).toContainText(`O de Maria e o do convidado ${GUEST.name}, que já entrou`);
+        await expect(kitTile).toContainText(EDITION.sharedKit ? "Entregue 1 kit" : "Entregue 2 kits");
+        await expect(kitTile).toContainText(EDITION.sharedKit ? "para dividir com Luiza" : `O de Maria e o do convidado ${GUEST.name}, que já entrou`);
         // O botão de confirmar já aparece na tela, sem rolar (barra fixa no pé).
         await expect(page.getByTestId("confirm-entry")).toBeInViewport();
         await expect(page.getByTestId("deliver-member-kit")).toHaveCount(0);
-        await expect(page.getByTestId("confirm-entry")).toHaveText(/Confirmar entrada \+ 2 kits/);
+        await expect(page.getByTestId("confirm-entry")).toHaveText(EDITION.sharedKit ? /Confirmar entrada \+ kit/ : /Confirmar entrada \+ 2 kits/);
         await page.getByTestId("confirm-entry").click();
         await confirmEarlyEntry(page);
         await expect(page.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
         const banner = page.getByTestId("entry-kit-result");
-        await expect(banner).toContainText("Entregue 2 kits!");
-        await expect(banner).toContainText(`Kit do convidado ${GUEST.name}, que já entrou`);
+        await expect(banner).toContainText(EDITION.sharedKit ? "Entregue 1 kit!" : "Entregue 2 kits!");
+        if (!EDITION.sharedKit) await expect(banner).toContainText(`Kit do convidado ${GUEST.name}, que já entrou`);
         await expect(page.getByTestId("scanner-combo")).toHaveText("COMBO x1");
 
         // Sem tocar em nada, o leitor reabre sozinho; o mesmo QR lido de novo não registra uma segunda entrada.
@@ -502,14 +511,23 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await expect(page.getByTestId("gate-status-title")).toHaveText("ENTRADA JÁ REGISTRADA");
       await expect(page.getByText("Kits guardados até 22:30")).toBeVisible();
       const gateResult = page.getByTestId("gate-result");
-      await expect(gateResult.getByText(/Seu kit: Entregue/)).toBeVisible();
-      await expect(gateResult.getByText(/Kit do convidado \(Luiza Souza Lima\): Entregue/)).toBeVisible();
+      if (EDITION.sharedKit) {
+        await expect(gateResult.getByText(/Kit para os dois \(com Luiza Souza Lima\): Entregue/)).toBeVisible();
+        await expect(gateResult.getByText(/Kit do convidado/)).toHaveCount(0);
+      } else {
+        await expect(gateResult.getByText(/Seu kit: Entregue/)).toBeVisible();
+        await expect(gateResult.getByText(/Kit do convidado \(Luiza Souza Lima\): Entregue/)).toBeVisible();
+      }
       await expect(page.getByTestId("deliver-member-kit")).toHaveCount(0);
       await expect(page.getByTestId("deliver-guest-kit")).toHaveCount(0);
 
       await openPersonAtGate(page, "Luiza", GUEST.name);
-      await expect(page.getByTestId("gate-result")).toContainText("Kit de consumação do convidado");
-      await expect(page.getByTestId("gate-result").getByText(/^Entregue /)).toBeVisible();
+      if (EDITION.sharedKit) {
+        await expect(page.getByTestId("shared-kit-note")).toContainText(`o de ${MEMBER.name} é para os dois`);
+      } else {
+        await expect(page.getByTestId("gate-result")).toContainText("Kit de consumação do convidado");
+        await expect(page.getByTestId("gate-result").getByText(/^Entregue /)).toBeVisible();
+      }
 
       // Da portaria, um toque volta ao painel.
       await page.getByTestId("back-to-panel").click();
@@ -520,17 +538,17 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
     await test.step("placar reflete presença, entregas e estoque", async () => {
       await admin.goto("/painel");
       await expect(admin.getByTestId("stat-present")).toHaveText("2");
-      await expect(admin.getByTestId("stat-kits-delivered")).toHaveText("2");
-      await expect(admin.getByTestId("stat-kits-available")).toHaveText("148");
+      await expect(admin.getByTestId("stat-kits-delivered")).toHaveText(EDITION.sharedKit ? "1" : "2");
+      await expect(admin.getByTestId("stat-kits-available")).toHaveText(EDITION.sharedKit ? "149" : "148");
       await expect(admin.getByTestId("stat-confirmed")).toHaveText("1");
       await expect(admin.getByTestId("stat-teachers")).toHaveText("1");
       await expect(admin.getByTestId("stat-kits-owed")).toHaveText("0");
-      await expect(admin.getByTestId("stock-forecast-all")).toContainText("2 kits previstos para 150 cadastrados");
+      await expect(admin.getByTestId("stock-forecast-all")).toContainText(EDITION.sharedKit ? "1 kit previsto para 150 cadastrados" : "2 kits previstos para 150 cadastrados");
       // Comparativo: do placar, um toque abre "Pessoas e kits" (quem vem x quem tem kit, grupo por grupo).
       await admin.getByTestId("dashboard-people-kits").click();
       await expect(admin).toHaveURL(/\/painel\/kits#comparativo$/);
       const board = admin.getByTestId("people-kits");
-      await expect(board.getByTestId("people-planned")).toHaveText("2");
+      await expect(board.getByTestId("people-planned")).toHaveText(EDITION.sharedKit ? "1" : "2");
       await expect(board.getByTestId("people-row-teachers")).toContainText(T.People);
       await expect(board.getByTestId("people-row-teacher-guests")).toContainText(`Convidados ${T.ofPeople}`);
       // Vouchers do grupo (professora + convidada) numa folha só, para imprimir.
@@ -550,12 +568,12 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       );
       await admin.goto("/painel/auditoria");
       const auditEntries = (label: string) => admin.locator("summary").filter({ has: admin.getByText(label, { exact: true }) });
-      await expect(auditEntries("Kit entregue")).toHaveCount(2);
+      await expect(auditEntries("Kit entregue")).toHaveCount(EDITION.sharedKit ? 1 : 2);
       await expect(auditEntries("Entrada registrada")).toHaveCount(2);
       // A entrada registra também os kits que saíram com ela.
-      await expect(auditEntries("Entrada registrada").filter({ hasText: "O kit fica para a chegada de" })).toHaveCount(1);
+      await expect(auditEntries("Entrada registrada").filter({ hasText: EDITION.sharedKit ? "Sem kit próprio" : "O kit fica para a chegada de" })).toHaveCount(1);
       await expect(auditEntries("Entrada registrada").filter({ hasText: "com kit entregue" })).toHaveCount(1);
-      await expect(auditEntries("Entrada registrada").filter({ hasText: `Kit do convidado ${GUEST.name} entregue junto` })).toHaveCount(1);
+      await expect(auditEntries("Entrada registrada").filter({ hasText: `Kit do convidado ${GUEST.name} entregue junto` })).toHaveCount(EDITION.sharedKit ? 0 : 1);
       // Da Auditoria, um toque abre o cadastro de quem teve a filiação confirmada.
       await auditEntries("Filiação confirmada").filter({ hasText: MEMBER.name }).getByTestId("audit-open").click();
       await expect(admin).toHaveURL(/\/painel\/participantes\/[0-9a-f-]{36}$/);
@@ -573,7 +591,7 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       const member = entryOf(MEMBER.name);
       await expect(member).toContainText(`registrada por ${SECURITY.name}`);
       await expect(member).toContainText("QR Code");
-      await expect(member).toContainText("2 kits na entrada");
+      await expect(member).toContainText(EDITION.sharedKit ? "1 kit na entrada" : "2 kits na entrada");
       // A festa do teste é daqui a 20 dias: a entrada ficou marcada como antecipada.
       await expect(member).toContainText("Antes do horário");
       const guest = entryOf(GUEST.name);
@@ -728,7 +746,7 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await expect(page.getByTestId("stat-joined")).toHaveText("1");
       await expect(page.getByTestId("stat-signature")).toHaveText("0");
       await expect(page.getByTestId("stat-present")).toHaveText("3");
-      await expect(page.getByTestId("stat-kits-delivered")).toHaveText("3");
+      await expect(page.getByTestId("stat-kits-delivered")).toHaveText(EDITION.sharedKit ? "2" : "3");
       await context.close();
     });
   });
@@ -1659,7 +1677,9 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await page.getByTestId("wizard-next").click();
       const notice = page.getByTestId("kit-waitlist-notice");
       await expect(notice).toContainText("Os kits de consumação acabaram");
-      await expect(notice).toContainText("o seu kit e o de Gustavo entram na fila do kit (lugares nº 1 e 2)");
+      await expect(notice).toContainText(
+        EDITION.sharedKit ? "o kit de vocês dois entra na fila do kit (nº 1)" : "o seu kit e o de Gustavo entram na fila do kit (lugares nº 1 e 2)",
+      );
       // Os dois jeitos de o kit sair da fila: se vagar antes, ou como sobra depois do horário dos kits guardados.
       await expect(notice.getByTestId("kit-waitlist-ways")).toContainText("Se vagar antes");
       await expect(notice.getByTestId("kit-waitlist-ways")).toContainText("Na festa, depois das 22:30");
@@ -1672,22 +1692,25 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await page.getByTestId("submit-registration").click();
       await page.waitForURL("**/vouchers/**");
       vouchersUrl = page.url();
-      await expect(page.getByTestId("voucher-kits").first()).toContainText("Seus kits estão na fila do kit (nº 1)");
+      await expect(page.getByTestId("voucher-kits").first()).toContainText(
+        EDITION.sharedKit ? "O kit de vocês dois está na fila do kit (nº 1)" : "Seus kits estão na fila do kit (nº 1)",
+      );
       await context.close();
     });
 
     await test.step("a equipe vê a fila; mais kits no estoque, a fila anda sozinha", async () => {
       await admin.goto("/painel/kits");
-      await expect(admin.getByTestId("kit-waitlist-row")).toHaveCount(2);
+      // Kit dividido: na fila só o kit da inscrição (para os dois); na outra festa, o dela e o do convidado.
+      await expect(admin.getByTestId("kit-waitlist-row")).toHaveCount(EDITION.sharedKit ? 1 : 2);
       await expect(admin.getByTestId("kit-waitlist")).toContainText(FILA.name);
       await admin.fill("#stock-all", String(committed + 2));
       await admin.getByRole("button", { name: "Salvar estoque" }).click();
-      await expect(admin.getByText("2 kits saíram da fila do kit")).toBeVisible();
+      await expect(admin.getByText(EDITION.sharedKit ? "1 kit saiu da fila do kit" : "2 kits saíram da fila do kit")).toBeVisible();
       await expect(admin.getByTestId("kit-waitlist")).toHaveCount(0);
       const visitor = await browser.newContext();
       const page = await visitor.newPage();
       await page.goto(vouchersUrl);
-      await expect(page.getByTestId("voucher-kits").first()).toContainText("2 kits de consumação");
+      await expect(page.getByTestId("voucher-kits").first()).toContainText(EDITION.sharedKit ? "1 kit de consumação" : "2 kits de consumação");
       await visitor.close();
     });
 
@@ -1863,7 +1886,7 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
           }
           if (id === "rapido") {
             // Já respondido acima.
-          } else if (id === "ja-pegou" || id === "nao-entrou") {
+          } else if (id === "ja-pegou" || id === "nao-entrou" || id === "kit-dividido") {
             await desk.getByTestId("desk-training-choice-right").click();
           } else {
             await desk.getByTestId("desk-deliver").click();

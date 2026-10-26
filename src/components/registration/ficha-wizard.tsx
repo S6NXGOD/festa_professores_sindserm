@@ -266,7 +266,13 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
               />
               <Callout tone="red" icon={Gift} testId="ficha-kit-notice">
                 Qualquer servidor(a) municipal pode se filiar e vir à festa.{" "}
-                <strong>{EDITION.askTeacher ? `O kit de consumação (e o convidado) é só para ${T.people}.` : "E já ganha o kit de consumação e 1 convidado."}</strong>
+                <strong>
+                  {EDITION.askTeacher
+                    ? `O kit de consumação (e o convidado) é só para ${T.people}.`
+                    : EDITION.sharedKit
+                      ? "E já ganha o kit de consumação, para dividir com 1 convidado."
+                      : "E já ganha o kit de consumação e 1 convidado."}
+                </strong>
               </Callout>
               {kitsSoldOut(kitSupply) ? <KitsSoldOutBanner deadlineLabel={kitSupply?.reservedUntil?.passed ? null : (kitSupply?.reservedUntil?.label ?? null)} /> : null}
               <FormField id="f-name" label="Nome completo" error={fe?.fullName?.message}>
@@ -531,8 +537,11 @@ export function FichaWizard({ onExit, today, kitSupply = null }: { onExit: () =>
               ) : isTeacher ? (
                 <Callout tone="info" icon={Gift}>
                   Como {T.person} filiado(a), você terá 1 kit de consumação
-                  {guest ? " e mais 1 para o seu convidado" : ""}. Os kits são entregues na recepção
-                  {guest ? ": o seu na sua entrada; o do convidado, depois que você chegar." : ", junto com a sua entrada."}
+                  {guest && EDITION.sharedKit
+                    ? ", para você e o seu convidado dividirem. Ele é entregue na recepção, junto com a sua entrada."
+                    : guest
+                      ? " e mais 1 para o seu convidado. Os kits são entregues na recepção: o seu na sua entrada; o do convidado, depois que você chegar."
+                      : ". Ele é entregue na recepção, junto com a sua entrada."}
                   {kitSupply?.reservedUntil && !kitSupply.reservedUntil.passed
                     ? ` Chegue até as ${kitSupply.reservedUntil.label}: até esse horário, o kit fica guardado.`
                     : ""}

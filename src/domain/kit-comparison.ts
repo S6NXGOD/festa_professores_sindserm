@@ -1,5 +1,5 @@
 import { plural } from "@/lib/plural";
-import { T } from "./edition";
+import { EDITION, T } from "./edition";
 import { employeeCategoryCount } from "./labels";
 import { COLLABORATOR_CATEGORIES, type CollaboratorCategory, type StockMode, type StockPool } from "./types";
 
@@ -59,16 +59,21 @@ export const PEOPLE_GROUP_LABEL: Record<PeopleGroupId, string> = {
   WITHOUT_KIT: "Cortesias e convidados sem kit",
 };
 
-/** Grupos que não têm direito a kit (a linha mostra "sem kit" no lugar dos números de kit). */
-export const GROUPS_WITHOUT_KIT: readonly PeopleGroupId[] = ["OTHER_MEMBERS", "WITHOUT_KIT"];
+/**
+ * Grupos que não têm direito a kit (a linha mostra "sem kit" no lugar dos números de kit). No
+ * kit dividido, os convidados de inscritos também: o kit de quem convidou é para os dois.
+ */
+export const GROUPS_WITHOUT_KIT: readonly PeopleGroupId[] = EDITION.sharedKit
+  ? ["TEACHER_GUESTS", "OTHER_MEMBERS", "WITHOUT_KIT"]
+  : ["OTHER_MEMBERS", "WITHOUT_KIT"];
 
 /** A regra de cada grupo, numa linha. */
 export function peopleGroupDetail(row: PeopleGroupRow, comparison: PeopleKitComparison): string {
   switch (row.id) {
     case "TEACHERS":
-      return "1 kit cada, com a filiação confirmada";
+      return EDITION.sharedKit ? "1 kit por inscrição, para os dois, com a filiação confirmada" : "1 kit cada, com a filiação confirmada";
     case "TEACHER_GUESTS":
-      return "1 kit cada, depois que quem convidou chega";
+      return EDITION.sharedKit ? "Sem kit próprio: dividem o kit de quem convidou" : "1 kit cada, depois que quem convidou chega";
     case "WALK_INS":
       return "Inscrição feita na hora: 1 kit cada, do estoque gordura (fora da conta do oficial)";
     case "OTHER_MEMBERS":

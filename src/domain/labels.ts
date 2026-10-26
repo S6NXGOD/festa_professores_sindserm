@@ -191,7 +191,13 @@ export const KIT_BLOCK_MESSAGE: Record<KitBlockCode, string> = {
   EMPLOYEE_NOT_CHECKED_IN: "Sai junto com a entrada.",
   WITHOUT_KIT: "Sem kit de consumação (combinado no cadastro).",
   KIT_WAITLIST: "Na fila do kit: a inscrição foi feita depois que os kits acabaram. Depois do horário dos kits guardados, se sobrar, sai.",
+  SHARED_KIT: "Kit dividido: o de quem convidou é para os dois.",
 };
+
+/** Kit dividido (ver `Edition.sharedKit`): o que se diz ao convidado, com o nome de quem convidou. */
+export function sharedKitMessage(hostName: string): string {
+  return `Sem kit próprio: o kit de ${hostName} é para os dois.`;
+}
 
 /** O que a recepção lê quando a pessoa entra sem kit (ela entra do mesmo jeito). */
 export const ENTRY_KIT_MESSAGE: Record<
@@ -210,6 +216,7 @@ export const ENTRY_KIT_MESSAGE: Record<
   HOST_NOT_CHECKED_IN: "Kit fica para depois: sai quando quem convidou chegar.",
   GUEST_NOT_CHECKED_IN: "Sem kit.",
   MEMBER_GOT_GUEST_KIT: "Sem kit: já recebeu o kit como convidado(a).",
+  SHARED_KIT: "Sem kit próprio: o kit de quem convidou é para os dois.",
   ALREADY: "O kit já tinha sido entregue.",
   GUEST_KIT_USED: "Sem kit: o kit de convidado deste grupo já foi entregue.",
   OUT_OF_STOCK: "Sem kit: o estoque acabou.",

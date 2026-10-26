@@ -6,7 +6,7 @@ import type { AccessMap } from "@/domain/access";
 import { formatTime } from "@/lib/datetime";
 import { isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
 import { type DeskCategory, deskCategoryOf } from "@/domain/desk-category";
-import { T } from "@/domain/edition";
+import { EDITION, T } from "@/domain/edition";
 import { EMPLOYEE_CATEGORY_LABEL } from "@/domain/labels";
 import { can, employeeKitAvailability, isActiveMember, kitAvailability, type KitAvailability } from "@/domain/rules";
 import type { EmployeeCategory, GroupKitType, KitType, ParticipantRole, StockPool } from "@/domain/types";
@@ -243,6 +243,9 @@ export interface DeskQueue {
  * A fila da mesa: entrou, tem direito a kit e o kit ainda não saiu. A conferência
  * de verdade é na entrega (mesma regra do resto do sistema); aqui é a lista de quem procurar.
  */
+/** Kit dividido (ver `Edition.sharedKit`): convidado de inscrito não tem kit próprio, então não entra na fila da mesa. */
+const MEMBER_GUEST_KITS = sql.raw(EDITION.sharedKit ? "false" : "true");
+
 export async function listDeskQueue(ex: Executor, limit = 40): Promise<DeskQueue> {
   const result = await ex.execute<{
     person_id: string;
@@ -286,7 +289,7 @@ export async function listDeskQueue(ex: Executor, limit = 40): Promise<DeskQueue
          AND NOT EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.beneficiary_person_id = ci.person_id AND kd.cancelled_at IS NULL)
          AND (
            (ci.role = 'MEMBER' AND r.is_teacher AND r.status IN ('CONFIRMED', 'JOINED_AT_EVENT'))
-           OR (ci.role = 'GUEST' AND hr.id IS NOT NULL AND hr.is_teacher AND hr.status IN ('CONFIRMED', 'JOINED_AT_EVENT')
+           OR (${MEMBER_GUEST_KITS} AND ci.role = 'GUEST' AND hr.id IS NOT NULL AND hr.is_teacher AND hr.status IN ('CONFIRMED', 'JOINED_AT_EVENT')
                AND NOT EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = hr.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
            OR (ci.role = 'GUEST' AND he.id IS NOT NULL AND he.removed_at IS NULL
                AND NOT EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.employee_id = he.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))

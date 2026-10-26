@@ -23,7 +23,9 @@ export function shareSummary(event: EventInfo, window: RegistrationWindow): stri
   const where = event.venue?.name ? ` · ${event.venue.name}` : "";
   return (
     `${capitalizeFirst(event.dateLongLabel)} · ${event.timeLabel}${where}. ${registrationLine(window)}. ` +
-    `Kit de consumação para ${T.peopleAffiliated}, com 1 convidado.`
+    (EDITION.sharedKit
+      ? `Kit de consumação para ${T.peopleAffiliated}, para dividir com 1 convidado.`
+      : `Kit de consumação para ${T.peopleAffiliated}, com 1 convidado.`)
   );
 }
 
@@ -44,7 +46,9 @@ export function defaultShareMessage(event: EventInfo, window: RegistrationWindow
   }
   lines.push(
     "",
-    `${T.PeopleAffiliated} ao SINDSERM ganham *kit de consumação* e podem levar *1 convidado(a)* (com kit).`,
+    EDITION.sharedKit
+      ? `${T.PeopleAffiliated} ao SINDSERM ganham *kit de consumação* e podem levar *1 convidado(a)* (o kit é para os dois).`
+      : `${T.PeopleAffiliated} ao SINDSERM ganham *kit de consumação* e podem levar *1 convidado(a)* (com kit).`,
     "Ainda não é filiado(a)? Dá para preencher a ficha de filiação na própria inscrição.",
     "",
     `✅ ${registrationLine(window)}:`,

@@ -6,7 +6,7 @@ import { Check, Package, Sliders, Users } from "@/components/icons/pixel";
 import { Input } from "@/components/ui/input";
 import type { StockSettingsData, StockSettingsInput } from "@/domain/schemas";
 import { cn } from "@/lib/utils";
-import { T } from "@/domain/edition";
+import { EDITION, T } from "@/domain/edition";
 
 export type StockForm = UseFormReturn<StockSettingsInput, unknown, StockSettingsData>;
 
@@ -29,17 +29,22 @@ export function StockFields({
       value: "UNIFIED" as const,
       icon: Users,
       title: "Um estoque só para todos",
-      text: `${T.PeopleList}, convidados, colaboradores e cortesias tiram do mesmo total.`,
+      text: EDITION.sharedKit
+        ? `${T.PeopleList} (1 kit por inscrição, para os dois), colaboradores, convidados deles e cortesias tiram do mesmo total.`
+        : `${T.PeopleList}, convidados, colaboradores e cortesias tiram do mesmo total.`,
       badge: "Mais simples",
     },
     {
       value: "SINGLE" as const,
       icon: Package,
       title: "Geral + colaboradores",
-      text: `Um total para ${T.peopleList} e convidados; outro para colaboradores e cortesias.`,
+      text: EDITION.sharedKit
+        ? `Um total para ${T.peopleList} (1 kit por inscrição, para os dois); outro para colaboradores, convidados deles e cortesias.`
+        : `Um total para ${T.peopleList} e convidados; outro para colaboradores e cortesias.`,
     },
     { value: "SPLIT" as const, icon: Sliders, title: "Tudo separado", text: `${T.Person}, convidado e colaboradores, cada um com a sua quantidade.` },
-  ];
+    // Kit dividido: o convidado de inscrito não tem kit, então o estoque separado de convidado não serve (só aparece se já estiver em uso).
+  ].filter((option) => !(EDITION.sharedKit && option.value === "SPLIT" && mode !== "SPLIT"));
   const deliveredAll = delivered ? delivered.member + delivered.guest + (delivered.employee ?? 0) : 0;
 
   const numberField = (
@@ -123,7 +128,11 @@ export function StockFields({
           "totalAll",
           "stock-all",
           "Quantidade total de kits (para todos)",
-          `Todos os kits que vocês têm, para ${T.peopleList}, convidados, colaboradores e cortesias.${delivered ? ` Já entregues: ${deliveredAll}.` : ""}`,
+          `${
+            EDITION.sharedKit
+              ? `Todos os kits que vocês têm: 1 por inscrição (para os dois) e os de colaboradores, convidados deles e cortesias.`
+              : `Todos os kits que vocês têm, para ${T.peopleList}, convidados, colaboradores e cortesias.`
+          }${delivered ? ` Já entregues: ${deliveredAll}.` : ""}`,
         )
       ) : mode === "SINGLE" ? (
         numberField("totalAll", "stock-all", "Quantidade total de kits", delivered ? `Já entregues: ${delivered.member + delivered.guest}` : undefined)

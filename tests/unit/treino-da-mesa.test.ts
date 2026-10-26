@@ -15,6 +15,17 @@ describe("treino da mesa dos kits", () => {
     expect(withMinor.find((m) => m.id === "nao-entrou")!.view.kit).toEqual({ kind: "NOT_ENTERED" });
   });
 
+  it("kit dividido: a convidada sozinha não pega kit (o de quem convidou é para os dois)", () => {
+    const missions = deskMissions({ kitDeadline: null, minorKit: true, sharedKit: true });
+    expect(missions.map((m) => m.id)).toEqual(["basico", "rapido", "na-hora", "ja-pegou", "nao-entrou", "kit-dividido", "menor"]);
+    const alone = missions.find((m) => m.id === "kit-dividido")!;
+    expect(alone.view.kit).toMatchObject({ kind: "BLOCKED", code: "SHARED_KIT" });
+    expect(alone.action).toEqual({ kind: "choose", right: "Explicar: o kit da Carla é para as duas", wrong: "Entregar um kit para a Júlia" });
+    // Convidado de filiado(a) não aparece na fila da mesa; o menor de 18 é convidado de colaborador(a).
+    expect(missions.find((m) => m.id === "rapido")!.queue?.every((entry) => entry.row.category !== "TEACHER_GUEST")).toBe(true);
+    expect(missions.find((m) => m.id === "menor")!.view).toMatchObject({ category: "EMPLOYEE_GUEST", kit: { kitType: "GUEST", minor: true } });
+  });
+
   it("a busca do treino acha pelo nome (sem acento), pelo código do voucher e pelo CPF", () => {
     const missions = deskMissions({ kitDeadline: null, minorKit: false });
     const [basic, walkIn, again] = ["basico", "na-hora", "ja-pegou"].map((id) => missions.find((m) => m.id === id));

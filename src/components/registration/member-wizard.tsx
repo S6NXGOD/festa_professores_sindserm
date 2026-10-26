@@ -338,8 +338,13 @@ export function MemberWizard({
               <Callout tone="red" icon={Gift} testId="kit-summary">
                 {isTeacher ? (
                   <>
-                    <strong className="font-bold">Kits de consumação:</strong>{" "}
-                    {guest ? (
+                    <strong className="font-bold">{EDITION.sharedKit ? "Kit de consumação:" : "Kits de consumação:"}</strong>{" "}
+                    {guest && EDITION.sharedKit ? (
+                      <>
+                        1 kit para {staff ? T.thePerson : "você"} e <strong>{guest.fullName || "o convidado"}</strong> dividirem, entregue na
+                        recepção junto com {staff ? `a entrada ${T.ofPerson}` : "a sua entrada"}.
+                      </>
+                    ) : guest ? (
                       <>
                         1 para {staff ? T.thePerson : "você"} e 1 para <strong>{guest.fullName || "o convidado"}</strong>, entregues
                         na recepção. O do convidado sai depois que {staff ? T.thePerson : "você"} chegar.

@@ -2,6 +2,7 @@ import "server-only";
 import { eq, inArray, sql } from "drizzle-orm";
 import type { Executor, Tx } from "@/server/db";
 import { eventConfig, kitStock, registration } from "@/server/db/schema";
+import { EDITION } from "@/domain/edition";
 import { isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
 import type { KitSupply } from "@/domain/kit-supply";
 import { formatTime } from "@/lib/datetime";
@@ -25,6 +26,12 @@ import { withTx } from "./tx";
 
 const EXPECTED_STATUSES: readonly string[] = ["PENDING", "AWAITING_SIGNATURE", "CONFIRMED", "JOINED_AT_EVENT"];
 const EXPECTED = sql`('PENDING', 'AWAITING_SIGNATURE', 'CONFIRMED', 'JOINED_AT_EVENT')`;
+/**
+ * Kit dividido (ver `Edition.sharedKit`): o convidado de inscrito não tem kit
+ * próprio, então não guarda kit, não entra na fila e não pega da gordura. Marcas
+ * antigas no banco (de antes da mudança) ficam sem efeito.
+ */
+const GUEST_KITS = sql.raw(EDITION.sharedKit ? "false" : "true");
 
 /** Estoques dos kits de inscritos (o dos colaboradores e a gordura não têm fila). */
 type GroupPool = Exclude<StockPool, "EMPLOYEE" | "EXTRA">;
@@ -74,14 +81,14 @@ async function slotCounts(ex: Executor, excludeRegistrationId: string | null) {
       (SELECT count(*) FROM registration r
         WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.member_kit_waitlisted_at IS NULL AND r.member_kit_extra_at IS NULL ${exclude})::int AS member_committed,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL AND r.guest_kit_extra_at IS NULL ${exclude}
+        WHERE ${GUEST_KITS} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NULL AND r.guest_kit_extra_at IS NULL ${exclude}
           AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
                OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS guest_committed,
       (SELECT count(*) FROM registration r
         WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.member_kit_waitlisted_at IS NOT NULL ${exclude})::int AS member_waitlist,
       (SELECT count(*) FROM registration r
-        WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL ${exclude}
+        WHERE ${GUEST_KITS} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL ${exclude}
           AND EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE'))::int AS guest_waitlist,
       -- Kits da lista interna (colaboradores com kit, convidados deles e cortesias com kit): no estoque único, tiram do mesmo total.
       ((SELECT count(*) FROM employee WHERE removed_at IS NULL AND with_kit)
@@ -152,7 +159,7 @@ export async function loadExtraBalance(
         (SELECT count(*) FROM registration r
           WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.member_kit_extra_at IS NOT NULL ${exclude})::int AS member,
         (SELECT count(*) FROM registration r
-          WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_extra_at IS NOT NULL ${exclude}
+          WHERE ${GUEST_KITS} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_extra_at IS NOT NULL ${exclude}
             AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.registration_id = r.id AND gl.status = 'ACTIVE')
                  OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
         )::int AS guest
@@ -238,7 +245,7 @@ export async function listKitWaitlist(ex: Executor): Promise<WaitingSlot[]> {
         JOIN person p ON p.id = r.member_person_id
         JOIN guest_link gl ON gl.registration_id = r.id AND gl.status = 'ACTIVE'
         JOIN person gp ON gp.id = gl.guest_person_id
-       WHERE r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL
+       WHERE ${GUEST_KITS} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_waitlisted_at IS NOT NULL
     ) fila
     ORDER BY since, registration_id, kit_type DESC
   `);
@@ -341,10 +348,13 @@ export async function allocateKitSlots(
   tx: Tx,
   actor: Actor,
   registrationId: string,
-  slots: { member: boolean; guest: boolean },
+  requested: { member: boolean; guest: boolean },
   now = new Date(),
 ): Promise<{ member: SlotOutcome | null; guest: SlotOutcome | null }> {
   const outcome: { member: SlotOutcome | null; guest: SlotOutcome | null } = { member: null, guest: null };
+  // Kit dividido: só existe o kit do(a) filiado(a), que é para os dois.
+  const guestKits = !EDITION.sharedKit;
+  const slots = { member: requested.member, guest: guestKits && requested.guest };
   if (!slots.member && !slots.guest) return outcome;
   const config = await getEventConfig(tx);
   if (config) await lockKitAllocation(tx);
@@ -392,7 +402,8 @@ export async function allocateKitSlots(
     const expected = EXPECTED_STATUSES.includes(current.status) && current.isTeacher;
     const extra = {
       MEMBER: !slots.member && expected && !current.memberSince && !current.memberExtra ? 1 : 0,
-      GUEST: !slots.guest && expected && !current.guestSince && !current.guestExtra && (current.guestName !== null || current.guestKitOut) ? 1 : 0,
+      GUEST:
+        guestKits && !slots.guest && expected && !current.guestSince && !current.guestExtra && (current.guestName !== null || current.guestKitOut) ? 1 : 0,
     };
     const balances = await loadKitBalances(tx, config.stockMode, registrationId, extra);
     // Quem já esperava na fila tem a vez.
@@ -414,7 +425,7 @@ export async function allocateKitSlots(
     const expected = EXPECTED_STATUSES.includes(current.status) && current.isTeacher;
     const balance = await loadExtraBalance(tx, registrationId, {
       MEMBER: !slots.member && expected && current.memberExtra ? 1 : 0,
-      GUEST: !slots.guest && expected && current.guestExtra && (current.guestName !== null || current.guestKitOut) ? 1 : 0,
+      GUEST: guestKits && !slots.guest && expected && current.guestExtra && (current.guestName !== null || current.guestKitOut) ? 1 : 0,
     });
     extraOpen = balance.free;
   }
@@ -511,7 +522,7 @@ export async function moveWalkInsToExtra(tx: Tx, actor: Actor, now = new Date())
         FROM registration r
         JOIN guest_link gl ON gl.registration_id = r.id AND gl.status = 'ACTIVE'
         JOIN person gp ON gp.id = gl.guest_person_id
-       WHERE gl.created_at >= ${closes} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_extra_at IS NULL
+       WHERE ${GUEST_KITS} AND gl.created_at >= ${closes} AND r.status IN ${EXPECTED} AND r.is_teacher AND r.guest_kit_extra_at IS NULL
          AND (r.created_at >= ${closes}
               OR NOT EXISTS (SELECT 1 FROM guest_link old WHERE old.registration_id = r.id AND old.created_at < ${closes}))
          AND NOT EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = r.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL)

@@ -24,7 +24,7 @@ import { type EmployeeRow, listEmployees } from "@/server/services/employees";
 import { getKitCounts, getKitPlan } from "@/server/services/kit-plan";
 import { listKitWaitlist } from "@/server/services/kit-waitlist";
 import { getDashboardStats, getPeopleKitComparison } from "@/server/services/stats";
-import { T } from "@/domain/edition";
+import { EDITION, T } from "@/domain/edition";
 
 /*
  * O conteúdo de cada relatório em PDF: as mesmas contas das telas do painel,
@@ -357,7 +357,8 @@ async function kitsReport(report: ReportPdf, deadline: ReportContext["kitDeadlin
     const found = deliveries.rows.find((row) => row.kind === kind);
     return { kind, delivered: Number(found?.delivered ?? 0), cancelled: Number(found?.cancelled ?? 0) };
   }).filter(
-    (row) => row.delivered || row.cancelled || row.kind === "MEMBER" || row.kind === "GUEST",
+    // Kit dividido: a linha do kit de convidado de inscrito só aparece se algum saiu (antes da mudança).
+    (row) => row.delivered || row.cancelled || row.kind === "MEMBER" || (row.kind === "GUEST" && !EDITION.sharedKit),
   );
   report.table(
     [
@@ -395,6 +396,8 @@ function kitCell(row: RegistrationReportRow, kind: GroupKitType): Cell {
   if (kind === "GUEST" && !row.guest_name && !row.guest_kit) return none;
   if (kind === "MEMBER" ? row.member_kit : row.guest_kit) return chip("Entregue", "success");
   if (row.status === "REJECTED") return none;
+  // Kit dividido: o convidado não tem kit próprio (o do(a) filiado(a) é para os dois).
+  if (kind === "GUEST" && EDITION.sharedKit) return chip("Kit dividido");
   if (kind === "MEMBER" ? row.member_kit_waitlisted_at : row.guest_kit_waitlisted_at) return chip("Fila do kit", "warning");
   if (!ACTIVE.includes(row.status)) return chip("A confirmar");
   return chip("Garantido");
@@ -422,7 +425,8 @@ async function registrationsReport(report: ReportPdf) {
   const teachers = rows.filter((row) => row.is_teacher && row.status !== "REJECTED").length;
   const guests = rows.filter((row) => row.guest_name).length;
   const entered = rows.filter((row) => row.member_in).length + rows.filter((row) => row.guest_in).length;
-  const waitlisted = rows.filter((row) => row.member_kit_waitlisted_at).length + rows.filter((row) => row.guest_kit_waitlisted_at).length;
+  const waitlisted =
+    rows.filter((row) => row.member_kit_waitlisted_at).length + (EDITION.sharedKit ? 0 : rows.filter((row) => row.guest_kit_waitlisted_at).length);
 
   report.stats([
     { label: "Inscrições", value: n(rows.length), hint: `${n(teachers)} de ${T.people}` },

@@ -9,6 +9,7 @@ import { quickRegisterHref } from "@/lib/quick-register";
 import { splitEventName, toSearchText } from "@/lib/text";
 import { authorizationText, nextMonthValue } from "@/domain/affiliation-text";
 import { isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
+import { kitOutlook } from "@/domain/kit-supply";
 import {
   can,
   canHaveGuest,
@@ -207,6 +208,24 @@ describe("Regras de kits e convidado", () => {
     expect(kitAvailability({ ...base, deliveries: { MEMBER: delivery } }, "MEMBER").kind).toBe("DELIVERED");
     // Entrega já feita continua aparecendo mesmo depois do prazo.
     expect(kitAvailability({ ...base, deadlinePassed: true, deliveries: { MEMBER: delivery } }, "MEMBER").kind).toBe("DELIVERED");
+  });
+  it("kit dividido: o convidado não tem kit próprio; o do(a) filiado(a) é para os dois", () => {
+    const shared = { ...base, sharedKit: true };
+    expect(kitAvailability(shared, "GUEST")).toEqual({ kind: "BLOCKED", code: "SHARED_KIT" });
+    expect(kitAvailability({ ...shared, memberCheckedIn: false }, "GUEST")).toEqual({ kind: "BLOCKED", code: "SHARED_KIT" });
+    expect(kitAvailability({ ...shared, waitlisted: { GUEST: true }, deadlinePassed: true }, "GUEST")).toEqual({ kind: "BLOCKED", code: "SHARED_KIT" });
+    expect(kitAvailability(shared, "MEMBER")).toEqual({ kind: "AVAILABLE" });
+    // Sem convidado, nada muda; entrega antiga (de antes da mudança) continua aparecendo.
+    expect(kitAvailability({ ...shared, hasGuest: false }, "GUEST")).toEqual({ kind: "BLOCKED", code: "NO_GUEST" });
+    expect(kitAvailability({ ...shared, deliveries: { GUEST: delivery } }, "GUEST").kind).toBe("DELIVERED");
+    // O formulário: o convidado não entra na fila do kit (só existe o kit de quem se inscreve).
+    const soldOut = { shared: true, member: 0, guest: 0, queue: { member: 2, guest: 0 } };
+    expect(kitOutlook(soldOut, { teacher: true, guest: true }, true)).toEqual({ member: "WAITLIST", guest: null, position: { member: 3, guest: null } });
+    expect(kitOutlook({ ...soldOut, member: 5, guest: 5 }, { teacher: true, guest: true }, true)).toEqual({
+      member: "KIT",
+      guest: null,
+      position: { member: null, guest: null },
+    });
   });
   it("convidado só para professor(a) com filiação não rejeitada", () => {
     expect(canHaveGuest({ status: "PENDING", isTeacher: true })).toBe(true);

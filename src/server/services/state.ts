@@ -14,6 +14,7 @@ import {
   user,
   voucher,
 } from "@/server/db/schema";
+import { EDITION } from "@/domain/edition";
 import type { AffiliationStatus, CheckInInfo, Deliveries, DeliveryInfo, DocumentKind, EmployeeDeliveries, EmployeeCategory } from "@/domain/types";
 import type { RegistrationOrigin } from "@/server/db/schema";
 
@@ -406,8 +407,9 @@ export async function loadRegistrationState(
     guest: guestRow ? { ...guestRow, checkIn: checkIns.get(guestRow.personId) ?? null } : null,
     deliveries,
     memberReceivedGuestKit: Boolean(kitAsGuest),
-    kitWaitlist: { MEMBER: row.memberKitWaitlistedAt, GUEST: row.guestKitWaitlistedAt },
-    kitExtra: { MEMBER: row.memberKitExtraAt, GUEST: row.guestKitExtraAt },
+    // Kit dividido: o convidado não tem kit próprio, então não tem lugar na fila nem kit da gordura.
+    kitWaitlist: { MEMBER: row.memberKitWaitlistedAt, GUEST: EDITION.sharedKit ? null : row.guestKitWaitlistedAt },
+    kitExtra: { MEMBER: row.memberKitExtraAt, GUEST: EDITION.sharedKit ? null : row.guestKitExtraAt },
   };
 }
 

@@ -1,7 +1,8 @@
 import { toSearchText } from "@/lib/text";
 import type { DeskView } from "@/server/services/desk";
 import type { DeskQueueRow } from "../queue-row";
-import { T } from "@/domain/edition";
+import { EDITION, T } from "@/domain/edition";
+import { sharedKitMessage } from "@/domain/labels";
 
 /*
  * Treino da mesa dos kits: cada missão é uma pessoa que chega na mesa. A
@@ -14,6 +15,8 @@ export interface DeskTrainingContext {
   kitDeadline: string | null;
   /** A montagem tem kit próprio para menor de 18. */
   minorKit: boolean;
+  /** Kit dividido (um por inscrição, para os dois); sem valor, o da festa (`Edition.sharedKit`). */
+  sharedKit?: boolean;
 }
 
 /** Quem aparece na busca do treino (a pessoa certa e uma de nome parecido). */
@@ -95,6 +98,8 @@ function queueRow(personId: string, fullName: string, voucherCode: string, at: D
 
 export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
   const deadline = ctx.kitDeadline ? { label: ctx.kitDeadline, passed: false } : null;
+  // Kit dividido: o convidado de filiado(a) não tem kit próprio (nem aparece na fila da mesa).
+  const shared = ctx.sharedKit ?? EDITION.sharedKit;
   const missions: DeskMission[] = [
     {
       id: "basico",
@@ -123,7 +128,7 @@ export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
       queue: [
         { right: false, fresh: true, row: queueRow("t-jpl", "João Paulo Lima", "QW7E-3RTY", today(20, 2)) },
         { right: true, fresh: true, row: queueRow("t-jp", "João Pedro Alves", "JP26-4XKA", today(20, 1)) },
-        { right: false, fresh: false, row: queueRow("t-mc", "Maria Clara Souza", "MC55-8ZPD", today(19, 57), "Paulo Reis") },
+        { right: false, fresh: false, row: queueRow("t-mc", "Maria Clara Souza", "MC55-8ZPD", today(19, 57), shared ? null : "Paulo Reis") },
       ],
       view: view({
         personId: "t-jp",
@@ -186,28 +191,51 @@ export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
       action: { kind: "choose", right: "Mandar para a segurança registrar a entrada", wrong: "Entregar o kit assim mesmo" },
       lesson: "Sem entrada validada, sem kit: a segurança registra a entrada primeiro.",
     },
-    {
-      id: "convidada",
-      title: "Convidada sozinha",
-      arrival: {
-        says: "Sou convidada da Carla Mendes. Ela ainda não chegou, posso pegar o meu?",
-        shows: { kind: "voucher", code: "J2KF-6WPS" },
-        hint: "Júlia",
-      },
-      roster: [{ personId: "t-julia", fullName: "Júlia Mendes", cpf: "Sem CPF", voucherCode: "J2KF-6WPS", entered: true }],
-      view: view({
-        personId: "t-julia",
-        fullName: "Júlia Mendes",
-        cpf: "Sem CPF",
-        voucherCode: "J2KF-6WPS",
-        roleLabel: "Convidado(a) de Carla Mendes",
-        category: "TEACHER_GUEST",
-        entry: { at: today(19, 58), byName: "Carlos (segurança)" },
-        kit: { kind: "READY", kitType: "GUEST", pool: "ALL", extra: false, minor: false },
-      }),
-      action: { kind: "deliver" },
-      lesson: "Convidado pega o próprio kit depois da entrada, sem esperar quem convidou.",
-    },
+    shared
+      ? {
+          id: "kit-dividido",
+          title: "Convidada sozinha",
+          arrival: {
+            says: "Sou convidada da Carla Mendes. Ela ainda não chegou, posso pegar o meu kit?",
+            shows: { kind: "voucher", code: "J2KF-6WPS" },
+            hint: "Júlia",
+          },
+          roster: [{ personId: "t-julia", fullName: "Júlia Mendes", cpf: "Sem CPF", voucherCode: "J2KF-6WPS", entered: true }],
+          view: view({
+            personId: "t-julia",
+            fullName: "Júlia Mendes",
+            cpf: "Sem CPF",
+            voucherCode: "J2KF-6WPS",
+            roleLabel: "Convidado(a) de Carla Mendes",
+            category: "TEACHER_GUEST",
+            entry: { at: today(19, 58), byName: "Carlos (segurança)" },
+            kit: { kind: "BLOCKED", code: "SHARED_KIT", message: `${sharedKitMessage("Carla Mendes")} Ele sai para Carla Mendes.`, leftover: false },
+          }),
+          action: { kind: "choose", right: "Explicar: o kit da Carla é para as duas", wrong: "Entregar um kit para a Júlia" },
+          lesson: "Convidado não tem kit próprio: o kit de quem convidou é para os dois e sai para quem convidou.",
+        }
+      : {
+          id: "convidada",
+          title: "Convidada sozinha",
+          arrival: {
+            says: "Sou convidada da Carla Mendes. Ela ainda não chegou, posso pegar o meu?",
+            shows: { kind: "voucher", code: "J2KF-6WPS" },
+            hint: "Júlia",
+          },
+          roster: [{ personId: "t-julia", fullName: "Júlia Mendes", cpf: "Sem CPF", voucherCode: "J2KF-6WPS", entered: true }],
+          view: view({
+            personId: "t-julia",
+            fullName: "Júlia Mendes",
+            cpf: "Sem CPF",
+            voucherCode: "J2KF-6WPS",
+            roleLabel: "Convidado(a) de Carla Mendes",
+            category: "TEACHER_GUEST",
+            entry: { at: today(19, 58), byName: "Carlos (segurança)" },
+            kit: { kind: "READY", kitType: "GUEST", pool: "ALL", extra: false, minor: false },
+          }),
+          action: { kind: "deliver" },
+          lesson: "Convidado pega o próprio kit depois da entrada, sem esperar quem convidou.",
+        },
   ];
   if (ctx.minorKit) {
     missions.push({
@@ -221,9 +249,10 @@ export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
         cpf: "Sem CPF",
         voucherCode: "T9MN-3BXQ",
         isMinor: true,
-        roleLabel: "Convidado(a) de André Barros",
-        category: "TEACHER_GUEST",
-        kit: { kind: "READY", kitType: "GUEST", pool: "ALL", extra: false, minor: true },
+        // Kit dividido: convidado de filiado(a) não tem kit próprio; o de colaborador(a), sim.
+        roleLabel: shared ? "Convidado(a) de André Barros (colaborador)" : "Convidado(a) de André Barros",
+        category: shared ? "EMPLOYEE_GUEST" : "TEACHER_GUEST",
+        kit: { kind: "READY", kitType: "GUEST", pool: shared ? "EMPLOYEE" : "ALL", extra: false, minor: true },
       }),
       action: { kind: "deliver", crate: { right: "Kit de menor de 18", wrong: "Kit comum" } },
       lesson: "Menor de 18: entregue o kit de menor (o cartão avisa).",

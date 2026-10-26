@@ -4,6 +4,7 @@ import { STOCK_POOL_LABEL } from "@/domain/labels";
 import { plural } from "@/lib/plural";
 import { cn } from "@/lib/utils";
 import type { StockPool } from "@/domain/types";
+import { EDITION } from "@/domain/edition";
 import type { StockOverview, StockPoolView } from "@/server/services/settings";
 import { SegmentMeter } from "./panel-ui";
 
@@ -115,7 +116,9 @@ function Forecast({ total, demand, pool, waiting = 0 }: { total: number; demand:
       title={
         pool === "EMPLOYEE"
           ? "Colaboradores do SINDSERM liberados (diretoria, funcionários e prestadores), os convidados deles e as cortesias com kit."
-          : "1 kit por pessoa com direito a kit, contando quem ainda aguarda conferência ou assinatura."
+          : EDITION.sharedKit
+            ? "1 kit por inscrição (o kit é para os dois), contando quem ainda aguarda conferência ou assinatura."
+            : "1 kit por pessoa com direito a kit, contando quem ainda aguarda conferência ou assinatura."
       }
     >
       {plural(demand, "kit previsto", "kits previstos")} para {total} cadastrados:{" "}

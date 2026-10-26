@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/common/confirm-action-dialog";
 import { Cancel, Check, Clock, Users } from "@/components/icons/pixel";
 import { Button } from "@/components/ui/button";
+import { EDITION } from "@/domain/edition";
 import { plural } from "@/lib/plural";
 import { confirmPendingInBulkAction } from "@/server/actions/operations";
 
@@ -61,7 +62,10 @@ export function BulkConfirmPending({ count, upTo }: { count: number; upTo: strin
         <ul className="grid gap-2.5 text-sm text-fg" data-testid="bulk-confirm-terms">
           <li className="flex items-start gap-2">
             <Users className="mt-0.5 size-4 shrink-0 text-success-text" />
-            <span>As {count} pessoas (e os convidados delas) passam a poder entrar e receber o kit.</span>
+            <span>
+              As {count} pessoas (e os convidados delas) passam a poder entrar e receber o kit
+              {EDITION.sharedKit ? " (um por inscrição, para os dois)" : ""}.
+            </span>
           </li>
           <li className="flex items-start gap-2">
             <Clock className="mt-0.5 size-4 shrink-0 text-fg-muted" />

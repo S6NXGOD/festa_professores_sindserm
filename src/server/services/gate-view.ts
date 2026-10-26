@@ -1,7 +1,8 @@
 import "server-only";
 import type { Executor } from "@/server/db";
+import { EDITION } from "@/domain/edition";
 import { eventStartAt, eventStartLabel, hasEventStarted, isKitDeadlinePassed, kitDeadlineAt } from "@/domain/kit-deadline";
-import { ENTRY_BLOCK_MESSAGE, ENTRY_KIT_MESSAGE, KIT_BLOCK_MESSAGE, KIT_TYPE_LABEL } from "@/domain/labels";
+import { ENTRY_BLOCK_MESSAGE, ENTRY_KIT_MESSAGE, KIT_BLOCK_MESSAGE, KIT_TYPE_LABEL, sharedKitMessage } from "@/domain/labels";
 import {
   can,
   canHaveGuest,
@@ -170,6 +171,8 @@ const BEFORE_ENTRY: readonly KitBlockCode[] = ["MEMBER_NOT_CHECKED_IN", "GUEST_N
 
 function kitView(reg: RegistrationState, kitType: GroupKitType, deadlinePassed: boolean): KitView {
   const view = toKitView(kitAvailability(kitInput(reg, deadlinePassed), kitType));
+  // Kit dividido: o kit do convidado é o de quem convidou.
+  if (view.kind === "BLOCKED" && view.code === "SHARED_KIT") return { ...view, message: `Kit dividido: o de ${reg.member.fullName} é para os dois.` };
   // Depois do horário dos kits guardados, a fila não espera mais: vale o "sai junto com a entrada".
   if (view.kind === "BLOCKED" && reg.kitWaitlist[kitType] && !deadlinePassed && BEFORE_ENTRY.includes(view.code)) {
     return { ...view, message: "Na fila do kit (inscrição depois que os kits acabaram): só sai se vagar kit." };
@@ -308,6 +311,7 @@ function kitOnEntryPreview(
     if (availability.kind === "BLOCKED" && availability.code === "HOST_NOT_CHECKED_IN") {
       return { kind: "WAITING", message: `O kit deste convidado sai quando ${group.member.fullName} chegar.` };
     }
+    if (availability.kind === "BLOCKED" && availability.code === "SHARED_KIT") return { kind: "NONE", message: sharedKitMessage(group.member.fullName) };
     const reason = check("GUEST", input);
     return reason ? { kind: "NONE", message: reason } : willDeliver(1, "1 kit de convidado", KIT_TYPE_LABEL.GUEST, minorCount(state.person));
   }
@@ -326,7 +330,13 @@ function kitOnEntryPreview(
       minorCount(state.person, waitingGuest),
     );
   }
-  if (!ownReason) return willDeliver(1, "1 kit de consumação", KIT_TYPE_LABEL.MEMBER, minorCount(state.person));
+  // Kit dividido: o kit de quem chega é para os dois.
+  const sharedWith = EDITION.sharedKit && group.guest ? firstName(group.guest.fullName) : null;
+  if (!ownReason) {
+    return sharedWith
+      ? willDeliver(1, `1 kit de consumação, para dividir com ${sharedWith}`, `${KIT_TYPE_LABEL.MEMBER}, para dividir com ${sharedWith}`, minorCount(state.person))
+      : willDeliver(1, "1 kit de consumação", KIT_TYPE_LABEL.MEMBER, minorCount(state.person));
+  }
   if (guestOut) {
     return willDeliver(
       1,

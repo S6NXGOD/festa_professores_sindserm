@@ -233,7 +233,7 @@ function KitTile({ view }: { view: DeskView }) {
       </span>
       <div className="min-w-0">
         <p className="pixel text-[0.5rem] text-fg-dim">Kit</p>
-        <p className="display mt-0.5 text-[1.65rem] leading-none text-fg">{waiting ? "Na fila do kit" : "Sem kit agora"}</p>
+        <p className="display mt-0.5 text-[1.65rem] leading-none text-fg">{waiting ? "Na fila do kit" : kit.kind === "BLOCKED" && kit.code === "SHARED_KIT" ? "Sem kit próprio" : "Sem kit agora"}</p>
         {kit.kind === "BLOCKED" ? <p className="mt-1 text-sm leading-snug text-fg-muted">{kit.message}</p> : null}
       </div>
     </div>

@@ -24,7 +24,9 @@ export function KitRules({
       title: "Quem tem kit",
       text: EDITION.askTeacher
         ? `${T.pair.replace(" e ", " ou ")} filiado(a): 1 kit, e mais 1 para o convidado, que sai depois que quem convidou chegar. Filiado(a) que não é ${T.person} entra sem kit.`
-        : `${T.pair.replace(" e ", " ou ")} filiado(a): 1 kit, e mais 1 para o convidado, que sai depois que quem convidou chegar.`,
+        : EDITION.sharedKit
+          ? `${T.pair.replace(" e ", " ou ")} filiado(a): 1 kit por inscrição, para dividir com o convidado (ele não tem kit próprio).`
+          : `${T.pair.replace(" e ", " ou ")} filiado(a): 1 kit, e mais 1 para o convidado, que sai depois que quem convidou chegar.`,
     },
     {
       icon: Building,

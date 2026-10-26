@@ -18,7 +18,7 @@ import { findDraftFormId, loadGroupByAccessToken } from "@/server/queries/vouche
 import { consumeRateLimit, RATE_LIMITS } from "@/server/services/rate-limit";
 import { clientIp } from "@/server/session";
 import { signingPath } from "@/server/signing-link";
-import { GAME, T } from "@/domain/edition";
+import { EDITION, GAME, T } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Meus vouchers", referrer: "no-referrer" };
 
@@ -118,7 +118,8 @@ export default async function GroupVouchersPage({ params, searchParams }: PagePr
           <Reveal delay={0.05} className="mt-6 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning-soft p-4 text-sm text-fg">
             <Warning className="mt-0.5 size-5 shrink-0 text-warning" />
             <p>
-              O SINDSERM vai confirmar a sua filiação. A entrada{group.isTeacher ? " e os kits são liberados" : " é liberada"} depois
+              O SINDSERM vai confirmar a sua filiação. A entrada
+              {group.isTeacher ? (EDITION.sharedKit ? " e o kit são liberados" : " e os kits são liberados") : " é liberada"} depois
               disso.
             </p>
           </Reveal>

@@ -73,6 +73,8 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
   const glowRgb = isEmployee ? metal.rgb : walkIn ? "255,210,63" : RED_RGB;
   // Na faixa do kit, só o primeiro nome: o nome completo já está no voucher de cada pessoa.
   const guestFirst = card.guestName ? firstName(card.guestName) : null;
+  // Kit dividido: um kit por inscrição, para os dois (o convidado de filiado(a) não tem kit próprio).
+  const shared = EDITION.sharedKit;
   const kitLine = isEmployee
     ? card.withoutKit
       ? "Entrada sem kit de consumação"
@@ -81,7 +83,9 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
         : "1 kit de consumação"
     : walkIn
       ? isMember && guestFirst
-        ? `Kits da gordura: o seu e o de ${guestFirst}`
+        ? shared
+          ? `1 kit da gordura, para dividir com ${guestFirst}`
+          : `Kits da gordura: o seu e o de ${guestFirst}`
         : "1 kit da gordura (inscrição na hora)"
       : card.kitWaitlist?.self
       ? `Kit na fila do kit (nº ${card.kitWaitlist.self}): sai se vagar`
@@ -90,10 +94,14 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
           ? card.kitWaitlist?.guest
             ? `Seu kit garantido; o de ${guestFirst ?? "convidado"} na fila (nº ${card.kitWaitlist.guest})`
             : guestFirst
-              ? `2 kits de consumação: o seu e o de ${guestFirst}`
+              ? shared
+                ? `1 kit de consumação, para dividir com ${guestFirst}`
+                : `2 kits de consumação: o seu e o de ${guestFirst}`
               : "1 kit de consumação"
           : "Participação sem kit de consumação"
-        : `1 kit de consumação, depois que ${card.hostName ? firstName(card.hostName) : "quem te convidou"} chegar`;
+        : shared && !card.hostIsEmployee
+          ? `Kit dividido: o de ${card.hostName ? firstName(card.hostName) : "quem te convidou"} é para os dois`
+          : `1 kit de consumação, depois que ${card.hostName ? firstName(card.hostName) : "quem te convidou"} chegar`;
   const tag = isEmployee ? metal.tag : GAME.player[isMember ? 1 : 2];
   const subtitle = isEmployee
     ? card.broughtByName

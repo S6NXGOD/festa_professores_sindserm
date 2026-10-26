@@ -40,7 +40,7 @@ import { stockBalance } from "@/domain/kit-comparison";
 import type { StockMode, StockPool } from "@/domain/types";
 import { can } from "@/domain/rules";
 import { requirePageActor } from "@/server/session";
-import { GAME, T } from "@/domain/edition";
+import { EDITION, GAME, T } from "@/domain/edition";
 
 export const metadata: Metadata = { title: "Placar" };
 
@@ -96,8 +96,16 @@ export default async function DashboardPage() {
   // Kits dos colaboradores (e dos convidados deles), sem as cortesias, que saem do mesmo estoque.
   const employeeKitsDelivered = stats.kitsDeliveredEmployee - stats.kitsDeliveredCourtesy;
   const employeeKitsOwed = Math.max(0, stats.kitsOwedEmployee - stats.kitsOwedCourtesy);
+  // Kit dividido: o convidado de inscrito não tem kit próprio (a parte "conv." só aparece se algum saiu antes da mudança).
   const kitParts = (member: number, guest: number, employee: number, courtesy: number) =>
-    [`${member} ${T.short}`, `${guest} conv.`, employee ? `${employee} colab.` : null, courtesy ? `${courtesy} cort.` : null].filter(Boolean).join(" · ");
+    [
+      `${member} ${T.short}`,
+      !EDITION.sharedKit || guest ? `${guest} conv.` : null,
+      employee ? `${employee} colab.` : null,
+      courtesy ? `${courtesy} cort.` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   // As duas partes do placar: inscrições + organização = todo mundo.
   const registrationBreakdown = [plural(stats.teachers + stats.otherMembers, "inscrito", "inscritos"), plural(stats.guests, "convidado", "convidados")].join(" · ");
   const organizationBreakdown = [

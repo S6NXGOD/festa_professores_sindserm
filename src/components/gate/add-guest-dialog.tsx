@@ -24,7 +24,7 @@ import { type AddGuestData, type AddGuestInput, addGuestSchema } from "@/domain/
 import { callAction } from "@/lib/call-action";
 import { playSound } from "@/lib/sound";
 import { addGuestAction } from "@/server/actions/operations";
-import { GAME } from "@/domain/edition";
+import { EDITION, GAME } from "@/domain/edition";
 
 /** Cadastro (ou troca) do convidado — o Player 2 — de um(a) professor(a) ou de um(a) funcionário(a) do SINDSERM. */
 export function AddGuestDialog({
@@ -129,7 +129,9 @@ export function AddGuestDialog({
           />
           <p className="flex items-start gap-2 rounded-lg border border-red/40 bg-brand-soft p-3 text-sm text-fg">
             <Gift className="mt-0.5 size-4 shrink-0 text-red" />
-            O convidado tem direito ao kit de consumação: sai na recepção depois que {holderName} chegar.
+            {EDITION.sharedKit && host.registrationId
+              ? `O convidado não tem kit próprio: o kit de ${holderName} é para os dois.`
+              : `O convidado tem direito ao kit de consumação: sai na recepção depois que ${holderName} chegar.`}
           </p>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={pending}>

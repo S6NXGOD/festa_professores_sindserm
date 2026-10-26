@@ -89,7 +89,9 @@ export type KitBlockCode =
   /** Cortesia ou convidado(a) de colaborador(a) cadastrado(a) sem kit de consumação. */
   | "WITHOUT_KIT"
   /** Inscrição feita quando os kits já estavam todos com os inscritos: o kit está na fila. */
-  | "KIT_WAITLIST";
+  | "KIT_WAITLIST"
+  /** Festa de kit dividido: o convidado não tem kit próprio, o do(a) filiado(a) é para os dois. */
+  | "SHARED_KIT";
 
 export type KitAvailability =
   | { kind: "DELIVERED"; delivery: DeliveryInfo }
@@ -121,6 +123,8 @@ export interface KitRegistrationInput {
    * sem esperar quem convidou (decisão da organização para a mesa).
    */
   guestIndependent?: boolean;
+  /** Um kit por inscrição, para os dois (ver `Edition.sharedKit`): o convidado não tem kit próprio. */
+  sharedKit?: boolean;
 }
 
 /**
@@ -131,6 +135,7 @@ export interface KitRegistrationInput {
  * Convidado fictício não gera kit. Filiados(as) que não são professoras ou
  * professores não têm direito a kit. Até o horário dos kits guardados, o kit de
  * quem está na fila espera; depois dele, as sobras saem por ordem de chegada.
+ * Na festa de kit dividido, só existe o kit do(a) filiado(a), que é para os dois.
  */
 export function kitAvailability(reg: KitRegistrationInput, kitType: GroupKitType): KitAvailability {
   const delivered = reg.deliveries[kitType];
@@ -142,6 +147,7 @@ export function kitAvailability(reg: KitRegistrationInput, kitType: GroupKitType
     if (!reg.memberCheckedIn) return { kind: "BLOCKED", code: "MEMBER_NOT_CHECKED_IN" };
   } else {
     if (!reg.hasGuest) return { kind: "BLOCKED", code: "NO_GUEST" };
+    if (reg.sharedKit) return { kind: "BLOCKED", code: "SHARED_KIT" };
     // O kit do convidado só sai depois que o(a) professor(a) que convidou chegou (na mesa dos kits, não espera)...
     if (!reg.memberCheckedIn && !reg.guestIndependent) return { kind: "BLOCKED", code: "HOST_NOT_CHECKED_IN" };
     // ...e com o convidado presente (convidado fictício não gera kit).
