@@ -38,6 +38,7 @@ import {
 import { callAction } from "@/lib/call-action";
 import { playSound } from "@/lib/sound";
 import type { EmployeeCategory } from "@/domain/types";
+import { EDITION } from "@/domain/edition";
 import { cn } from "@/lib/utils";
 import { createEmployeeAction, createEmployeesFromListAction, updateEmployeeAction } from "@/server/actions/employees";
 import { CATEGORY_STYLE, CategoryPicker } from "./employee-category";
@@ -178,8 +179,8 @@ function RightsNote() {
     <p className="flex items-start gap-2.5 rounded-xl border border-warning/40 bg-warning-soft p-3 text-sm text-fg">
       <Gift className="mt-0.5 size-4 shrink-0 text-warning" />
       <span>
-        Ganha voucher próprio, <strong>1 kit de consumação</strong> na entrada e pode levar <strong>1 convidado</strong> (com kit, que
-        sai quando o(a) colaborador(a) chegar).
+        Ganha voucher próprio, <strong>1 kit de consumação</strong> na entrada e pode levar <strong>1 convidado</strong>{" "}
+        {EDITION.sharedKit ? "(o kit é para os dois: o convidado não tem kit próprio)." : "(com kit, que sai quando o(a) colaborador(a) chegar)."}
       </span>
     </p>
   );

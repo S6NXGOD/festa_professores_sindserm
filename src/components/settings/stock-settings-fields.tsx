@@ -30,7 +30,7 @@ export function StockFields({
       icon: Users,
       title: "Um estoque só para todos",
       text: EDITION.sharedKit
-        ? `${T.PeopleList} (1 kit por inscrição, para os dois), colaboradores, convidados deles e cortesias tiram do mesmo total.`
+        ? `${T.PeopleList}, colaboradores (1 kit para os dois, com o convidado) e cortesias tiram do mesmo total.`
         : `${T.PeopleList}, convidados, colaboradores e cortesias tiram do mesmo total.`,
       badge: "Mais simples",
     },
@@ -39,7 +39,7 @@ export function StockFields({
       icon: Package,
       title: "Geral + colaboradores",
       text: EDITION.sharedKit
-        ? `Um total para ${T.peopleList} (1 kit por inscrição, para os dois); outro para colaboradores, convidados deles e cortesias.`
+        ? `Um total para ${T.peopleList} (1 kit por inscrição, para os dois); outro para colaboradores (kit para os dois) e cortesias.`
         : `Um total para ${T.peopleList} e convidados; outro para colaboradores e cortesias.`,
     },
     { value: "SPLIT" as const, icon: Sliders, title: "Tudo separado", text: `${T.Person}, convidado e colaboradores, cada um com a sua quantidade.` },
@@ -130,7 +130,7 @@ export function StockFields({
           "Quantidade total de kits (para todos)",
           `${
             EDITION.sharedKit
-              ? `Todos os kits que vocês têm: 1 por inscrição (para os dois) e os de colaboradores, convidados deles e cortesias.`
+              ? `Todos os kits que vocês têm: 1 por inscrição e 1 por colaborador(a) (para os dois, com o convidado) e os das cortesias.`
               : `Todos os kits que vocês têm, para ${T.peopleList}, convidados, colaboradores e cortesias.`
           }${delivered ? ` Já entregues: ${deliveredAll}.` : ""}`,
         )
@@ -149,7 +149,7 @@ export function StockFields({
           "totalEmployee",
           "stock-employee",
           "Kits dos colaboradores (estoque separado)",
-          `Para a diretoria, os funcionários e os prestadores de serviço do SINDSERM e os convidados deles (1 kit cada). Deixe 0 se ninguém da casa for liberado.${
+          `${EDITION.sharedKit ? "Para a diretoria, os funcionários e os prestadores de serviço do SINDSERM (1 kit cada, para dividir com o convidado) e as cortesias." : "Para a diretoria, os funcionários e os prestadores de serviço do SINDSERM e os convidados deles (1 kit cada)."} Deixe 0 se ninguém da casa for liberado.${
             delivered?.employee ? ` Já entregues: ${delivered.employee}.` : ""
           }`,
         )}

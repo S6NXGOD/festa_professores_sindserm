@@ -8,9 +8,9 @@ import type { EmployeeCategory, ParticipantRole } from "./types";
  */
 export type DeskCategory = "TEACHER" | "MEMBER" | "TEACHER_GUEST" | "BOARD" | "STAFF" | "CONTRACTOR" | "EMPLOYEE_GUEST" | "COURTESY";
 
-/** A ordem da legenda da mesa (quem tem kit; no kit dividido, o convidado de inscrito não tem kit próprio). */
+/** A ordem da legenda da mesa (quem tem kit; no kit dividido, convidado não tem kit próprio). */
 export const DESK_CATEGORY_ORDER: readonly DeskCategory[] = EDITION.sharedKit
-  ? ["TEACHER", "BOARD", "STAFF", "CONTRACTOR", "EMPLOYEE_GUEST", "COURTESY"]
+  ? ["TEACHER", "BOARD", "STAFF", "CONTRACTOR", "COURTESY"]
   : ["TEACHER", "TEACHER_GUEST", "BOARD", "STAFF", "CONTRACTOR", "EMPLOYEE_GUEST", "COURTESY"];
 
 export function deskCategoryOf(input: {

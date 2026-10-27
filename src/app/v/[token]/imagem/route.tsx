@@ -79,7 +79,9 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
     ? card.withoutKit
       ? "Entrada sem kit de consumação"
       : guestFirst
-        ? `2 kits de consumação: o seu e o de ${guestFirst}`
+        ? shared
+          ? `1 kit de consumação, para dividir com ${guestFirst}`
+          : `2 kits de consumação: o seu e o de ${guestFirst}`
         : "1 kit de consumação"
     : walkIn
       ? isMember && guestFirst
@@ -99,7 +101,7 @@ export async function GET(_request: Request, context: RouteContext<"/v/[token]/i
                 : `2 kits de consumação: o seu e o de ${guestFirst}`
               : "1 kit de consumação"
           : "Participação sem kit de consumação"
-        : shared && !card.hostIsEmployee
+        : shared
           ? `Kit dividido: o de ${card.hostName ? firstName(card.hostName) : "quem te convidou"} é para os dois`
           : `1 kit de consumação, depois que ${card.hostName ? firstName(card.hostName) : "quem te convidou"} chegar`;
   const tag = isEmployee ? metal.tag : GAME.player[isMember ? 1 : 2];

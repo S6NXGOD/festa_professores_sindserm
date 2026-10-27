@@ -173,12 +173,15 @@ export interface EmployeeKitInput {
   deadlinePassed: boolean;
   /** Mesa dos kits: o convidado não espera quem convidou (ver KitRegistrationInput). */
   guestIndependent?: boolean;
+  /** Kit dividido (ver `Edition.sharedKit`): o convidado não tem kit próprio. */
+  sharedKit?: boolean;
 }
 
 /**
  * Funcionário(a) do SINDSERM: 1 kit próprio, que sai na entrada dele(a), e 1
  * kit para o convidado, só depois que o(a) funcionário(a) chegou — a mesma
  * regra do convidado de professor(a). Os dois saem do estoque dos funcionários.
+ * No kit dividido, só existe o kit do(a) colaborador(a), que é para os dois.
  */
 export function employeeKitAvailability(input: EmployeeKitInput, kitType: EmployeeKitType): KitAvailability {
   const delivered = input.deliveries[kitType];
@@ -189,6 +192,7 @@ export function employeeKitAvailability(input: EmployeeKitInput, kitType: Employ
     if (!input.employeeCheckedIn) return { kind: "BLOCKED", code: "EMPLOYEE_NOT_CHECKED_IN" };
   } else {
     if (!input.hasGuest) return { kind: "BLOCKED", code: "NO_GUEST" };
+    if (input.sharedKit) return { kind: "BLOCKED", code: "SHARED_KIT" };
     if (!input.employeeCheckedIn && !input.guestIndependent) return { kind: "BLOCKED", code: "HOST_NOT_CHECKED_IN" };
     if (!input.guestCheckedIn) return { kind: "BLOCKED", code: "GUEST_NOT_CHECKED_IN" };
   }

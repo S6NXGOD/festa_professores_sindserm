@@ -61,10 +61,10 @@ export const PEOPLE_GROUP_LABEL: Record<PeopleGroupId, string> = {
 
 /**
  * Grupos que não têm direito a kit (a linha mostra "sem kit" no lugar dos números de kit). No
- * kit dividido, os convidados de inscritos também: o kit de quem convidou é para os dois.
+ * kit dividido, os convidados (de inscritos e de colaboradores) também: o kit de quem convidou é para os dois.
  */
 export const GROUPS_WITHOUT_KIT: readonly PeopleGroupId[] = EDITION.sharedKit
-  ? ["TEACHER_GUESTS", "OTHER_MEMBERS", "WITHOUT_KIT"]
+  ? ["TEACHER_GUESTS", "OTHER_MEMBERS", "EMPLOYEE_GUESTS", "WITHOUT_KIT"]
   : ["OTHER_MEMBERS", "WITHOUT_KIT"];
 
 /** A regra de cada grupo, numa linha. */
@@ -85,7 +85,7 @@ export function peopleGroupDetail(row: PeopleGroupRow, comparison: PeopleKitComp
       return parts.length ? parts.join(" · ") : "Diretoria, funcionários e prestadores";
     }
     case "EMPLOYEE_GUESTS":
-      return "1 kit cada";
+      return EDITION.sharedKit ? "Sem kit próprio: dividem o kit de quem convidou" : "1 kit cada";
     case "COURTESIES":
       return "Amigos e familiares da organização, 1 kit cada";
     case "WITHOUT_KIT":

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { EDITION } from "@/domain/edition";
 import Link from "next/link";
 import { ConfirmActionDialog } from "@/components/common/confirm-action-dialog";
 import { Gift, Heart, Info, Login, Pencil, Printer, QrCode, Reload, Trash, Warning } from "@/components/icons/pixel";
@@ -61,7 +62,8 @@ export default async function CourtesiesPage({ searchParams }: PageProps<"/paine
   const withoutKit = active.length - withKit.length;
   // O estoque é o mesmo dos colaboradores: a previsão soma todo mundo que tira kit dele (cortesia sem kit fica fora).
   const collaborators = everyone.filter((row) => row.category !== "COURTESY" && !row.removedAt);
-  const kitsNeeded = collaborators.length + collaborators.filter((row) => row.guest).length + withKit.length;
+  // Kit dividido: o convidado do(a) colaborador(a) não tem kit próprio.
+  const kitsNeeded = collaborators.length + (EDITION.sharedKit ? 0 : collaborators.filter((row) => row.guest).length) + withKit.length;
   const employeePool = employeePoolOf(stock);
   // Estoque único para todos: os kits da casa saem do geral (o aviso de "estoque dos colaboradores menor" não se aplica).
   const sharedStock = stock?.mode === "UNIFIED";
@@ -151,8 +153,8 @@ export default async function CourtesiesPage({ searchParams }: PageProps<"/paine
           <Warning className="mt-0.5 size-4 shrink-0 text-warning" />
           <span>
             {employeePool
-              ? `O estoque dos colaboradores (${employeePool.total}) é menor que os kits previstos: ${plural(withKit.length, "cortesia com kit", "cortesias com kit")} + colaboradores e convidados deles = ${kitsNeeded}.`
-              : `Nenhum kit cadastrado no estoque dos colaboradores: são previstos ${kitsNeeded} (cortesias + colaboradores e convidados deles).`}{" "}
+              ? `O estoque dos colaboradores (${employeePool.total}) é menor que os kits previstos: ${plural(withKit.length, "cortesia com kit", "cortesias com kit")} + ${EDITION.sharedKit ? "colaboradores" : "colaboradores e convidados deles"} = ${kitsNeeded}.`
+              : `Nenhum kit cadastrado no estoque dos colaboradores: são previstos ${kitsNeeded} (cortesias + ${EDITION.sharedKit ? "colaboradores" : "colaboradores e convidados deles"}).`}{" "}
             <Link href="/painel/kits" className="underline underline-offset-4">
               Ajustar em Kits e estoque
             </Link>

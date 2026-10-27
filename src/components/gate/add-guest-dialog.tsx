@@ -129,7 +129,7 @@ export function AddGuestDialog({
           />
           <p className="flex items-start gap-2 rounded-lg border border-red/40 bg-brand-soft p-3 text-sm text-fg">
             <Gift className="mt-0.5 size-4 shrink-0 text-red" />
-            {EDITION.sharedKit && host.registrationId
+            {EDITION.sharedKit
               ? `O convidado não tem kit próprio: o kit de ${holderName} é para os dois.`
               : `O convidado tem direito ao kit de consumação: sai na recepção depois que ${holderName} chegar.`}
           </p>

@@ -249,10 +249,12 @@ export function deskMissions(ctx: DeskTrainingContext): DeskMission[] {
         cpf: "Sem CPF",
         voucherCode: "T9MN-3BXQ",
         isMinor: true,
-        // Kit dividido: convidado de filiado(a) não tem kit próprio; o de colaborador(a), sim.
-        roleLabel: shared ? "Convidado(a) de André Barros (colaborador)" : "Convidado(a) de André Barros",
-        category: shared ? "EMPLOYEE_GUEST" : "TEACHER_GUEST",
-        kit: { kind: "READY", kitType: "GUEST", pool: shared ? "EMPLOYEE" : "ALL", extra: false, minor: true },
+        // Kit dividido: convidado não tem kit próprio; o menor de 18 com kit é uma cortesia.
+        roleLabel: shared ? "Cortesia (convite de André Barros)" : "Convidado(a) de André Barros",
+        category: shared ? "COURTESY" : "TEACHER_GUEST",
+        kit: shared
+          ? { kind: "READY", kitType: "EMPLOYEE", pool: "EMPLOYEE", extra: false, minor: true }
+          : { kind: "READY", kitType: "GUEST", pool: "ALL", extra: false, minor: true },
       }),
       action: { kind: "deliver", crate: { right: "Kit de menor de 18", wrong: "Kit comum" } },
       lesson: "Menor de 18: entregue o kit de menor (o cartão avisa).",

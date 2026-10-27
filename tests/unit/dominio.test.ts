@@ -227,6 +227,13 @@ describe("Regras de kits e convidado", () => {
       position: { member: null, guest: null },
     });
   });
+  it("kit dividido também para o convidado do(a) colaborador(a)", () => {
+    const employee = { active: true, employeeCheckedIn: true, hasGuest: true, guestCheckedIn: true, deliveries: {}, deadlinePassed: false, sharedKit: true };
+    expect(employeeKitAvailability(employee, "GUEST")).toEqual({ kind: "BLOCKED", code: "SHARED_KIT" });
+    expect(employeeKitAvailability(employee, "EMPLOYEE")).toEqual({ kind: "AVAILABLE" });
+    expect(employeeKitAvailability({ ...employee, hasGuest: false }, "GUEST")).toEqual({ kind: "BLOCKED", code: "NO_GUEST" });
+    expect(employeeKitAvailability({ ...employee, sharedKit: false }, "GUEST")).toEqual({ kind: "AVAILABLE" });
+  });
   it("convidado só para professor(a) com filiação não rejeitada", () => {
     expect(canHaveGuest({ status: "PENDING", isTeacher: true })).toBe(true);
     expect(canHaveGuest({ status: "AWAITING_SIGNATURE", isTeacher: true })).toBe(true);

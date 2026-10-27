@@ -70,7 +70,7 @@ export interface DashboardStats {
 
 const EXPECTED_STATUSES = sql`('PENDING', 'AWAITING_SIGNATURE', 'CONFIRMED', 'JOINED_AT_EVENT')`;
 const ACTIVE_STATUSES = sql`('CONFIRMED', 'JOINED_AT_EVENT')`;
-/** Kit dividido (ver `Edition.sharedKit`): o convidado de inscrito conta como pessoa, mas não tem kit próprio. */
+/** Kit dividido (ver `Edition.sharedKit`): convidado (de inscrito ou de colaborador) conta como pessoa, mas não tem kit próprio. */
 const GUEST_KITS = sql.raw(EDITION.sharedKit ? "false" : "true");
 
 export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
@@ -166,7 +166,7 @@ export async function getDashboardStats(ex: Executor): Promise<DashboardStats> {
       (SELECT count(*) FROM guest_link gl JOIN employee e ON e.id = gl.employee_id
         WHERE gl.status = 'ACTIVE' AND e.removed_at IS NULL)::int AS employee_guests,
       (SELECT count(*) FROM employee e
-        WHERE e.removed_at IS NULL
+        WHERE ${GUEST_KITS} AND e.removed_at IS NULL
           AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.employee_id = e.id AND gl.status = 'ACTIVE')
                OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.employee_id = e.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS entitled_employee_guest,
@@ -309,8 +309,9 @@ export async function getPeopleKitComparison(ex: Executor): Promise<PeopleKitCom
 
       (SELECT count(*) FROM employee_guests)::int AS employee_guests,
       (SELECT count(*) FROM active_employees e
-        WHERE EXISTS (SELECT 1 FROM guest_link gl WHERE gl.employee_id = e.id AND gl.status = 'ACTIVE')
-           OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.employee_id = e.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL)
+        WHERE ${GUEST_KITS}
+          AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.employee_id = e.id AND gl.status = 'ACTIVE')
+               OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.employee_id = e.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
       )::int AS employee_guests_with_kit,
       (SELECT count(*) FROM employee_kits WHERE kit_type = 'GUEST')::int AS employee_guests_delivered,
       (SELECT count(*) FROM employee_guests g JOIN active_checkins c ON c.person_id = g.person_id)::int AS employee_guests_present,

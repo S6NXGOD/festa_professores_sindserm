@@ -21,7 +21,7 @@ function poolInfo(pool: StockPool, mode?: StockMode): { name: string; audience: 
       ? {
           name: "Estoque único",
           audience: EDITION.sharedKit
-            ? `Todo mundo: ${T.peopleList} (1 kit por inscrição, para os dois), colaboradores, convidados deles e cortesias`
+            ? `Todo mundo: ${T.peopleList} e colaboradores (1 kit para os dois, com o convidado) e cortesias`
             : `Todo mundo: ${T.peopleList}, convidados, colaboradores e cortesias`,
         }
       : {
@@ -31,7 +31,10 @@ function poolInfo(pool: StockPool, mode?: StockMode): { name: string; audience: 
   }
   if (pool === "MEMBER") return { name: `Estoque de ${T.person}`, audience: T.People };
   if (pool === "GUEST") return { name: "Estoque de convidado", audience: `Convidados ${T.ofPeople}` };
-  return { name: "Estoque dos colaboradores", audience: "Colaboradores do SINDSERM, convidados deles e cortesias" };
+  return {
+    name: "Estoque dos colaboradores",
+    audience: EDITION.sharedKit ? "Colaboradores do SINDSERM (1 kit para os dois, com o convidado) e cortesias" : "Colaboradores do SINDSERM, convidados deles e cortesias",
+  };
 }
 
 /** "550 − 562 = faltam 12", com o nome de cada número embaixo. */
@@ -192,7 +195,7 @@ export function StockMath({
         <strong className="text-fg">Cadastrados</strong>: os kits que vocês têm, contando os que já saíram.{" "}
         <strong className="text-fg">Previstos</strong>:{" "}
         {EDITION.sharedKit
-          ? "1 por inscrição (o kit é para os dois: o convidado não tem kit próprio) e 1 por colaborador(a), convidado dele(a) e cortesia com kit, inclusive quem ainda aguarda conferência."
+          ? "1 por inscrição e 1 por colaborador(a) (o kit é para os dois: convidado não tem kit próprio) e 1 por cortesia com kit, inclusive quem ainda aguarda conferência."
           : "1 por pessoa com direito a kit, inclusive quem ainda aguarda conferência."}
         {waitlist
           ? ` A fila do kit (${plural(waitlist, "kit", "kits")}) fica fora da conta: ganha kit se vagar ou se sobrar na festa.`

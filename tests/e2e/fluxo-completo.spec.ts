@@ -820,39 +820,43 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await expect(cards).toHaveCount(2);
       await expect(cards.first()).toHaveAttribute("data-kind", "employee");
       await expect(admin.getByTestId("voucher-job")).toContainText(`Funcionário(a) do SINDSERM · ${STAFF.job}`);
-      await expect(admin.getByTestId("voucher-employee-kit")).toContainText("2 kits de consumação");
+      await expect(admin.getByTestId("voucher-employee-kit")).toContainText(EDITION.sharedKit ? "1 kit de consumação" : "2 kits de consumação");
       await expect(cards.nth(1)).not.toHaveAttribute("data-kind", "employee");
       await expect(cards.nth(1)).toContainText(`Convidado(a) de ${STAFF.name}`);
       await expect(admin.getByTestId("send-group-vouchers")).toBeVisible();
     });
 
-    await test.step("o convidado chega antes: entra e o kit espera; a funcionária chega e saem 2 kits", async () => {
+    await test.step("o convidado chega antes: entra (sem kit próprio no kit dividido); a funcionária chega e sai o kit", async () => {
       await openPersonAtGate(admin, "Caio Convidado", STAFF.guest);
       await expect(admin.getByTestId("gate-result")).toContainText(`Convidado(a) de ${STAFF.name} (funcionário(a) do SINDSERM)`);
-      await expect(admin.getByTestId("kit-on-entry")).toContainText(`O kit deste convidado sai quando ${STAFF.name} chegar.`);
+      await expect(admin.getByTestId("kit-on-entry")).toContainText(
+        EDITION.sharedKit ? `o kit de ${STAFF.name} é para os dois` : `O kit deste convidado sai quando ${STAFF.name} chegar.`,
+      );
       await admin.getByTestId("confirm-entry").click();
       await confirmEarlyEntry(admin);
-      await expect(admin.getByTestId("entry-kit-result")).toContainText("Kit fica para depois");
+      await expect(admin.getByTestId("entry-kit-result")).toContainText(EDITION.sharedKit ? "Sem kit" : "Kit fica para depois");
 
       await openPersonAtGate(admin, "Rosa Financeiro", STAFF.name);
       await expect(admin.getByTestId("gate-status-title")).toHaveText("LIBERADO PARA ENTRADA");
       await expect(admin.getByTestId("gate-result")).toContainText(`Funcionário(a) do SINDSERM · ${STAFF.job}`);
-      await expect(admin.getByTestId("confirm-entry")).toHaveText(/Confirmar entrada \+ 2 kits/);
+      await expect(admin.getByTestId("confirm-entry")).toHaveText(EDITION.sharedKit ? /Confirmar entrada \+ kit/ : /Confirmar entrada \+ 2 kits/);
       await admin.getByTestId("confirm-entry").click();
       await confirmEarlyEntry(admin);
       await expect(admin.getByTestId("gate-status-title")).toHaveText("ENTRADA CONFIRMADA");
       const banner = admin.getByTestId("entry-kit-result");
-      await expect(banner).toContainText("Entregue 2 kits!");
+      await expect(banner).toContainText(EDITION.sharedKit ? "Entregue 1 kit!" : "Entregue 2 kits!");
       await expect(banner).toContainText("estoque dos colaboradores");
-      await expect(banner).toContainText(`Kit do convidado ${STAFF.guest}, que já entrou`);
+      if (!EDITION.sharedKit) await expect(banner).toContainText(`Kit do convidado ${STAFF.guest}, que já entrou`);
 
       await admin.goto("/painel/colaboradores");
       await expect(admin.getByTestId("stat-employees-present")).toHaveText("1");
-      await expect(admin.getByTestId("stat-employee-stock")).toHaveText("3");
+      // Kit dividido: saiu 1 kit (o da funcionária, para os dois); na outra festa, 2.
+      await expect(admin.getByTestId("stat-employee-stock")).toHaveText(EDITION.sharedKit ? "4" : "3");
     });
 
     await test.step("estoque dos funcionários acabou: entra sem kit; reposto, o kit sai pelo botão", async () => {
-      await setEmployeeStock("2");
+      // O estoque fica do tamanho dos kits que já saíram (1 no kit dividido; 2 na outra festa).
+      await setEmployeeStock(EDITION.sharedKit ? "1" : "2");
       await openPersonAtGate(admin, "Bruno Financeiro", "Bruno Financeiro Costa");
       await expect(admin.getByTestId("confirm-entry")).toHaveText(/^\s*Confirmar entrada\s*$/);
       await admin.getByTestId("confirm-entry").click();
@@ -867,7 +871,7 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await expect(admin.getByText("Entrega registrada.")).toBeVisible();
       await expect(admin.getByTestId("deliver-employee-kit")).toHaveCount(0);
       await admin.goto("/painel/colaboradores");
-      await expect(admin.getByTestId("stat-employee-stock")).toHaveText("3");
+      await expect(admin.getByTestId("stat-employee-stock")).toHaveText(EDITION.sharedKit ? "4" : "3");
     });
 
     await test.step("convidado sem kit da prestadora, cadastrado na hora pela portaria: entra e o estoque não mexe", async () => {
@@ -897,7 +901,7 @@ test.describe.serial(T.partyOf.toLowerCase(), () => {
       await expect(admin.getByTestId("companions-list")).toContainText("Presente");
 
       await admin.goto("/painel/colaboradores");
-      await expect(admin.getByTestId("stat-employee-stock")).toHaveText("3");
+      await expect(admin.getByTestId("stat-employee-stock")).toHaveText(EDITION.sharedKit ? "4" : "3");
       const clara = admin.getByTestId("employee-row").filter({ hasText: "Clara Juridico Dias" });
       await expect(clara.getByTestId("employee-companions")).toContainText("1 sem kit");
       await admin.goto("/painel/cortesias");

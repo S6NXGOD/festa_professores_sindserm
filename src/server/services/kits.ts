@@ -76,6 +76,7 @@ export function employeeKitInput(
     guestCheckedIn: Boolean(group.guest?.checkIn),
     deliveries: group.deliveries,
     deadlinePassed,
+    sharedKit: EDITION.sharedKit,
     ...overrides,
   };
 }

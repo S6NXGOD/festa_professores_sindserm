@@ -157,9 +157,9 @@ async function deliverEmployeeNow(
     return { kind: "NONE", message: kitType === "GUEST" ? ENTRY_KIT_MESSAGE.GUEST_KIT_USED : ENTRY_KIT_MESSAGE.ALREADY };
   }
   if (availability.kind === "BLOCKED") {
-    return availability.code === "HOST_NOT_CHECKED_IN"
-      ? { kind: "WAITING", message: `Sai quando ${group.person.fullName} chegar.` }
-      : { kind: "NONE", message: ENTRY_KIT_MESSAGE[availability.code] };
+    if (availability.code === "HOST_NOT_CHECKED_IN") return { kind: "WAITING", message: `Sai quando ${group.person.fullName} chegar.` };
+    if (availability.code === "SHARED_KIT") return { kind: "NONE", message: sharedKitMessage(group.person.fullName) };
+    return { kind: "NONE", message: ENTRY_KIT_MESSAGE[availability.code] };
   }
   if (!(await hasEmployeeStock(tx))) return { kind: "NONE", message: ENTRY_KIT_MESSAGE.NO_EMPLOYEE_STOCK };
   try {
@@ -199,8 +199,8 @@ async function deliverEmployeeKitsOnEntry(
   }
   const input = employeeKitInput(group, deadlinePassed, { employeeCheckedIn: true });
   const kit = await deliverEmployeeNow(tx, actor, group, "EMPLOYEE", input);
-  // O convidado chegou antes e está esperando: o kit dele sai agora.
-  const guestWaiting = Boolean(group.guest?.checkIn) && !group.deliveries.GUEST;
+  // O convidado chegou antes e está esperando: o kit dele sai agora (no kit dividido, ele não tem kit próprio).
+  const guestWaiting = !EDITION.sharedKit && Boolean(group.guest?.checkIn) && !group.deliveries.GUEST;
   const guestKit = guestWaiting ? await deliverEmployeeNow(tx, actor, group, "GUEST", input) : null;
   return { kit, guestKit };
 }

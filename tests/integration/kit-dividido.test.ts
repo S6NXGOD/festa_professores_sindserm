@@ -2,7 +2,8 @@
  * Kit dividido (festa das servidoras e servidores, decisão da organização em
  * 26/10/2026): um kit por inscrição, para o(a) filiado(a) e o convidado. O
  * convidado não tem kit próprio: não guarda kit no estoque, não entra na fila e
- * não pega kit na portaria nem na mesa. Colaboradores e convidados deles não mudam.
+ * não pega kit na portaria nem na mesa. Desde 27/10, o mesmo vale para o convidado
+ * do(a) colaborador(a): o kit é só de quem se inscreveu, dos colaboradores e das cortesias.
  */
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -134,7 +135,7 @@ describe("kit dividido: um kit por inscrição, para os dois", () => {
     expect((await getPeopleKitComparison(db)).registrations.find((group) => group.id === "TEACHER_GUESTS")).toMatchObject({ people: 1, withKit: 0 });
   });
 
-  it("colaboradores não mudam: o convidado do(a) colaborador(a) continua com o kit dele", async () => {
+  it("colaboradores também: o convidado do(a) colaborador(a) não tem kit próprio; o kit é para os dois", async () => {
     await configureEvent(admin, { totalAll: 10, totalEmployee: 10, lowStockThreshold: 0 });
     const rosa = await createEmployee(admin, {
       fullName: "Rosa Colaboradora Lima",
@@ -147,12 +148,28 @@ describe("kit dividido: um kit por inscrição, para os dois", () => {
     const view = await loadGateView(db, rosa.personId, ROLE_PRESETS.ADMIN);
     const guestPersonId = view?.employee?.guest?.personId;
     expect(guestPersonId).toBeTruthy();
-    await registerCheckIn(security, { personId: guestPersonId!, method: "SEARCH" });
-    // A colaboradora chega: saem o kit dela e o do convidado (que já tinha entrado).
+    // O que se conta: 1 kit para a colaboradora (para os dois); o convidado não entra na conta nem na mesa.
+    expect((await getDashboardStats(db)).kitDemand.employee).toBe(1);
+    expect((await getPeopleKitComparison(db)).house.find((group) => group.id === "EMPLOYEE_GUESTS")).toMatchObject({ people: 1, withKit: 0 });
+    expect((await loadGateView(db, guestPersonId!, ROLE_PRESETS.SECURITY))?.kitOnEntry).toEqual({
+      kind: "NONE",
+      message: sharedKitMessage("Rosa Colaboradora Lima"),
+    });
+    expect(await registerCheckIn(security, { personId: guestPersonId!, method: "SEARCH" })).toMatchObject({
+      kit: { kind: "NONE", message: sharedKitMessage("Rosa Colaboradora Lima") },
+    });
+    // A colaboradora chega: sai 1 kit, para os dois.
+    expect((await loadGateView(db, rosa.personId, ROLE_PRESETS.SECURITY))?.kitOnEntry).toMatchObject({
+      kind: "WILL_DELIVER",
+      count: 1,
+      label: "1 kit de colaborador(a), para dividir com Caio",
+    });
     expect(await registerCheckIn(security, { personId: rosa.personId, method: "SEARCH" })).toMatchObject({
       outcome: "CHECKED_IN",
       kit: { kind: "DELIVERED", kitType: "EMPLOYEE" },
-      guestKit: { kind: "DELIVERED", kitType: "GUEST" },
+      guestKit: null,
     });
+    expect(await db.select({ kitType: kitDelivery.kitType }).from(kitDelivery)).toEqual([{ kitType: "EMPLOYEE" }]);
+    expect((await getDashboardStats(db)).kitsOwedEmployee).toBe(0);
   });
 });

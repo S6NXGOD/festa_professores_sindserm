@@ -387,7 +387,8 @@ function DetailRows({ view }: { view: GateView }) {
           {view.employee.active ? (
             <>
               <span className="block">
-                Seu kit: <KitStatusText kit={view.employee.kits.EMPLOYEE} />
+                {EDITION.sharedKit && view.employee.guest ? `Kit para os dois (com ${view.employee.guest.fullName})` : "Seu kit"}:{" "}
+                <KitStatusText kit={view.employee.kits.EMPLOYEE} />
               </span>
               {view.employee.broughtBy ? (
                 <span className="mt-1 block text-fg-muted">
@@ -401,8 +402,8 @@ function DetailRows({ view }: { view: GateView }) {
                   {view.employee.companions.map((c) => `${c.fullName}${c.checkedIn ? " (já entrou)" : ""}`).join(", ")}.
                 </span>
               ) : null}
-              {/* Cortesia não leva convidado: só o próprio kit. */}
-              {view.employee.category !== "COURTESY" ? (
+              {/* Cortesia não leva convidado: só o próprio kit. Kit dividido: o convidado não tem kit próprio (só aparece se um já saiu). */}
+              {view.employee.category !== "COURTESY" && !(EDITION.sharedKit && view.employee.kits.GUEST.kind !== "DELIVERED") ? (
                 <span className="mt-1 block">
                   Kit do convidado
                   {view.employee.kits.GUEST.kind === "DELIVERED"
@@ -483,11 +484,11 @@ function DetailRows({ view }: { view: GateView }) {
       ) : null}
 
       {isGuest && view.guestKit ? (
-        <InfoRow icon={Gift} label={EDITION.sharedKit && view.host?.kind === "MEMBER" ? "Kit de consumação" : "Kit de consumação do convidado"}>
+        <InfoRow icon={Gift} label={EDITION.sharedKit ? "Kit de consumação" : "Kit de consumação do convidado"}>
           {view.guestKit.delivered && view.guestKit.deliveredAt ? (
             <span className="font-bold text-success-text">Entregue {formatShortDateTime(view.guestKit.deliveredAt)}.</span>
-          ) : EDITION.sharedKit && view.host?.kind === "MEMBER" ? (
-            // Kit dividido: o convidado de filiado(a) não tem kit próprio.
+          ) : EDITION.sharedKit && view.host ? (
+            // Kit dividido: convidado não tem kit próprio (o de quem convidou é para os dois).
             <span className="font-semibold text-fg" data-testid="shared-kit-note">
               Kit dividido: o de <strong>{view.host.fullName}</strong> é para os dois (o convidado não tem kit próprio).
             </span>

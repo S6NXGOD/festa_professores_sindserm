@@ -208,9 +208,9 @@ export function quickQuestions(ctx: TrainingContext): QuickQuestion[] {
         kicker: GAME.ready,
         title: "LIBERADO PARA ENTRADA",
         name: "Theo Barros",
-        // Kit dividido: convidado de filiado(a) não tem kit próprio; o de colaborador(a), sim.
-        role: shared ? "Convidado de André Barros (colaborador do SINDSERM), que já entrou" : "Convidado de André Barros, que já entrou",
-        tags: ["P2", "MINOR"],
+        // Kit dividido: convidado não tem kit próprio; o menor de 18 com kit é uma cortesia.
+        role: shared ? "Cortesia do SINDSERM · Convite: André Barros" : "Convidado de André Barros, que já entrou",
+        tags: shared ? ["MINOR"] : ["P2", "MINOR"],
         kit: { kind: "give", title: "Entregue 1 kit", detail: "Kit de menor de 18" },
       },
       right: "Entregar o kit de menor de 18",

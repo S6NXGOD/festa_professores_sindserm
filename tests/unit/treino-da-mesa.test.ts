@@ -21,9 +21,9 @@ describe("treino da mesa dos kits", () => {
     const alone = missions.find((m) => m.id === "kit-dividido")!;
     expect(alone.view.kit).toMatchObject({ kind: "BLOCKED", code: "SHARED_KIT" });
     expect(alone.action).toEqual({ kind: "choose", right: "Explicar: o kit da Carla é para as duas", wrong: "Entregar um kit para a Júlia" });
-    // Convidado de filiado(a) não aparece na fila da mesa; o menor de 18 é convidado de colaborador(a).
+    // Convidado não aparece na fila da mesa; o menor de 18 com kit é uma cortesia.
     expect(missions.find((m) => m.id === "rapido")!.queue?.every((entry) => entry.row.category !== "TEACHER_GUEST")).toBe(true);
-    expect(missions.find((m) => m.id === "menor")!.view).toMatchObject({ category: "EMPLOYEE_GUEST", kit: { kitType: "GUEST", minor: true } });
+    expect(missions.find((m) => m.id === "menor")!.view).toMatchObject({ category: "COURTESY", kit: { kitType: "EMPLOYEE", minor: true } });
   });
 
   it("a busca do treino acha pelo nome (sem acento), pelo código do voucher e pelo CPF", () => {

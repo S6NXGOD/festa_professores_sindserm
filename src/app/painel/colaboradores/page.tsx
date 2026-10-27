@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { EDITION } from "@/domain/edition";
 import Link from "next/link";
 import { ConfirmActionDialog } from "@/components/common/confirm-action-dialog";
 import { Building, Gift, Login, Pencil, Printer, QrCode, Reload, Trash, Users, Warning } from "@/components/icons/pixel";
@@ -88,7 +89,7 @@ export default async function EmployeesPage({ searchParams }: PageProps<"/painel
       <PageHeader
         eyebrow="Cadastro interno"
         title="Colaboradores do SINDSERM"
-        description={`Diretoria, funcionários e prestadores de serviço liberados para a festa: cada um tem voucher próprio (o passe da casa, com a categoria), 1 kit de consumação e pode levar 1 convidado com kit. Quem mais vier junto entra como convidado sem kit (na tela da pessoa, também na portaria). Os kits saem ${sharedStock ? "do estoque geral (o mesmo de todos)" : "do estoque dos colaboradores"}. Amigos e familiares da organização entram como cortesias.`}
+        description={`Diretoria, funcionários e prestadores de serviço liberados para a festa: cada um tem voucher próprio (o passe da casa, com a categoria), 1 kit de consumação e pode levar 1 convidado${EDITION.sharedKit ? " (o kit é para os dois)" : " com kit"}. Quem mais vier junto entra como convidado sem kit (na tela da pessoa, também na portaria). Os kits saem ${sharedStock ? "do estoque geral (o mesmo de todos)" : "do estoque dos colaboradores"}. Amigos e familiares da organização entram como cortesias.`}
         actions={
           <>
             {canManage ? (

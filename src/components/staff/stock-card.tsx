@@ -65,8 +65,8 @@ export function StockCard({
               <Warning className="size-3.5 animate-blink" />
               {pool.pool === "EMPLOYEE"
                 ? pool.available === 0
-                  ? `Esgotado: ${plural(pool.awaiting ?? 0, "kit", "kits")} ainda por sair (colaboradores, convidados deles e cortesias)`
-                  : `Faltam ${plural(employeeShortfall(pool), "kit", "kits")} para quem ainda vai receber (colaboradores, convidados deles e cortesias)`
+                  ? `Esgotado: ${plural(pool.awaiting ?? 0, "kit", "kits")} ainda por sair (${EDITION.sharedKit ? "colaboradores e cortesias" : "colaboradores, convidados deles e cortesias"})`
+                  : `Faltam ${plural(employeeShortfall(pool), "kit", "kits")} para quem ainda vai receber (${EDITION.sharedKit ? "colaboradores e cortesias" : "colaboradores, convidados deles e cortesias"})`
                 : pool.available === 0
                   ? "Estoque esgotado"
                   : `Estoque baixo (alerta em ${stock.threshold})`}
@@ -115,7 +115,9 @@ function Forecast({ total, demand, pool, waiting = 0 }: { total: number; demand:
       data-testid={`stock-forecast-${pool.toLowerCase()}`}
       title={
         pool === "EMPLOYEE"
-          ? "Colaboradores do SINDSERM liberados (diretoria, funcionários e prestadores), os convidados deles e as cortesias com kit."
+          ? EDITION.sharedKit
+            ? "Colaboradores do SINDSERM liberados (diretoria, funcionários e prestadores; o kit é para os dois, com o convidado) e as cortesias com kit."
+            : "Colaboradores do SINDSERM liberados (diretoria, funcionários e prestadores), os convidados deles e as cortesias com kit."
           : EDITION.sharedKit
             ? "1 kit por inscrição (o kit é para os dois), contando quem ainda aguarda conferência ou assinatura."
             : "1 kit por pessoa com direito a kit, contando quem ainda aguarda conferência ou assinatura."

@@ -170,14 +170,17 @@ const minorCount = (...people: ({ isMinor: boolean } | null)[]) => people.filter
 const BEFORE_ENTRY: readonly KitBlockCode[] = ["MEMBER_NOT_CHECKED_IN", "GUEST_NOT_CHECKED_IN", "HOST_NOT_CHECKED_IN"];
 
 function kitView(reg: RegistrationState, kitType: GroupKitType, deadlinePassed: boolean): KitView {
-  const view = toKitView(kitAvailability(kitInput(reg, deadlinePassed), kitType));
-  // Kit dividido: o kit do convidado é o de quem convidou.
-  if (view.kind === "BLOCKED" && view.code === "SHARED_KIT") return { ...view, message: `Kit dividido: o de ${reg.member.fullName} é para os dois.` };
+  const view = sharedKitView(toKitView(kitAvailability(kitInput(reg, deadlinePassed), kitType)), reg.member.fullName);
   // Depois do horário dos kits guardados, a fila não espera mais: vale o "sai junto com a entrada".
   if (view.kind === "BLOCKED" && reg.kitWaitlist[kitType] && !deadlinePassed && BEFORE_ENTRY.includes(view.code)) {
     return { ...view, message: "Na fila do kit (inscrição depois que os kits acabaram): só sai se vagar kit." };
   }
   return view;
+}
+
+/** Kit dividido: o kit do convidado é o de quem convidou (o recado diz de quem). */
+function sharedKitView(view: KitView, hostName: string): KitView {
+  return view.kind === "BLOCKED" && view.code === "SHARED_KIT" ? { ...view, message: `Kit dividido: o de ${hostName} é para os dois.` } : view;
 }
 
 function toKitView(availability: KitAvailability): KitView {
@@ -237,6 +240,7 @@ function employeeKitPreview(
     if (availability.kind === "BLOCKED" && availability.code === "HOST_NOT_CHECKED_IN") {
       return { kind: "WAITING", message: `O kit deste convidado sai quando ${group.person.fullName} chegar.` };
     }
+    if (availability.kind === "BLOCKED" && availability.code === "SHARED_KIT") return { kind: "NONE", message: sharedKitMessage(group.person.fullName) };
     const reason = check("GUEST", input);
     return reason ? { kind: "NONE", message: reason } : willDeliver(1, "1 kit de convidado", KIT_TYPE_LABEL.GUEST, minorCount(state.person));
   }
@@ -257,10 +261,12 @@ function employeeKitPreview(
   }
   if (!ownReason) {
     const courtesy = group.category === "COURTESY";
+    // Kit dividido: o kit do(a) colaborador(a) é para os dois.
+    const sharedWith = EDITION.sharedKit && !courtesy && group.guest ? firstName(group.guest.fullName) : null;
     return willDeliver(
       1,
-      courtesy ? "1 kit da cortesia" : "1 kit de colaborador(a)",
-      courtesy ? "Kit da cortesia" : KIT_TYPE_LABEL.EMPLOYEE,
+      courtesy ? "1 kit da cortesia" : sharedWith ? `1 kit de colaborador(a), para dividir com ${sharedWith}` : "1 kit de colaborador(a)",
+      courtesy ? "Kit da cortesia" : sharedWith ? `${KIT_TYPE_LABEL.EMPLOYEE}, para dividir com ${sharedWith}` : KIT_TYPE_LABEL.EMPLOYEE,
       minorCount(state.person),
     );
   }
@@ -465,7 +471,7 @@ export function buildGateView(
           guest: staffGroup.guest ? guestView(staffGroup.guest, staffGroup.deliveries.GUEST?.beneficiaryPersonId ?? null) : null,
           kits: {
             EMPLOYEE: toKitView(employeeKitAvailability(employeeKitInput(staffGroup, deadlinePassed), "EMPLOYEE")),
-            GUEST: toKitView(employeeKitAvailability(employeeKitInput(staffGroup, deadlinePassed), "GUEST")),
+            GUEST: sharedKitView(toKitView(employeeKitAvailability(employeeKitInput(staffGroup, deadlinePassed), "GUEST")), staffGroup.person.fullName),
           },
           withKit: staffGroup.withKit,
           broughtBy: staffGroup.broughtBy

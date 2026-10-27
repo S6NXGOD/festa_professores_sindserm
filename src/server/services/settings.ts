@@ -3,6 +3,7 @@ import { eq, ne, sql } from "drizzle-orm";
 import type { Executor } from "@/server/db";
 import { eventConfig, kitDelivery, kitStock } from "@/server/db/schema";
 import type { EventSettingsData, HelpSettingsData, SigningSettingsData, StockSettingsData } from "@/domain/schemas";
+import { EDITION } from "@/domain/edition";
 import { STOCK_MODE_LABEL } from "@/domain/labels";
 import { employeeStockPool, isLowEmployeeStock, isLowExtraStock, isLowStock, poolsForMode } from "@/domain/rules";
 import type { StockMode, StockPool } from "@/domain/types";
@@ -350,7 +351,8 @@ export async function countEmployeesAwaitingKit(ex: Executor): Promise<number> {
          + (SELECT count(*)
               FROM guest_link gl
               JOIN employee e ON e.id = gl.employee_id
-             WHERE gl.status = 'ACTIVE' AND e.removed_at IS NULL
+             -- Kit dividido (Edition.sharedKit): o convidado do(a) colaborador(a) não tem kit próprio.
+             WHERE ${sql.raw(EDITION.sharedKit ? "false" : "true")} AND gl.status = 'ACTIVE' AND e.removed_at IS NULL
                AND NOT EXISTS (SELECT 1 FROM kit_delivery kd
                                 WHERE kd.employee_id = e.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
            AS total

@@ -150,7 +150,12 @@ export function evaluateDeskKit(
       const group = state.guestOfEmployee.host;
       if (group.guest?.personId !== state.person.id) return blocked("NO_KIT");
       const input = employeeKitInput(group, deadlinePassed, { guestCheckedIn: true, guestIndependent });
-      return decide(employeeKitAvailability(input, "GUEST"), "GUEST", employeePool, false, true);
+      const availability = employeeKitAvailability(input, "GUEST");
+      // Kit dividido: o convidado do(a) colaborador(a) também não tem kit próprio.
+      if (availability.kind === "BLOCKED" && availability.code === "SHARED_KIT") {
+        return blocked("SHARED_KIT", `${sharedKitMessage(group.person.fullName)} Ele sai para ${group.person.fullName}.`);
+      }
+      return decide(availability, "GUEST", employeePool, false, true);
     }
     return blocked("NO_KIT", "Sem kit: o vínculo de convidado não está ativo.");
   }

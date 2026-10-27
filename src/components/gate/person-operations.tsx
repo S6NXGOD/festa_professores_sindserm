@@ -126,16 +126,33 @@ export function PersonOperations({ view, personBasePath, onChanged, onEntryUnloc
         {staffGroup.active && p.deliverKits ? (
           <GroupKitsSection
             view={view}
-            intro="Os kits saem sozinhos com as entradas. O do convidado só sai depois que o(a) colaborador(a) chegar: se o convidado chegou antes, o kit dele sai junto com a entrada do(a) colaborador(a)."
+            intro={
+              EDITION.sharedKit
+                ? "O kit sai sozinho com a entrada do(a) colaborador(a). É um kit para os dois: o convidado não tem kit próprio."
+                : "Os kits saem sozinhos com as entradas. O do convidado só sai depois que o(a) colaborador(a) chegar: se o convidado chegou antes, o kit dele sai junto com a entrada do(a) colaborador(a)."
+            }
             cards={[
-              { type: "EMPLOYEE", label: KIT_TYPE_LABEL.EMPLOYEE, detail: `Para ${view.fullName}, na entrada dele(a)`, state: staffGroup.kits.EMPLOYEE },
               {
-                type: "GUEST",
-                label: KIT_TYPE_LABEL.GUEST,
-                detail: guestKitDetail(staffGroup.kits.GUEST, staffGroup.guest),
-                state: staffGroup.kits.GUEST,
-                guestName: staffGroup.guest?.fullName,
+                type: "EMPLOYEE",
+                label: KIT_TYPE_LABEL.EMPLOYEE,
+                detail:
+                  EDITION.sharedKit && staffGroup.guest
+                    ? `Para ${view.fullName} e ${staffGroup.guest.fullName} dividirem, na entrada dele(a)`
+                    : `Para ${view.fullName}, na entrada dele(a)`,
+                state: staffGroup.kits.EMPLOYEE,
               },
+              // Kit dividido: o cartão do kit do convidado só aparece se um já saiu antes da mudança.
+              ...(EDITION.sharedKit && staffGroup.kits.GUEST.kind !== "DELIVERED"
+                ? []
+                : [
+                    {
+                      type: "GUEST" as const,
+                      label: KIT_TYPE_LABEL.GUEST,
+                      detail: guestKitDetail(staffGroup.kits.GUEST, staffGroup.guest),
+                      state: staffGroup.kits.GUEST,
+                      guestName: staffGroup.guest?.fullName,
+                    },
+                  ]),
             ]}
             onChanged={onChanged}
           />
@@ -256,7 +273,13 @@ function EmployeeSection({ view, personBasePath }: { view: GateView; personBaseP
   const listName = courtesy ? "cortesias" : "colaboradores";
   const broughtBy = staffGroup.broughtBy;
   // A regra, não a contagem (os convidados sem kit têm seção própria, com o número).
-  const rights = courtesy ? (staffGroup.withKit ? "1 kit (sem convidado)" : "Sem kit de consumação") : "1 kit + 1 convidado com kit + convidados sem kit";
+  const rights = courtesy
+    ? staffGroup.withKit
+      ? "1 kit (sem convidado)"
+      : "Sem kit de consumação"
+    : EDITION.sharedKit
+      ? "1 kit para os dois (com o convidado) + convidados sem kit"
+      : "1 kit + 1 convidado com kit + convidados sem kit";
   return (
     <Panel
       title={EMPLOYEE_CATEGORY_TITLE[staffGroup.category]}

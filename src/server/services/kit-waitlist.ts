@@ -27,9 +27,9 @@ import { withTx } from "./tx";
 const EXPECTED_STATUSES: readonly string[] = ["PENDING", "AWAITING_SIGNATURE", "CONFIRMED", "JOINED_AT_EVENT"];
 const EXPECTED = sql`('PENDING', 'AWAITING_SIGNATURE', 'CONFIRMED', 'JOINED_AT_EVENT')`;
 /**
- * Kit dividido (ver `Edition.sharedKit`): o convidado de inscrito não tem kit
- * próprio, então não guarda kit, não entra na fila e não pega da gordura. Marcas
- * antigas no banco (de antes da mudança) ficam sem efeito.
+ * Kit dividido (ver `Edition.sharedKit`): convidado (de inscrito ou de
+ * colaborador) não tem kit próprio, então não guarda kit, não entra na fila e não
+ * pega da gordura. Marcas antigas no banco (de antes da mudança) ficam sem efeito.
  */
 const GUEST_KITS = sql.raw(EDITION.sharedKit ? "false" : "true");
 
@@ -93,7 +93,7 @@ async function slotCounts(ex: Executor, excludeRegistrationId: string | null) {
       -- Kits da lista interna (colaboradores com kit, convidados deles e cortesias com kit): no estoque único, tiram do mesmo total.
       ((SELECT count(*) FROM employee WHERE removed_at IS NULL AND with_kit)
        + (SELECT count(*) FROM employee e
-           WHERE e.removed_at IS NULL
+           WHERE ${GUEST_KITS} AND e.removed_at IS NULL
              AND (EXISTS (SELECT 1 FROM guest_link gl WHERE gl.employee_id = e.id AND gl.status = 'ACTIVE')
                   OR EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.employee_id = e.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))))::int
         AS employee_committed

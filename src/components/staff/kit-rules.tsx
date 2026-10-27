@@ -31,7 +31,9 @@ export function KitRules({
     {
       icon: Building,
       title: "Colaboradores e cortesias",
-      text: `Colaborador(a) do SINDSERM: 1 kit e mais 1 para o convidado. Cortesia: com ou sem kit, como foi cadastrada. ${sharedStock ? "Todos tiram do mesmo estoque." : "Os três saem do estoque dos colaboradores."}`,
+      text: `${
+        EDITION.sharedKit ? "Colaborador(a) do SINDSERM: 1 kit, para dividir com o convidado." : "Colaborador(a) do SINDSERM: 1 kit e mais 1 para o convidado."
+      } Cortesia: com ou sem kit, como foi cadastrada. ${sharedStock ? "Todos tiram do mesmo estoque." : EDITION.sharedKit ? "Os dois saem do estoque dos colaboradores." : "Os três saem do estoque dos colaboradores."}`,
     },
     {
       icon: Clock,

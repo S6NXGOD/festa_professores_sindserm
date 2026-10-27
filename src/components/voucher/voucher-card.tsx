@@ -136,8 +136,8 @@ export function VoucherCard({
                 : ""}{" "}
               A entrada está garantida.
             </Note>
-          ) : !isMember && EDITION.sharedKit && !card.hostIsEmployee ? (
-            // Kit dividido: o convidado de filiado(a) não tem kit próprio; o de quem convidou é para os dois.
+          ) : !isMember && EDITION.sharedKit ? (
+            // Kit dividido: convidado não tem kit próprio; o de quem convidou é para os dois.
             <Note tone="red" icon={Gift} testId="voucher-guest-kit">
               <strong className="font-bold">Kit dividido:</strong> o kit de consumação de {card.hostName ? properName(card.hostName) : "quem te convidou"} é
               para vocês dois. Ele sai na entrada de {card.hostName ? properName(card.hostName) : "quem te convidou"}.
@@ -274,6 +274,15 @@ function EmployeePass({
             </Note>
           ) : (
             <Note tone="warning" icon={Gift} testId="voucher-employee-kit">
+              {EDITION.sharedKit && card.guestName ? (
+                <>
+                  <strong className="font-bold">1 kit de consumação</strong> — para você e{" "}
+                  <span data-testid="voucher-guest-name">{properName(card.guestName)}</span> dividirem. Entregue na recepção, junto com a sua
+                  entrada.
+                  {event.kitDeadlineLabel ? ` O kit fica guardado até as ${event.kitDeadlineLabel}.` : ""}
+                </>
+              ) : (
+                <>
               <strong className="font-bold">{card.guestName ? "2 kits de consumação" : "1 kit de consumação"}</strong>
               {card.guestName ? (
                 <>
@@ -286,6 +295,8 @@ function EmployeePass({
                 ? "O seu sai na recepção, junto com a sua entrada; o do convidado, depois que você chegar."
                 : "Entregue na recepção, junto com a sua entrada."}
               {event.kitDeadlineLabel ? ` Seu kit fica guardado até as ${event.kitDeadlineLabel}.` : ""}
+                </>
+              )}
             </Note>
           )}
         </div>

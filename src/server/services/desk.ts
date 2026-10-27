@@ -243,8 +243,8 @@ export interface DeskQueue {
  * A fila da mesa: entrou, tem direito a kit e o kit ainda não saiu. A conferência
  * de verdade é na entrega (mesma regra do resto do sistema); aqui é a lista de quem procurar.
  */
-/** Kit dividido (ver `Edition.sharedKit`): convidado de inscrito não tem kit próprio, então não entra na fila da mesa. */
-const MEMBER_GUEST_KITS = sql.raw(EDITION.sharedKit ? "false" : "true");
+/** Kit dividido (ver `Edition.sharedKit`): convidado (de inscrito ou de colaborador) não tem kit próprio, então não entra na fila da mesa. */
+const GUEST_KITS = sql.raw(EDITION.sharedKit ? "false" : "true");
 
 export async function listDeskQueue(ex: Executor, limit = 40): Promise<DeskQueue> {
   const result = await ex.execute<{
@@ -289,9 +289,9 @@ export async function listDeskQueue(ex: Executor, limit = 40): Promise<DeskQueue
          AND NOT EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.beneficiary_person_id = ci.person_id AND kd.cancelled_at IS NULL)
          AND (
            (ci.role = 'MEMBER' AND r.is_teacher AND r.status IN ('CONFIRMED', 'JOINED_AT_EVENT'))
-           OR (${MEMBER_GUEST_KITS} AND ci.role = 'GUEST' AND hr.id IS NOT NULL AND hr.is_teacher AND hr.status IN ('CONFIRMED', 'JOINED_AT_EVENT')
+           OR (${GUEST_KITS} AND ci.role = 'GUEST' AND hr.id IS NOT NULL AND hr.is_teacher AND hr.status IN ('CONFIRMED', 'JOINED_AT_EVENT')
                AND NOT EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.registration_id = hr.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
-           OR (ci.role = 'GUEST' AND he.id IS NOT NULL AND he.removed_at IS NULL
+           OR (${GUEST_KITS} AND ci.role = 'GUEST' AND he.id IS NOT NULL AND he.removed_at IS NULL
                AND NOT EXISTS (SELECT 1 FROM kit_delivery kd WHERE kd.employee_id = he.id AND kd.kit_type = 'GUEST' AND kd.cancelled_at IS NULL))
            OR (ci.role = 'EMPLOYEE' AND e.id IS NOT NULL AND e.with_kit)
          )

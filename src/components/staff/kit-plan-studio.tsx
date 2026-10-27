@@ -65,7 +65,7 @@ const KIND_SHORT: Record<KitKind, string> = {
   // Kit dividido: o kit da inscrição é para o(a) filiado(a) e o convidado.
   MEMBER: EDITION.sharedKit ? `${T.People} (kit para os dois)` : T.People,
   GUEST: "Convidados delas e deles",
-  EMPLOYEE: "Colaboradores",
+  EMPLOYEE: EDITION.sharedKit ? "Colaboradores (kit para os dois)" : "Colaboradores",
   EMPLOYEE_GUEST: "Convidados dos colaboradores",
   COURTESY: "Cortesias",
 };
@@ -318,8 +318,8 @@ export function KitPlanStudio({
 
 /** Os kits como tíquetes de festa: um para cada kit diferente (e o de menor de 18, se houver). */
 function KitTickets({ plan, counts, hasPrices }: { plan: KitPlan; counts: KitCounts; hasPrices: boolean }) {
-  // Kit dividido: não há kit de convidado de inscrito (o da inscrição é para os dois).
-  const shownKinds = KIT_KINDS.filter((kind) => !(EDITION.sharedKit && kind === "GUEST"));
+  // Kit dividido: não há kit de convidado (o de quem convidou é para os dois).
+  const shownKinds = KIT_KINDS.filter((kind) => !(EDITION.sharedKit && (kind === "GUEST" || kind === "EMPLOYEE_GUEST")));
   const groups = kitGroups(plan)
     .map((group) => ({ ...group, kinds: group.kinds.filter((kind) => shownKinds.includes(kind)) }))
     .filter((group) => group.kinds.length > 0);
@@ -344,7 +344,7 @@ function KitTickets({ plan, counts, hasPrices }: { plan: KitPlan; counts: KitCou
             audience={
               everyone
                 ? EDITION.sharedKit
-                  ? `${T.People} (kit para os dois), colaboradores, convidados deles e cortesias`
+                  ? `${T.People} e colaboradores (kit para os dois) e cortesias`
                   : `${T.People}, convidados, colaboradores e cortesias`
                 : group.kinds.map((kind) => KIND_SHORT[kind]).join(" · ")
             }
@@ -697,8 +697,8 @@ function KitEditor({
           <>
             <Phase n={2} title="Os outros kits são iguais?" hint="Quase sempre, sim. Toque em Diferente só no kit que muda.">
               <div className="grid gap-2">
-                {/* Kit dividido: o convidado de inscrito não tem kit próprio, então não há kit dele para montar. */}
-                {KIT_KINDS.filter((kind) => kind !== "MEMBER" && !(EDITION.sharedKit && kind === "GUEST")).map((kind) => (
+                {/* Kit dividido: convidado (de inscrito ou de colaborador) não tem kit próprio, então não há kit dele para montar. */}
+                {KIT_KINDS.filter((kind) => kind !== "MEMBER" && !(EDITION.sharedKit && (kind === "GUEST" || kind === "EMPLOYEE_GUEST"))).map((kind) => (
                   <KindChoice key={kind} kind={kind} plan={plan} lines={plan.kits[kind]} onLines={(lines) => onChange({ ...plan, kits: { ...plan.kits, [kind]: lines } })} />
                 ))}
               </div>

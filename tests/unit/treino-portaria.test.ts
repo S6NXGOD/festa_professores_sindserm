@@ -54,8 +54,8 @@ describe("treino relâmpago da portaria", () => {
       right: "Confirmar e entregar 1 kit, para os dois",
       wrong: "Entregar 2 kits, um para cada",
     });
-    // Menor de 18 com kit próprio: o convidado de colaborador(a) (o de filiado(a) não tem kit).
-    expect(byId({ ...shared, minorKit: true }, "menor").card.role).toContain("colaborador");
+    // Menor de 18 com kit próprio: uma cortesia (convidado nenhum tem kit).
+    expect(byId({ ...shared, minorKit: true }, "menor").card.role).toContain("Cortesia");
     // Na mesa dos kits, o convidado não vai à mesa.
     const atDesk = quickQuestions({ ...shared, kitsAtDesk: true });
     expect(atDesk.map((question) => question.id)).not.toContain("kit-para-dois");

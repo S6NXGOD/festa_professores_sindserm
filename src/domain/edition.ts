@@ -109,11 +109,11 @@ export interface Edition {
    */
   askTeacher: boolean;
   /**
-   * Um kit por inscrição, dividido com o convidado (decisão da organização para a
-   * festa das servidoras e servidores, 26/10/2026): o kit do(a) filiado(a) é
-   * para os dois e o convidado não tem kit próprio. Sem isso (festa das
-   * professoras e professores), o convidado tem o kit dele. Colaboradores e
-   * convidados deles não mudam.
+   * Kit dividido com o convidado (decisão da organização para a festa das
+   * servidoras e servidores, 26 e 27/10/2026): o kit do(a) filiado(a) e o do(a)
+   * colaborador(a) são para os dois, e convidado nenhum tem kit próprio (o kit é
+   * só de quem se inscreveu, dos colaboradores e das cortesias). Sem isso (festa
+   * das professoras e professores), o convidado tem o kit dele.
    */
   sharedKit: boolean;
   /** Nome da festa enquanto o painel não tem um configurado. */
